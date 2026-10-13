@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>منصة متابعة الحصص عن بُعد</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;600;700&display=swap">
+<style>
+/* Layout: a school operations console — header strip, supervisor switch, day tabs, period timeline beside a live summary rail; a drawer holds the observation form. */
+:root{
+  --bg:#EEF2F1; --surface:#FFFFFF; --surface-2:#F5F8F7; --line:#D5DFDC; --ink:#11302B; --muted:#5B726D;
+  --accent:#0E6B57; --accent-ink:#FFFFFF; --accent-soft:#DCEFE9; --brass:#A87B2D;
+  --ok:#1C8A4E; --ok-soft:#DDF3E5; --warn:#B7791F; --warn-soft:#FBEFD8; --bad:#C2413A; --bad-soft:#FBE1DF; --tech:#6B4FB8; --tech-soft:#ECE6FA; --idle:#8A9A96; --idle-soft:#EAEFEE;
+  --shadow:0 1px 2px rgba(17,48,43,.06),0 6px 18px rgba(17,48,43,.06);
+  --f-display:"Reem Kufi","IBM Plex Sans Arabic",Tahoma,sans-serif;
+  --f-body:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0D1716; --surface:#14211F; --surface-2:#1A2A27; --line:#2A3D39; --ink:#E4EFEC; --muted:#93A9A4;
+  --accent:#3FB596; --accent-ink:#06201A; --accent-soft:#163A32; --brass:#D6A957;
+  --ok:#4CC27F; --ok-soft:#173527; --warn:#E3A945; --warn-soft:#3A2E16; --bad:#EE7B73; --bad-soft:#3F1F1D; --tech:#A994F0; --tech-soft:#2A2343; --idle:#7D918C; --idle-soft:#1E2C29;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1716; --surface:#14211F; --surface-2:#1A2A27; --line:#2A3D39; --ink:#E4EFEC; --muted:#93A9A4;
+  --accent:#3FB596; --accent-ink:#06201A; --accent-soft:#163A32; --brass:#D6A957;
+  --ok:#4CC27F; --ok-soft:#173527; --warn:#E3A945; --warn-soft:#3A2E16; --bad:#EE7B73; --bad-soft:#3F1F1D; --tech:#A994F0; --tech-soft:#2A2343; --idle:#7D918C; --idle-soft:#1E2C29;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;direction:rtl}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:18px 48px;display:grid;gap:18px}
+.num{font-variant-numeric:tabular-nums}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;padding-block:6px 4px;border-bottom:1px solid var(--line);padding-bottom:16px}
+.brand{display:flex;gap:14px;align-items:center;min-width:0}
+.seal{width:48px;height:48px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-family:var(--f-display);font-size:22px;flex:none;box-shadow:inset 0 0 0 3px color-mix(in srgb,var(--accent-ink) 25%,transparent)}
+.brand h1{font-family:var(--f-display);font-weight:600;font-size:clamp(20px,3vw,27px);margin:0;line-height:1.2;text-wrap:balance}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+.clock{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:13.5px;white-space:nowrap}
+.pill b{font-weight:600}
+.live{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 var(--ok);animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 60%,transparent)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){.live{animation:none}}
+.iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:13.5px}
+.iconbtn:hover{border-color:var(--accent)}
+
+/* nav */
+.nav{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.views{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px}
+.views button{border:0;background:transparent;padding:7px 16px;border-radius:999px;font-weight:500;color:var(--muted)}
+.views button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.sups{display:flex;gap:8px;flex-wrap:wrap}
+.sup{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 12px;font-size:14px;min-width:0}
+.sup small{color:var(--muted);font-size:12px}
+.sup .badge{background:var(--surface-2);border-radius:6px;padding:0 7px;font-size:12px;color:var(--muted)}
+.sup[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.sup[aria-pressed="true"] .badge{background:var(--accent);color:var(--accent-ink)}
+
+.days{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.day{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:10px 12px;text-align:right;display:grid;gap:2px;position:relative;min-width:0}
+.day b{font-family:var(--f-display);font-weight:600;font-size:16px}
+.day span{font-size:12px;color:var(--muted)}
+.day .bar{height:4px;border-radius:4px;background:var(--idle-soft);margin-top:6px;overflow:hidden;display:flex}
+.day .bar i{display:block;height:100%}
+.day[aria-pressed="true"]{border-color:var(--accent);box-shadow:var(--shadow)}
+.day .today{position:absolute;top:8px;left:10px;font-size:11px;color:var(--accent);font-weight:600}
+@media (max-width:640px){.days{grid-template-columns:repeat(5,minmax(96px,1fr));overflow-x:auto;padding-bottom:4px}}
+
+/* main grid */
+.main{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
+@media (max-width:960px){.main{grid-template-columns:minmax(0,1fr)}}
+.timeline{display:grid;gap:10px}
+.slot{display:grid;grid-template-columns:92px minmax(0,1fr);gap:12px}
+.slot-time{padding-top:10px;text-align:left;direction:ltr;font-size:13px;color:var(--muted);line-height:1.3}
+.slot-time b{display:block;font-size:15px;color:var(--ink);font-weight:600}
+.slot-time em{font-style:normal;display:block;direction:rtl;text-align:left;font-size:12px;margin-top:2px}
+.slot.now .slot-time b{color:var(--accent)}
+.slot.now .slot-time em{color:var(--accent);font-weight:600}
+.slot-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;border-right:2px solid var(--line);padding-right:12px;min-width:0}
+.slot.now .slot-cards{border-right-color:var(--accent)}
+.break{grid-column:1/-1;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;padding-inline:4px}
+.break::before,.break::after{content:"";flex:1;height:1px;background:var(--line)}
+@media (max-width:560px){.slot{grid-template-columns:minmax(0,1fr);gap:6px}.slot-time{text-align:right;direction:rtl;padding-top:0;display:flex;gap:10px;align-items:baseline}.slot-time b{display:inline}.slot-time em{display:inline;text-align:right}}
+
+.card{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px 14px;text-align:right;display:grid;gap:6px;position:relative;overflow:hidden;min-width:0;transition:border-color .15s,transform .15s}
+.card::before{content:"";position:absolute;inset-block:0;right:0;width:4px;background:var(--st,var(--idle))}
+.card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.cardbox{position:relative;display:grid;min-width:0}
+.cardbox .card{padding-bottom:40px}
+.join{position:absolute;left:12px;bottom:10px;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:4px 11px;border-radius:999px;background:var(--accent);color:var(--accent-ink);text-decoration:none}
+.join:hover{filter:brightness(1.08)}
+.nolink{position:absolute;left:12px;bottom:12px;font-size:12px;color:var(--muted)}
+.linkrow{display:flex;gap:8px}
+.linkrow input{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:9px 10px;direction:ltr;text-align:left;font-size:13px}
+.linkrow a,.linkrow button{white-space:nowrap}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.card .row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card .subj{font-weight:600;font-size:16px}
+.card .teacher{color:var(--muted);font-size:13.5px}
+.tag{font-size:11.5px;padding:2px 8px;border-radius:6px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.tag.track{background:color-mix(in srgb,var(--brass) 16%,transparent);color:var(--brass)}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;padding:3px 9px;border-radius:999px;background:var(--st-soft,var(--idle-soft));color:var(--st,var(--idle));white-space:nowrap}
+.status::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.s-done{--st:var(--ok);--st-soft:var(--ok-soft)} .s-late{--st:var(--warn);--st-soft:var(--warn-soft)} .s-absent{--st:var(--bad);--st-soft:var(--bad-soft)} .s-tech{--st:var(--tech);--st-soft:var(--tech-soft)}
+
+/* rail */
+.rail{display:grid;gap:14px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}
+@media (max-width:960px){.rail{position:static}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px}
+.panel h2{font-family:var(--f-display);font-weight:600;font-size:17px;margin:0}
+.panel h2 small{font-family:var(--f-body);font-weight:400;color:var(--muted);font-size:12.5px;margin-inline-start:6px}
+.ring{display:flex;gap:16px;align-items:center}
+.ring svg{flex:none}
+.ring .big{font-family:var(--f-display);font-size:30px;line-height:1}
+.ring p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lg{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:10px;background:var(--st-soft,var(--idle-soft));font-size:13px}
+.lg b{color:var(--st,var(--idle));font-size:16px}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+.alerts{display:grid;gap:8px;max-height:260px;overflow:auto}
+.alert{display:grid;gap:2px;padding:9px 11px;border-radius:10px;background:var(--st-soft);border:0;text-align:right;font-size:13px}
+.alert b{color:var(--st)}
+.empty{color:var(--muted);font-size:13px;padding:6px 0}
+
+/* report */
+.report{display:grid;gap:18px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:860px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:420px){.kpis{grid-template-columns:minmax(0,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:10px;min-width:0}
+.kpi header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.kpi h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:17px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi .pct{font-family:var(--f-display);font-size:26px;color:var(--accent)}
+.kpi .cls{color:var(--muted);font-size:12.5px;margin-top:-6px}
+.stack{display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--idle-soft)}
+.stack i{display:block;height:100%}
+.kpi dl{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0}
+.kpi dl div{background:var(--surface-2);border-radius:8px;padding:6px 8px}
+.kpi dt{font-size:11.5px;color:var(--muted)}
+.kpi dd{margin:0;font-weight:600}
+.tablebox{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.tablebox header{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+.tablebox h2{margin:0;font-family:var(--f-display);font-weight:600;font-size:17px}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.filters select,.filters input{border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:6px 10px;font-size:13.5px;min-width:0}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:860px;font-size:13.5px}
+th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;color:var(--muted);font-size:12.5px;background:var(--surface-2);position:sticky;top:0}
+td.wrap{white-space:normal;min-width:180px}
+tr.clickable{cursor:pointer}
+tr.clickable:hover td{background:var(--surface-2)}
+.btn{border:0;border-radius:10px;padding:9px 16px;font-weight:600;background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(5,20,17,.45);z-index:20}
+.drawer{position:fixed;top:0;bottom:0;left:0;width:min(440px,100%);background:var(--surface);z-index:21;box-shadow:0 0 40px rgba(0,0,0,.25);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.drawer-head{padding:18px 20px 14px;border-bottom:1px solid var(--line);display:grid;gap:6px}
+.drawer-head .row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.drawer-head h2{margin:0;font-family:var(--f-display);font-weight:600;font-size:22px}
+.drawer-head p{margin:0;color:var(--muted);font-size:13.5px}
+.drawer-body{padding:18px 20px;overflow:auto;display:grid;gap:18px;flex:1;align-content:start}
+.drawer-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.field{display:grid;gap:7px}
+.field>label,.field>.lbl{font-size:13px;font-weight:600;color:var(--muted)}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choice{border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:10px;text-align:right;font-weight:500;display:flex;align-items:center;gap:8px}
+.choice::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--st)}
+.choice[aria-pressed="true"]{border-color:var(--st);background:var(--st-soft)}
+.inputs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.inputs input,.field textarea{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:9px 10px}
+.field textarea{min-height:90px;resize:vertical}
+.toggle{display:flex;gap:8px}
+.toggle button{flex:1;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:8px}
+.toggle button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+.stars{display:flex;gap:6px;direction:ltr;justify-content:flex-end}
+.stars button{border:0;background:transparent;font-size:26px;line-height:1;color:var(--line);padding:2px}
+.stars button.on{color:var(--brass)}
+.who{font-size:12.5px;color:var(--muted)}
+.toast{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;z-index:30;box-shadow:var(--shadow)}
+.banner{background:var(--warn-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);border-radius:10px;padding:10px 14px;font-size:13.5px}
+.names{display:grid;gap:10px}
+.names input{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:9px 10px}
+.foot{color:var(--muted);font-size:12.5px;text-align:center}
+/* gate */
+.gate{position:fixed;inset:0;z-index:40;background:var(--bg);display:grid;place-items:center;padding-inline:16px;padding-block:24px;overflow:auto}
+.gate-card{width:min(440px,100%);background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:26px 24px;display:grid;gap:18px}
+.gate-card .brand{justify-content:center;text-align:center;flex-direction:column;gap:10px}
+.gate-card h2{font-family:var(--f-display);font-weight:600;font-size:18px;margin:0}
+.roles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.role{border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:10px;text-align:right;display:grid;gap:1px;min-width:0}
+.role b{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.role span{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.role.master{grid-column:1/-1;border-style:dashed}
+.role[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);border-style:solid}
+.gate input[type=password],.names input[type=password]{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:16px;direction:ltr;text-align:right}
+.err{color:var(--bad);font-size:13px;margin:0;min-height:1.2em}
+.gate .btn{width:100%;padding:11px}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.rolepill{display:inline-flex;gap:6px;align-items:center}
+.sec{display:grid;gap:10px;padding-top:6px;border-top:1px solid var(--line)}
+.sec h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:16px}
+.views{flex-wrap:wrap;border-radius:16px}
+/* teachers */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:14px 16px}
+.tcard{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 14px;text-align:right;display:grid;gap:8px;min-width:0}
+.tcard:hover{border-color:var(--accent)}
+.tcard[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.tcard .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.tcard b{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tcard .subjs{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tcard .pct{font-family:var(--f-display);color:var(--accent);font-size:18px}
+.tdetail-head{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:flex-start;padding:16px;border-bottom:1px solid var(--line)}
+.tdetail-head h2{margin:0;font-family:var(--f-display);font-weight:600;font-size:22px}
+.tdetail-head p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.tstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;padding:14px 16px}
+.tstat{background:var(--st-soft,var(--surface-2));border-radius:10px;padding:8px 10px;display:grid}
+.tstat span{font-size:12px;color:var(--muted)}
+.tstat b{font-family:var(--f-display);font-size:22px;color:var(--st,var(--ink));font-weight:600}
+/* board */
+.board{display:grid;gap:16px}
+.board-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
+.board-head h2{margin:0;font-family:var(--f-display);font-weight:600;font-size:26px}
+.hero{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media (max-width:860px){.hero{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.htile{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 20px;display:grid;gap:6px;min-width:0}
+.htile span{color:var(--muted);font-size:14px}
+.htile b{font-family:var(--f-display);font-weight:600;font-size:clamp(38px,6vw,64px);line-height:1;color:var(--accent)}
+.htile small{color:var(--muted);font-size:13px}
+.htile .meter{height:8px;border-radius:6px;background:var(--idle-soft);overflow:hidden}
+.htile .meter i{display:block;height:100%;background:var(--accent);border-radius:6px}
+.bstatus{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:760px){.bstatus{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stile{background:var(--st-soft,var(--idle-soft));border-radius:14px;padding:14px 16px;display:grid;gap:2px}
+.stile span{font-size:13.5px}
+.stile b{font-family:var(--f-display);font-size:clamp(28px,4vw,42px);line-height:1.1;color:var(--st,var(--idle));font-weight:600}
+.bgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+@media (max-width:960px){.bgrid{grid-template-columns:minmax(0,1fr)}}
+.bars{display:grid;gap:12px}
+.barrow{display:grid;gap:5px}
+.barrow .row{display:flex;justify-content:space-between;gap:8px;font-size:14px}
+.barrow .row b{font-variant-numeric:tabular-nums}
+.trow{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.trow:last-child{border-bottom:0}
+.trow .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.chip{font-size:12px;padding:1px 8px;border-radius:999px;background:var(--st-soft);color:var(--st);font-variant-numeric:tabular-nums}
+.wa{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.wa label{font-size:13px;font-weight:600;color:var(--muted)}
+.wa input{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 10px;direction:ltr;text-align:left;width:170px;max-width:100%}
+.wabtn{background:#1F9D55;color:#fff;border:0;border-radius:10px;padding:8px 14px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.wabtn[aria-disabled="true"]{opacity:.45;pointer-events:none}
+.tag.wa-ok{background:color-mix(in srgb,#1F9D55 15%,transparent);color:#1F9D55}
+.qnow{display:grid;gap:10px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);text-align:center}
+.qnow b{font-family:var(--f-display);font-size:22px;font-weight:600}
+.qnow .wabtn{justify-content:center;padding:12px 16px;font-size:16px}
+.qlist{display:grid;gap:6px}
+.qrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);font-size:14px}
+.qrow.cur{border-color:#1F9D55}
+.qrow .st{font-size:12px;color:var(--muted)}
+.qrow.sent .st{color:#1F9D55;font-weight:600}
+.rng{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.btngroup{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+.btngroup .btn{padding:6px 12px;font-size:13px}
+.busy{position:fixed;inset:0;z-index:50;background:rgba(5,20,17,.5);display:grid;place-items:center}
+.busy div{background:var(--surface);color:var(--ink);padding:18px 24px;border-radius:14px;box-shadow:var(--shadow);font-weight:600}
+.pdfhost{position:fixed;left:-12000px;top:0;width:794px;background:#fff;z-index:-1}
+.board:fullscreen{background:var(--bg);padding:28px;overflow:auto}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="seal" aria-hidden="true">ص</div>
+      <div>
+        <h1>متابعة الحصص عن بُعد</h1>
+        <p>ثانوية الصحافة الأهلية · الأسبوع من الأحد 1448/4/30هـ إلى الخميس 1448/5/4هـ (11–15 أكتوبر 2026م)</p>
+      </div>
+    </div>
+    <div class="clock">
+      <span class="pill"><span class="live" aria-hidden="true"></span><span id="nowTxt">—</span></span>
+      <span class="pill rolepill" id="rolePill" hidden></span>
+      <button class="iconbtn" id="namesBtn" hidden>الإعدادات وكلمات المرور</button>
+      <button class="iconbtn" id="logoutBtn" hidden>تسجيل الخروج</button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <div class="nav">
+    <div class="views" role="group" aria-label="العرض">
+      <button id="vSchedule" aria-pressed="true">جدول اليوم</button>
+      <button id="vReport" aria-pressed="false">التقرير الأسبوعي</button>
+      <button id="vTeachers" aria-pressed="false">تقارير المعلمين</button>
+      <button id="vBoard" aria-pressed="false">شاشة الأرقام</button>
+    </div>
+    <div class="sups" id="sups" role="group" aria-label="المسؤول"></div>
+  </div>
+
+  <section id="scheduleView" class="timeline-view" style="display:grid;gap:16px">
+    <div class="days" id="days" role="group" aria-label="اليوم"></div>
+    <div class="main">
+      <div class="timeline" id="timeline"></div>
+      <aside class="rail">
+        <div class="panel">
+          <h2 id="sumTitle">ملخص اليوم</h2>
+          <div class="ring" id="ring"></div>
+          <div class="legend" id="legend"></div>
+        </div>
+        <div class="panel">
+          <h2>تحتاج متابعة <small>هذا الأسبوع</small></h2>
+          <div class="alerts" id="alerts"></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="reportView" class="report" hidden>
+    <div class="kpis" id="kpis"></div>
+    <div class="tablebox">
+      <header>
+        <h2>سجل الحصص</h2>
+        <div class="filters">
+          <label class="rng">من <select id="fFrom" aria-label="من يوم"></select></label>
+          <label class="rng">إلى <select id="fTo" aria-label="إلى يوم"></select></label>
+          <select id="fStatus" aria-label="الحالة"></select>
+          <input id="fText" type="search" placeholder="بحث بالمادة أو المعلم" aria-label="بحث">
+          <button class="btn ghost" id="exportBtn" hidden>تصدير CSV</button>
+          <button class="btn ghost dlx" id="wkPrint" hidden>طباعة</button>
+          <button class="btn dlx" id="wkPdf" hidden>تحميل PDF</button>
+        </div>
+      </header>
+      <div class="scroll"><table><thead><tr>
+        <th>اليوم</th><th>الحصة</th><th>الوقت</th><th>الصف / المسار</th><th>المادة</th><th>المعلم</th><th>المسؤول</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>تسجيل</th><th>تقييم</th><th>ملاحظات</th>
+      </tr></thead><tbody id="tbody"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="teachersView" class="report" hidden>
+    <div class="tablebox">
+      <header>
+        <h2>تقارير المعلمين <small class="note" id="tCount"></small></h2>
+        <div class="filters">
+          <input id="tSearch" type="search" placeholder="ابحث باسم المعلم" aria-label="بحث باسم المعلم">
+          <label class="rng">من <select id="tFrom" aria-label="من يوم"></select></label>
+          <label class="rng">إلى <select id="tTo" aria-label="إلى يوم"></select></label>
+          <span class="btngroup dlx" hidden><span>كل المعلمين:</span><button class="btn ghost" id="allPrint">طباعة</button><button class="btn" id="allPdf">PDF</button></span>
+          <button class="wabtn master-only2" id="waAllBtn" hidden>إرسال للجميع بالواتساب</button>
+          <span class="btngroup dlx master-only" hidden><span>التقرير العام:</span><button class="btn ghost" id="genPrint">طباعة</button><button class="btn" id="genPdf">PDF</button></span>
+        </div>
+      </header>
+      <div class="tgrid" id="tGrid"></div>
+    </div>
+    <div class="tablebox" id="tDetail" hidden></div>
+  </section>
+
+  <section id="boardView" class="board" hidden>
+    <div class="board-head">
+      <div><h2>لوحة الأرقام العامة</h2><p class="note" id="bSub"></p></div>
+      <button class="btn ghost" id="fsBtn">ملء الشاشة</button>
+    </div>
+    <div class="hero" id="bHero"></div>
+    <div class="bstatus" id="bStatus"></div>
+    <div class="bgrid">
+      <div class="panel"><h2>الإنجاز حسب المسؤول</h2><div class="bars" id="bSups"></div></div>
+      <div class="panel"><h2>الإنجاز حسب اليوم</h2><div class="bars" id="bDays"></div></div>
+      <div class="panel"><h2>معلمون يحتاجون متابعة</h2><div id="bTeachers"></div></div>
+    </div>
+  </section>
+
+  <p class="foot">يتحدّث الرصد مباشرة لكل المسؤولين · اضغط على أي حصة لتسجيل المتابعة</p>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden role="dialog" aria-modal="true" aria-labelledby="dTitle">
+  <div class="drawer-head">
+    <div class="row"><h2 id="dTitle"></h2><button class="iconbtn" id="dClose" aria-label="إغلاق">إغلاق</button></div>
+    <p id="dSub"></p>
+  </div>
+  <div class="drawer-body">
+    <div class="field"><label for="dLink">رابط الحصة (Zoom)</label><div class="linkrow"><input id="dLink" type="url" inputmode="url" placeholder="https://zoom.us/j/..."><a class="btn" id="dJoin" target="_blank" rel="noopener noreferrer">دخول</a><button class="btn ghost" id="dLinkSave">حفظ الرابط</button></div></div>
+    <div class="field"><span class="lbl">حالة الحصة</span><div class="choices" id="dStatus"></div></div>
+    <div class="inputs">
+      <div class="field"><label for="dEntry">دخول المعلم</label><input id="dEntry" type="time"></div>
+      <div class="field"><label for="dPresent">الحضور</label><input id="dPresent" type="number" min="0" inputmode="numeric"></div>
+      <div class="field"><label for="dAbsent">الغياب</label><input id="dAbsent" type="number" min="0" inputmode="numeric"></div>
+    </div>
+    <div class="field"><span class="lbl">هل سُجّلت الحصة؟</span><div class="toggle" id="dRec"><button data-v="yes" aria-pressed="false">نعم</button><button data-v="no" aria-pressed="false">لا</button></div></div>
+    <div class="field"><span class="lbl">تقييم الحصة</span><div class="stars" id="dStars"></div></div>
+    <div class="field"><label for="dNotes">ملاحظات المتابع</label><textarea id="dNotes" placeholder="مثال: تأخر دخول المعلم 5 دقائق، تفاعل جيد من الطلاب"></textarea></div>
+    <p class="who" id="dWho"></p>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn ghost" id="dClear">مسح الرصد</button>
+    <button class="btn" id="dSave">حفظ المتابعة</button>
+  </div>
+</aside>
+
+<div class="scrim" id="nScrim" hidden></div>
+<aside class="drawer" id="nDrawer" hidden role="dialog" aria-modal="true" aria-labelledby="nTitle">
+  <div class="drawer-head"><div class="row"><h2 id="nTitle">الإعدادات وكلمات المرور</h2><button class="iconbtn" id="nClose">إغلاق</button></div><p>اترك خانة كلمة المرور فارغة للإبقاء على الحالية. تغيير أي كلمة مرور يُخرج صاحبها من المنصة.</p></div>
+  <div class="drawer-body names" id="nFields"></div>
+  <div class="drawer-foot"><p class="err" id="nErr"></p><button class="btn" id="nSave">حفظ الإعدادات</button></div>
+</aside>
+
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <div class="brand"><div class="seal" aria-hidden="true">ص</div><div><h1>متابعة الحصص عن بُعد</h1><p>ثانوية الصحافة الأهلية</p></div></div>
+    <div id="gateMsg" class="hint" style="text-align:center">جارٍ التحميل…</div>
+    <form id="loginForm" hidden style="display:grid;gap:14px">
+      <div class="field"><span class="lbl">الدخول بصفة</span><div class="roles" id="roles"></div></div>
+      <div class="field"><label for="pw">كلمة المرور</label><input id="pw" type="password" autocomplete="current-password" required></div>
+      <p class="err" id="loginErr"></p>
+      <button class="btn" type="submit">دخول</button>
+    </form>
+    <form id="setupForm" hidden style="display:grid;gap:12px">
+      <h2>تهيئة كلمات المرور</h2>
+      <p class="hint">أول دخول: حدّد كلمة المرور الرئيسية (للمدير) وكلمة مرور لكل مسؤول. تقدر تغيّرها لاحقاً من الإعدادات.</p>
+      <div class="names" id="setupFields"></div>
+      <p class="err" id="setupErr"></p>
+      <button class="btn" type="submit">حفظ والدخول كمدير</button>
+    </form>
+  </div>
+</div>
+
+<div class="scrim" id="qScrim" hidden></div>
+<aside class="drawer" id="qDrawer" hidden role="dialog" aria-modal="true" aria-labelledby="qTitle">
+  <div class="drawer-head"><div class="row"><h2 id="qTitle">إرسال التقارير بالواتساب</h2><button class="iconbtn" id="qClose">إغلاق</button></div><p id="qSub"></p></div>
+  <div class="drawer-body">
+    <div class="qnow" id="qNow"></div>
+    <div class="qlist" id="qList"></div>
+  </div>
+  <div class="drawer-foot"><button class="btn ghost" id="qSkip">تخطي</button><span class="note" id="qProg"></span></div>
+</aside>
+<div class="toast" id="toast" hidden></div>
+<div class="busy" id="busy" hidden><div id="busyTxt">جارٍ تجهيز الملف…</div></div>
+<div class="pdfhost" id="pdfhost" aria-hidden="true"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ===== إعدادات Firebase: الصق هنا بيانات مشروعك من Firebase Console ← Project settings ← Your apps ===== */
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBkzpz7hLmQlnL5nODu3dpKZD_if71nOcY",
+  authDomain: "alsahafa-followup.firebaseapp.com",
+  projectId: "alsahafa-followup",
+  storageBucket: "alsahafa-followup.firebasestorage.app",
+  messagingSenderId: "652830562435",
+  appId: "1:652830562435:web:1c1b529b5d6b57c944a3b6"
+};
+</script>
+<script>
+/* طبقة توافق: تربط المنصة بقاعدة Firebase بدل خدمات Claude */
+(function(){
+  window.__STANDALONE=true;
+  var ready=null;
+  function init(){
+    if(ready)return ready;
+    ready=(async function(){
+      var cfg=window.FIREBASE_CONFIG||{};
+      if(!window.firebase||!cfg.apiKey||!cfg.projectId)return null;
+      try{
+        if(!firebase.apps.length)firebase.initializeApp(cfg);
+        var cred=await firebase.auth().signInAnonymously();
+        return {fs:firebase.firestore(),uid:cred.user&&cred.user.uid};
+      }catch(e){console.error(e);return null}
+    })();
+    return ready;
+  }
+  function wrapDoc(s){return{exists:s.exists,id:s.id,data:function(){return s.data()},metadata:{fromCache:false,hasPendingWrites:false}}}
+  function makeDb(fs){
+    return{
+      doc:function(path){var r=fs.doc(path);return{
+        id:r.id,path:path,
+        get:function(){return r.get().then(wrapDoc)},
+        set:function(d){return r.set(d)},
+        update:function(d){return r.update(d)},
+        delete:function(){return r.delete()},
+        onSnapshot:function(next,err){return r.onSnapshot(function(s){next(wrapDoc(s))},function(e){err&&err({code:'unavailable',message:String(e)})})}
+      }},
+      collection:function(path){var r=fs.collection(path);return{
+        path:path,
+        onSnapshot:function(next,err){return r.onSnapshot(function(q){var docs=q.docs.map(wrapDoc);next({docs:docs,size:docs.length,empty:!docs.length,docChanges:function(){return[]},metadata:{fromCache:false,hasPendingWrites:false}})},function(e){err&&err({code:'unavailable',message:String(e)})})},
+        get:function(){return r.get().then(function(q){var docs=q.docs.map(wrapDoc);return{docs:docs,size:docs.length,empty:!docs.length}})}
+      }}
+    }
+  }
+  window.claude={use:async function(name){
+    var ctx=await init();
+    if(name==='db')return ctx?makeDb(ctx.fs):null;
+    if(name==='user')return{id:async function(){return ctx&&ctx.uid},can:async function(){return true},canEdit:async function(){return true},isOwner:async function(){return false},profiles:async function(){return{}}};
+    if(name==='downloads')return{save:async function(req){
+      var blob=req.data instanceof Blob?req.data:new Blob([req.data],{type:/\.html$/i.test(req.filename)?'text/html;charset=utf-8':/\.csv$/i.test(req.filename)?'text/csv;charset=utf-8':'application/octet-stream'});
+      var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=req.filename;document.body.appendChild(a);a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},4000);return{status:'saved'}}};
+    return null;
+  }};
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function(){
+const DAYS=[{n:'الأحد',h:'1448/4/30',g:'2026-10-11',gs:'11 أكتوبر'},{n:'الاثنين',h:'1448/5/1',g:'2026-10-12',gs:'12 أكتوبر'},{n:'الثلاثاء',h:'1448/5/2',g:'2026-10-13',gs:'13 أكتوبر'},{n:'الأربعاء',h:'1448/5/3',g:'2026-10-14',gs:'14 أكتوبر'},{n:'الخميس',h:'1448/5/4',g:'2026-10-15',gs:'15 أكتوبر'}];
+const SLOTS=[['الأولى','6:30','7:10'],['الثانية','7:10','7:50'],['الثالثة','7:50','8:30'],['الرابعة','8:45','9:25'],['الخامسة','9:25','10:05'],['السادسة','10:05','10:45'],['السابعة','10:45','11:25']];
+const CLS={c1:'الأول الثانوي',c2:'الثاني الثانوي',c3:'الثالث الثانوي',cs:'الثالث · الحاسب والهندسة',ba:'الثالث · إدارة الأعمال'};
+const SUPCLS=['الأول الثانوي','الثاني الثانوي','الثالث الثانوي','مسار الحاسب والهندسة + إدارة الأعمال'];
+const ST={done:{t:'تمت في وقتها',c:'s-done'},late:{t:'بدأت متأخرة',c:'s-late'},absent:{t:'لم تُعقد',c:'s-absent'},tech:{t:'مشكلة تقنية',c:'s-tech'}};
+const G={
+c1:["رياضيات|تامر شعيشع;انجليزي|عامر مجممي;أحياء|مجاهد الهجوة;كيمياء|موسى العطو;كفايات|فيصل بشير;تقنية|عبدالتواب خليفة;لفظي|محمود عبود","أحياء|مجاهد الهجوة;كيمياء|موسى العطو;تفكير ناقد|صابر محمد;انجليزي|مولى الطيب;رياضيات|تامر شعيشع;كفايات|فيصل بشير;قرآن|تركي الشقير","كيمياء|موسى العطو;أحياء|مجاهد الهجوة;كمي|تامر شعيشع;انجليزي|عامر مجممي;لفظي|محمود عبود;تفكير ناقد|صابر محمد;كفايات|فيصل بشير","انجليزي|مولى الطيب;كمي|تامر شعيشع;كيمياء|موسى العطو;تفكير ناقد|صابر محمد;أحياء|مجاهد الهجوة;كفايات|فيصل بشير","كيمياء|موسى العطو;رياضيات|محمد الشيمي;انجليزي|عامر مجممي;أحياء|مجاهد الهجوة;كفايات|فيصل بشير;تقنية|عبدالتواب خليفة"],
+c2:["رياضيات|عبدالرحمن جذمي;أحياء|أحمد سمير;كيمياء|إيهاب الشافعي;فيزياء|أحمد حفني;انجليزي|الصادق إبراهيم;كفايات|أحمد عماد;تاريخ|صابر محمد","كمي|حسان طه;كيمياء|إيهاب الشافعي;فيزياء|أحمد حفني;لفظي|محمود عبود;كفايات|أحمد عماد;انجليزي|الصادق إبراهيم;أحياء|وليد الحداد","انجليزي|الصادق إبراهيم;كفايات|أحمد عماد;أحياء|وليد الحداد;كمي|حسان طه;فيزياء|أحمد حفني;كيمياء|إيهاب الشافعي","لفظي|محمود عبود;فيزياء|أحمد حفني;انجليزي|الصادق إبراهيم;رياضيات|عبدالرحمن جذمي;كيمياء|إيهاب الشافعي;تاريخ|صابر محمد","فيزياء|أحمد حفني;انجليزي|الصادق إبراهيم;كفايات|أحمد عماد;كيمياء|إيهاب الشافعي;رياضيات|عبدالرحمن جذمي;أحياء|وليد الحداد"],
+c3:["لفظي|محمود عبود;تحصيلي فيزياء|عبدالحكيم قاسم;رياضيات|حسان طه;كيمياء|محمد الحصري;انجليزي|ماهر أباظة;علم أرض|أحمد حمدي;بحث|عادل المنيعي","تحصيلي أحياء|أحمد حمدي;انجليزي|ماهر أباظة;علم أرض|أحمد سمير;فيزياء|أحمد نجيب;تحصيلي كيمياء|محمد الحصري;بحث|عادل المنيعي;كمي|محمد زيد","انجليزي|ماهر أباظة;تحصيلي رياضيات|محمد زيد;كيمياء|محمد الحصري;تحصيلي أحياء|أحمد حمدي;فيزياء|أحمد نجيب;إدارية|سعد القرني","كيمياء|محمد الحصري;علم أرض|أحمد سمير;رياضيات|محمد الشيمي;انجليزي|ماهر أباظة;تحصيلي فيزياء|عبدالحكيم قاسم;تقنية|محمد الطاووس","فيزياء|عبدالحكيم قاسم;تحصيلي كيمياء|محمد الحصري;انجليزي|ماهر أباظة;رياضيات|محمد الشيمي;علم أرض|أحمد حمدي;تقنية|محمد الطاووس"],
+ba:["مبادئ الإدارة|وليد الحداد;الإحصاء|عبدالتواب خليفة;الفقه|تركي الشقير","اللغة الإنجليزية|مولى الطيب;البحث ومصادر المعلومات|وليد الحداد;إدارة الفعاليات|أحمد حمدي","جغرافيا|فيصل بشير;مبادئ القانون|أحمد سمير;الفقه|تركي الشقير","دراسات أدبية|صابر محمد;تخطيط الحملات التسويقية|مجاهد الهجوة;مبادئ الإدارة|وليد الحداد","مبادئ القانون|أحمد سمير;اللغة الإنجليزية|مولى الطيب;الإحصاء|عبدالتواب خليفة"]};
+const CS=[[1,0,'التصميم الهندسي','محمد الطاووس'],[2,5,'الذكاء الاصطناعي','محمد الطاووس'],[3,5,'الأمن السيبراني','عبدالتواب خليفة'],[4,5,'الدراسات الأدبية','أحمد عماد']];
+const S=[];
+[['c1',0],['c2',1],['c3',2]].forEach(([k,sup])=>G[k].forEach((d,di)=>d.split(';').forEach((x,pi)=>{const[a,b]=x.split('|');S.push({id:`${k}-d${di}-p${pi}`,sup,day:di,slot:pi,label:SLOTS[pi][0],cls:k,subj:a,teacher:b})})));
+G.ba.forEach((d,di)=>d.split(';').forEach((x,pi)=>{const[a,b]=x.split('|');S.push({id:`ba-d${di}-p${pi}`,sup:3,day:di,slot:pi+1,label:SLOTS[pi][0]+' (المسار)',cls:'ba',subj:a,teacher:b})}));
+CS.forEach(([di,pi,a,b])=>S.push({id:`cs-d${di}-p${pi}`,sup:3,day:di,slot:pi,label:SLOTS[pi][0],cls:'cs',subj:a,teacher:b}));
+S.sort((x,y)=>x.day-y.day||x.slot-y.slot||x.sup-y.sup);
+const byId=Object.fromEntries(S.map(s=>[s.id,s]));
+
+const state={phones:{},from:0,to:4,view:'schedule',sup:-1,day:2,logs:{},links:{},names:['المسؤول 1','المسؤول 2','المسؤول 3','المسؤول 4'],db:null,user:null,canWrite:true,uid:null,profiles:{},open:null,draft:null};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toMin=t=>{const[h,m]=t.split(':').map(Number);return h*60+m};
+
+// Riyadh clock
+function riyadh(){const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date());const o={};p.forEach(x=>o[x.type]=x.value);return{date:`${o.year}-${o.month}-${o.day}`,min:(+o.hour%24)*60+ +o.minute,hm:`${o.hour%24}:${o.minute}`}}
+function todayIdx(){const r=riyadh();return DAYS.findIndex(d=>d.g===r.date)}
+function nowSlot(){const r=riyadh();if(todayIdx()<0)return -1;return SLOTS.findIndex(s=>r.min>=toMin(s[1])&&r.min<toMin(s[2]))}
+function tickClock(){const r=riyadh(),ti=todayIdx(),ns=nowSlot();let t;
+  if(ti<0)t=`خارج أسبوع الجدول · ${r.hm} بتوقيت الرياض`;
+  else if(ns>=0)t=`${DAYS[ti].n} · الحصة <b>${SLOTS[ns][0]}</b> جارية الآن`;
+  else if(r.min<toMin('6:30'))t=`${DAYS[ti].n} · تبدأ الحصص 6:30`;
+  else if(r.min>=toMin('8:30')&&r.min<toMin('8:45'))t=`${DAYS[ti].n} · الفسحة حتى 8:45`;
+  else t=`${DAYS[ti].n} · انتهى اليوم الدراسي`;
+  $('nowTxt').innerHTML=t;}
+{const ti=todayIdx();if(ti>=0)state.day=ti;}
+
+const inRange=s=>s.day>=state.from&&s.day<=state.to;
+const rangeText=()=>state.from===0&&state.to===4?'الأسبوع: من الأحد 1448/4/30هـ (2026/10/11م) إلى الخميس 1448/5/4هـ (2026/10/15م)':state.from===state.to?`يوم ${DAYS[state.from].n} ${DAYS[state.from].h}هـ (${DAYS[state.from].g.replace(/-/g,'/')}م)`:`الفترة: من ${DAYS[state.from].n} ${DAYS[state.from].h}هـ إلى ${DAYS[state.to].n} ${DAYS[state.to].h}هـ`;
+const effSup=()=>state.role!=null&&state.role>=0?state.role:state.sup;
+const scope=()=>{const k=effSup();return S.filter(s=>k<0||s.sup===k)};
+function counts(list){const c={total:list.length,done:0,late:0,absent:0,tech:0,pending:0,rating:[],present:0};list.forEach(s=>{const l=state.logs[s.id];if(l&&ST[l.status]){c[l.status]++;if(l.rating)c.rating.push(l.rating)}else c.pending++});c.logged=c.total-c.pending;c.held=c.done+c.late;return c}
+const pct=(a,b)=>b?Math.round(a*100/b):0;
+
+function renderSups(){const el=$('sups');
+  if(state.role!=null&&state.role>=0){const i=state.role;el.innerHTML=`<span class="sup" aria-pressed="true"><span>${esc(state.names[i])}</span><small>${SUPCLS[i]}</small><span class="badge num">${S.filter(s=>s.sup===i).length}</span></span>`;return}
+  const all=[{i:-1,n:'كل المسؤولين',c:S.length}].concat(state.names.map((n,i)=>({i,n,c:S.filter(s=>s.sup===i).length})));
+  el.innerHTML=all.map(x=>`<button class="sup" aria-pressed="${state.sup===x.i}" data-sup="${x.i}"><span>${esc(x.n)}</span><span class="badge num">${x.c}</span></button>`).join('');}
+function renderDays(){const ti=todayIdx();$('days').innerHTML=DAYS.map((d,i)=>{const l=scope().filter(s=>s.day===i),c=counts(l);const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');
+  return `<button class="day" aria-pressed="${state.day===i}" data-day="${i}">${i===ti?'<span class="today">اليوم</span>':''}<b>${d.n}</b><span class="num">${d.h}هـ · ${d.gs}</span><span class="num">${c.logged} / ${c.total} مرصودة</span><span class="bar">${seg}</span></button>`}).join('');}
+function cardHTML(s){const l=state.logs[s.id];const st=l&&ST[l.status];const meta=[];if(l){if(l.entry)meta.push('دخول '+esc(l.entry));if(l.present!=null&&l.present!=='')meta.push('حضور '+esc(l.present));if(l.rating)meta.push('★'.repeat(l.rating))}
+  return `<div class="cardbox"><button class="card ${st?st.c:''}" data-open="${s.id}"><div class="row"><span class="subj">${esc(s.subj)}</span><span class="status">${st?st.t:'لم تُرصد'}</span></div><div class="teacher">${esc(s.teacher)}</div><div class="row"><span class="tag ${s.cls==='ba'||s.cls==='cs'?'track':''}">${CLS[s.cls]}</span>${effSup()<0?`<span class="tag">${esc(state.names[s.sup])}</span>`:''}</div>${meta.length?`<div class="meta num">${meta.join(' · ')}</div>`:''}</button>${linkHTML(s)}</div>`}
+function safeUrl(u){u=String(u||'').trim();return /^https:\/\//i.test(u)?u:''}
+function linkHTML(s){const u=safeUrl(state.links[s.id]);return u?`<a class="join" href="${esc(u)}" target="_blank" rel="noopener noreferrer">دخول الحصة ↗</a>`:`<span class="nolink">لا يوجد رابط</span>`}
+function renderTimeline(){const list=scope().filter(s=>s.day===state.day);const ns=state.day===todayIdx()?nowSlot():-1;let h='';
+  SLOTS.forEach((sl,i)=>{if(i===3)h+=`<div class="break">الفسحة · 8:30 – 8:45</div>`;const items=list.filter(s=>s.slot===i);if(!items.length)return;
+    h+=`<div class="slot ${i===ns?'now':''}"><div class="slot-time"><b class="num">${sl[1]}</b><span class="num">${sl[2]}</span><em>${i===ns?'الآن':'الحصة '+sl[0]}</em></div><div class="slot-cards">${items.map(cardHTML).join('')}</div></div>`});
+  $('timeline').innerHTML=h||'<p class="empty">لا توجد حصص لهذا المسؤول في هذا اليوم.</p>';}
+function ringSVG(c){const R=34,C=2*Math.PI*R;let off=0;const segs=['done','late','absent','tech'].map(k=>{if(!c[k])return'';const len=C*c[k]/c.total;const s=`<circle cx="42" cy="42" r="${R}" fill="none" stroke="var(--st)" class="s-${k}" stroke-width="10" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 42 42)"/>`;off+=len;return s}).join('');
+  return `<svg width="84" height="84" viewBox="0 0 84 84" aria-hidden="true"><circle cx="42" cy="42" r="${R}" fill="none" stroke="var(--idle-soft)" stroke-width="10"/>${segs}</svg>`}
+function renderRail(){const list=scope().filter(s=>s.day===state.day),c=counts(list);
+  $('sumTitle').innerHTML=`ملخص ${DAYS[state.day].n} <small>${effSup()<0?'كل المسؤولين':esc(state.names[effSup()])}</small>`;
+  $('ring').innerHTML=ringSVG(c)+`<div><div class="big num">${pct(c.logged,c.total)}%</div><p class="num">رُصدت ${c.logged} من ${c.total} حصة</p><p class="num">انعقاد ${c.logged?pct(c.held,c.logged):0}% من المرصود</p></div>`;
+  $('legend').innerHTML=[['done'],['late'],['absent'],['tech']].map(([k])=>`<div class="lg s-${k}"><span>${ST[k].t}</span><b class="num">${c[k]}</b></div>`).join('')+`<div class="lg" style="grid-column:1/-1"><span>لم تُرصد بعد</span><b class="num">${c.pending}</b></div>`;
+  const issues=scope().filter(s=>{const l=state.logs[s.id];return l&&(l.status==='absent'||l.status==='tech'||l.status==='late')});
+  $('alerts').innerHTML=issues.length?issues.map(s=>{const l=state.logs[s.id],st=ST[l.status];return `<button class="alert ${st.c}" data-open="${s.id}"><b>${st.t}</b><span>${esc(s.subj)} · ${esc(s.teacher)}</span><span class="note">${DAYS[s.day].n} · ${s.label} · ${CLS[s.cls]}${l.notes?' — '+esc(l.notes):''}</span></button>`}).join(''):'<p class="empty">لا توجد حصص متعثرة حتى الآن.</p>';}
+function renderReport(){
+  $('kpis').innerHTML=state.names.map((n,i)=>{if(effSup()>=0&&i!==effSup())return'';const c=counts(S.filter(s=>s.sup===i&&inRange(s)));const avg=c.rating.length?(c.rating.reduce((a,b)=>a+b,0)/c.rating.length).toFixed(1):'—';
+    const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');
+    return `<article class="kpi"><header><h3>${esc(n)}</h3><span class="pct num">${pct(c.logged,c.total)}%</span></header><div class="cls">${SUPCLS[i]} · ${c.total} حصة</div><div class="stack">${seg}</div><dl><div><dt>تمت</dt><dd class="num">${c.done}</dd></div><div><dt>متأخرة</dt><dd class="num">${c.late}</dd></div><div><dt>لم تُعقد</dt><dd class="num">${c.absent}</dd></div><div><dt>تقنية</dt><dd class="num">${c.tech}</dd></div><div><dt>متبقية</dt><dd class="num">${c.pending}</dd></div><div><dt>متوسط التقييم</dt><dd class="num">${avg}</dd></div></dl></article>`}).join('');
+  const fs=$('fStatus').value,ft=$('fText').value.trim();
+  const rows=scope().filter(s=>{const l=state.logs[s.id];if(!inRange(s))return false;if(fs==='pending'&&l&&ST[l.status])return false;if(fs&&fs!=='pending'&&(!l||l.status!==fs))return false;if(ft&&!(s.subj+s.teacher+CLS[s.cls]).includes(ft))return false;return true});
+  state.reportRows=rows;
+  $('tbody').innerHTML=rows.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr class="clickable" data-open="${s.id}"><td>${DAYS[s.day].n}</td><td>${s.label}</td><td class="num">${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td>${esc(s.teacher)}</td><td>${esc(state.names[s.sup])}</td><td><span class="status ${st?st.c:''}">${st?st.t:'لم تُرصد'}</span></td><td class="num">${esc(l.entry||'')}</td><td class="num">${esc(l.present??'')}</td><td class="num">${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${l.rating?'★'.repeat(l.rating):''}</td><td class="wrap">${esc(l.notes||'')}</td></tr>`}).join('')||'<tr><td colspan="14" class="empty">لا توجد نتائج.</td></tr>';}
+// ---------- teachers ----------
+const avgOf=a=>a.length?(a.reduce((x,y)=>x+y,0)/a.length):null;
+function tStats(list){const c=counts(list);let pr=0,ab=0,rec=0,recN=0,ent=[];list.forEach(s=>{const l=state.logs[s.id];if(!l||!ST[l.status])return;if(typeof l.present==='number')pr+=l.present;if(typeof l.absent==='number')ab+=l.absent;if(l.recorded){recN++;if(l.recorded==='yes')rec++}});
+  c.avg=avgOf(c.rating);c.present=pr;c.absentSt=ab;c.att=pr+ab?Math.round(pr*100/(pr+ab)):null;c.rec=recN?Math.round(rec*100/recN):null;return c}
+function teachersIn(list){const m=new Map();list.forEach(s=>{if(!m.has(s.teacher))m.set(s.teacher,[]);m.get(s.teacher).push(s)});return [...m.entries()].map(([name,ss])=>({name,ss})).sort((a,b)=>a.name.localeCompare(b.name,'ar'))}
+function subjOf(ss){return [...new Set(ss.map(s=>s.subj))].join('، ')}
+function clsOf(ss){return [...new Set(ss.map(s=>CLS[s.cls]))].join('، ')}
+const fmtAvg=v=>v==null?'—':v.toFixed(1);
+function normPhone(v){let d=String(v||'').replace(/[^\d]/g,'');if(d.startsWith('00'))d=d.slice(2);if(d.startsWith('05')&&d.length===10)d='966'+d.slice(1);else if(d.startsWith('5')&&d.length===9)d='966'+d;return d.length>=10&&d.length<=15?d:''}
+function waText(t){const c=tStats(t.ss);const L=[];
+  L.push(`السلام عليكم ورحمة الله، أ. ${t.name}`);L.push('تقرير متابعة الحصص عن بُعد – ثانوية الصحافة الأهلية');L.push(rangeText());L.push('');
+  L.push(`عدد الحصص: ${c.total}`);L.push(`تمت في وقتها: ${c.done} | بدأت متأخرة: ${c.late}`);L.push(`لم تُعقد: ${c.absent} | مشكلة تقنية: ${c.tech}`);
+  if(c.pending)L.push(`لم تُرصد بعد: ${c.pending}`);if(c.avg!=null)L.push(`متوسط التقييم: ${c.avg.toFixed(1)} من 5`);if(c.att!=null)L.push(`نسبة حضور الطلاب: ${c.att}%`);
+  const notes=t.ss.map(s=>{const l=state.logs[s.id];if(!l||!ST[l.status])return null;if(l.status==='done'&&!l.notes)return null;return `• ${DAYS[s.day].n} – الحصة ${s.label} (${s.subj}، ${CLS[s.cls]}): ${ST[l.status].t}${l.notes?' – '+l.notes:''}`}).filter(Boolean);
+  if(notes.length){L.push('');L.push('ملاحظات المتابعة:');notes.slice(0,15).forEach(n=>L.push(n))}
+  L.push('');L.push('شاكرين جهودكم، وتقبلوا تحياتنا.');L.push('إدارة ثانوية الصحافة الأهلية');return L.join('\n')}
+function waLink(t){const ph=normPhone(state.phones[t.name]);return ph?`https://wa.me/${ph}?text=${encodeURIComponent(waText(t))}`:''}
+function renderTeachers(){const q=$('tSearch').value.trim();const all=teachersIn(scope().filter(inRange));const list=all.filter(t=>!q||t.name.includes(q));
+  $('tCount').textContent=`${all.length} معلم`;
+  $('tGrid').innerHTML=list.map(t=>{const c=tStats(t.ss);const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');
+    return `<button class="tcard" data-teacher="${esc(t.name)}" aria-pressed="${state.teacher===t.name}"><div class="row"><b>${esc(t.name)}</b><span class="pct num">${c.logged?pct(c.held,c.logged)+'%':'—'}</span></div><div class="subjs">${esc(subjOf(t.ss))} · <span class="num">${c.total}</span> حصة${normPhone(state.phones[t.name])?' · <span class="tag wa-ok">واتساب</span>':''}</div><div class="stack">${seg}</div></button>`}).join('')||'<p class="empty">لا يوجد معلم بهذا الاسم.</p>';
+  const sel=all.find(t=>t.name===state.teacher);const box=$('tDetail');
+  if(!sel){box.hidden=true;return}box.hidden=false;const c=tStats(sel.ss);
+  box.innerHTML=`<div class="tdetail-head"><div><h2>${esc(sel.name)}</h2><p>${esc(subjOf(sel.ss))} · ${esc(clsOf(sel.ss))}</p></div><div class="filters">${state.downloads?'<button class="btn ghost" id="tPrint">طباعة</button><button class="btn" id="tPdf">تحميل PDF</button>':''}<button class="btn ghost" id="tClose">إغلاق</button></div></div>
+  <div class="wa"><label for="tPhone">جوال المعلم</label><input id="tPhone" type="tel" inputmode="tel" placeholder="05xxxxxxxx" value="${esc(state.phones[sel.name]||'')}" ${state.role===-1&&state.isEditor&&state.db?'':'disabled'}>${state.role===-1&&state.isEditor&&state.db?'<button class="btn ghost" id="tPhoneSave">حفظ الرقم</button>':''}<a class="wabtn" id="tWa" target="_blank" rel="noopener noreferrer" aria-disabled="${waLink(sel)?'false':'true'}" ${waLink(sel)?`href="${esc(waLink(sel))}"`:''}>إرسال التقرير بالواتساب</a><span class="note" id="tWaNote">${waLink(sel)?'يفتح واتساب برسالة جاهزة فيها ملخص التقرير. لإرفاق ملف PDF: حمّله أولاً ثم أرفقه في المحادثة.':(state.role===-1&&state.isEditor?'أضف رقم الجوال ثم احفظه لتفعيل الإرسال.':'لم يُضف رقم جوال لهذا المعلم بعد (يضيفه المدير).')}</span></div>
+  <div class="tstats"><div class="tstat"><span>عدد الحصص</span><b class="num">${c.total}</b></div><div class="tstat s-done"><span>تمت في وقتها</span><b class="num">${c.done}</b></div><div class="tstat s-late"><span>بدأت متأخرة</span><b class="num">${c.late}</b></div><div class="tstat s-absent"><span>لم تُعقد</span><b class="num">${c.absent}</b></div><div class="tstat s-tech"><span>مشكلة تقنية</span><b class="num">${c.tech}</b></div><div class="tstat"><span>لم تُرصد</span><b class="num">${c.pending}</b></div><div class="tstat"><span>متوسط التقييم</span><b class="num">${fmtAvg(c.avg)}</b></div><div class="tstat"><span>نسبة حضور الطلاب</span><b class="num">${c.att==null?'—':c.att+'%'}</b></div></div>
+  <div class="scroll"><table><thead><tr><th>اليوم</th><th>الحصة</th><th>الوقت</th><th>الصف / المسار</th><th>المادة</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>تسجيل</th><th>تقييم</th><th>ملاحظات</th></tr></thead><tbody>${sel.ss.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr class="clickable" data-open="${s.id}"><td>${DAYS[s.day].n}</td><td>${s.label}</td><td class="num">${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td><span class="status ${st?st.c:''}">${st?st.t:'لم تُرصد'}</span></td><td class="num">${esc(l.entry||'')}</td><td class="num">${esc(l.present??'')}</td><td class="num">${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${l.rating?'★'.repeat(l.rating):''}</td><td class="wrap">${esc(l.notes||'')}</td></tr>`}).join('')}</tbody></table></div>`;
+  if($('tPdf')){$('tPdf').onclick=()=>exportDoc('pdf','تقرير المعلم '+sel.name,[teacherPage(sel)]);$('tPrint').onclick=()=>exportDoc('print','تقرير المعلم '+sel.name,[teacherPage(sel)])}$('tClose').onclick=()=>{state.teacher=null;renderTeachers()};
+  const ps=$('tPhoneSave');if(ps)ps.onclick=async()=>{const raw=$('tPhone').value.trim();if(raw&&!normPhone(raw)){toast('رقم غير صحيح، اكتبه مثل 0551234567');return}
+    const phones={...state.phones};if(raw)phones[sel.name]=raw.slice(0,20);else delete phones[sel.name];
+    try{await state.db.doc('config/phones').set({phones});state.phones=phones;toast('تم حفظ الرقم');renderTeachers()}catch(e){toast('تعذّر حفظ الرقم')}};}
+$('tSearch').addEventListener('input',renderTeachers);
+$('tGrid').addEventListener('click',e=>{const b=e.target.closest('[data-teacher]');if(!b)return;state.teacher=b.dataset.teacher;renderTeachers();$('tDetail').scrollIntoView({behavior:'smooth',block:'start'})});
+
+// ---------- whatsapp queue ----------
+const queue={items:[],i:0,sent:new Set()};
+function openQueue(){const all=teachersIn(scope().filter(inRange));queue.items=all.filter(t=>waLink(t));queue.i=0;queue.sent=new Set();
+  const missing=all.length-queue.items.length;
+  $('qSub').textContent=`${rangeText()} · ${queue.items.length} معلم لديهم رقم جوال${missing?` · ${missing} بدون رقم (لن يُرسل لهم)`:''}`;
+  $('qScrim').hidden=false;$('qDrawer').hidden=false;paintQueue()}
+function closeQueue(){$('qScrim').hidden=true;$('qDrawer').hidden=true}
+function paintQueue(){const it=queue.items,cur=it[queue.i];
+  if(!it.length){$('qNow').innerHTML='<p class="empty">لا يوجد معلم لديه رقم جوال. أضف الأرقام من تقرير كل معلم.</p>';$('qList').innerHTML='';$('qProg').textContent='';$('qSkip').hidden=true;return}
+  $('qSkip').hidden=!cur;
+  $('qNow').innerHTML=cur?`<span class="note">التالي (${queue.i+1} من ${it.length})</span><b>${esc(cur.name)}</b><a class="wabtn" id="qGo" href="${esc(waLink(cur))}" target="_blank" rel="noopener noreferrer">فتح المحادثة وإرسال التقرير</a><span class="note">بعد ما يفتح واتساب اضغط إرسال، ثم ارجع هنا وينتقل تلقائياً للمعلم التالي.</span>`:`<b>تم الانتهاء</b><span class="note">فُتحت ${queue.sent.size} محادثة من ${it.length}.</span>`;
+  $('qList').innerHTML=it.map((t,k)=>`<div class="qrow ${k===queue.i?'cur':''} ${queue.sent.has(t.name)?'sent':''}"><span>${esc(t.name)}</span><span class="st">${queue.sent.has(t.name)?'تم الفتح':k===queue.i?'الحالي':'بانتظار'}</span></div>`).join('');
+  $('qProg').textContent=`${queue.sent.size} / ${it.length}`;
+  const go=$('qGo');if(go)go.addEventListener('click',()=>{queue.sent.add(cur.name);setTimeout(()=>{queue.i++;paintQueue()},700)})}
+$('waAllBtn').onclick=openQueue;$('qClose').onclick=closeQueue;$('qScrim').onclick=closeQueue;
+$('qSkip').onclick=()=>{queue.i++;paintQueue()};
+
+// ---------- printable reports ----------
+const PRINT_CSS=`@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:"IBM Plex Sans Arabic",Tahoma,Arial,sans-serif;direction:rtl;color:#13231f;margin:0;font-size:12.5px;line-height:1.5}
+.page{page-break-after:always;padding:0}.page:last-child{page-break-after:auto}
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0E6B57;padding-bottom:8px;margin-bottom:12px}
+.hdr .org{font-size:11px;line-height:1.6;color:#334}.hdr .ttl{text-align:left}.hdr h1{margin:0;font-size:20px;color:#0E6B57}.hdr p{margin:2px 0 0;font-size:11.5px;color:#556}
+h2{font-size:16px;margin:14px 0 6px;color:#0E6B57}
+.info{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}.info div{border:1px solid #cfdcd8;border-radius:6px;padding:6px 8px}.info span{display:block;font-size:10.5px;color:#667}.info b{font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:8px 0 12px}.stats div{border:1px solid #cfdcd8;border-radius:6px;padding:6px;text-align:center}.stats span{display:block;font-size:10px;color:#667}.stats b{font-size:17px}
+table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #bccbc7;padding:5px 6px;text-align:right;vertical-align:top}th{background:#e7f1ee;font-weight:700}
+.ok{color:#1C7A45;font-weight:700}.late{color:#9A6512;font-weight:700}.bad{color:#B0352F;font-weight:700}.tech{color:#5B40A6;font-weight:700}.idle{color:#888}
+.notes{min-height:60px;border:1px solid #bccbc7;border-radius:6px;padding:8px;margin-top:8px}
+.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px;text-align:center;font-size:12px}.sign div{padding-top:30px;border-top:1px dashed #889}
+.foot{margin-top:10px;font-size:10px;color:#889;text-align:center}
+.toolbar{position:sticky;top:0;background:#0E6B57;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px}
+.toolbar button{background:#fff;color:#0E6B57;border:0;border-radius:6px;padding:6px 14px;font-weight:700;cursor:pointer;font-family:inherit}
+.wrapper{max-width:900px;margin:0 auto;padding:18px}
+@media print{.toolbar{display:none}.wrapper{padding:0;max-width:none}}`;
+const stCls={done:'ok',late:'late',absent:'bad',tech:'tech'};
+function printHeader(title,sub){return `<div class="hdr"><div class="org">المملكة العربية السعودية<br>وزارة التعليم<br>الإدارة العامة للتعليم بمنطقة الرياض<br>مدارس الصحافة الأهلية – القسم الثانوي</div><div class="ttl"><h1>${esc(title)}</h1><p>${esc(sub)}</p><p>${rangeText()}</p></div></div>`}
+function teacherPage(t){const c=tStats(t.ss);const sups=[...new Set(t.ss.map(s=>state.names[s.sup]))].join('، ');
+  const rows=t.ss.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr><td>${DAYS[s.day].n}<br><small>${DAYS[s.day].h}هـ</small></td><td>${s.label}<br><small>${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</small></td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td class="${st?stCls[l.status]:'idle'}">${st?st.t:'لم تُرصد'}</td><td>${esc(l.entry||'')}</td><td>${esc(l.present??'')}</td><td>${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${l.rating?l.rating+' / 5':''}</td><td>${esc(l.notes||'')}</td></tr>`}).join('');
+  return `<section class="page">${printHeader('تقرير متابعة الحصص عن بُعد','ثانوية الصحافة الأهلية')}
+  <div class="info"><div><span>اسم المعلم</span><b>${esc(t.name)}</b></div><div><span>المواد</span><b>${esc(subjOf(t.ss))}</b></div><div><span>الصفوف / المسارات</span><b>${esc(clsOf(t.ss))}</b></div><div><span>المتابِع</span><b>${esc(sups)}</b></div><div><span>نسبة الانعقاد من المرصود</span><b>${c.logged?pct(c.held,c.logged)+'%':'—'}</b></div><div><span>نسبة تسجيل الحصص</span><b>${c.rec==null?'—':c.rec+'%'}</b></div></div>
+  <div class="stats"><div><span>الحصص</span><b>${c.total}</b></div><div><span>تمت في وقتها</span><b class="ok">${c.done}</b></div><div><span>متأخرة</span><b class="late">${c.late}</b></div><div><span>لم تُعقد</span><b class="bad">${c.absent}</b></div><div><span>مشكلة تقنية</span><b class="tech">${c.tech}</b></div><div><span>لم تُرصد</span><b>${c.pending}</b></div><div><span>متوسط التقييم</span><b>${fmtAvg(c.avg)}</b></div><div><span>حضور الطلاب</span><b>${c.att==null?'—':c.att+'%'}</b></div></div>
+  <table><thead><tr><th>اليوم</th><th>الحصة</th><th>الصف</th><th>المادة</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>تسجيل</th><th>التقييم</th><th>ملاحظات المتابع</th></tr></thead><tbody>${rows}</tbody></table>
+  <h2>توصيات ومرئيات</h2><div class="notes"></div>
+  <div class="sign"><div>توقيع المعلم</div><div>المتابِع</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div>
+  <p class="foot">صدر من منصة متابعة الحصص عن بُعد · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
+function generalPage(){const R=S.filter(inRange);const c=tStats(R);
+  const supRows=state.names.map((n,i)=>{const x=tStats(R.filter(s=>s.sup===i));return `<tr><td>${esc(n)}</td><td>${SUPCLS[i]}</td><td>${x.total}</td><td>${x.logged}</td><td class="ok">${x.done}</td><td class="late">${x.late}</td><td class="bad">${x.absent}</td><td class="tech">${x.tech}</td><td>${pct(x.logged,x.total)}%</td><td>${fmtAvg(x.avg)}</td></tr>`}).join('');
+  const tRows=teachersIn(R).map(t=>{const x=tStats(t.ss);return `<tr><td>${esc(t.name)}</td><td>${esc(subjOf(t.ss))}</td><td>${x.total}</td><td class="ok">${x.done}</td><td class="late">${x.late}</td><td class="bad">${x.absent}</td><td class="tech">${x.tech}</td><td>${x.pending}</td><td>${x.logged?pct(x.held,x.logged)+'%':'—'}</td><td>${fmtAvg(x.avg)}</td></tr>`}).join('');
+  return `<section class="page">${printHeader('التقرير العام لمتابعة الحصص عن بُعد','ثانوية الصحافة الأهلية – جميع الصفوف')}
+  <div class="stats"><div><span>إجمالي الحصص</span><b>${c.total}</b></div><div><span>تمت في وقتها</span><b class="ok">${c.done}</b></div><div><span>متأخرة</span><b class="late">${c.late}</b></div><div><span>لم تُعقد</span><b class="bad">${c.absent}</b></div><div><span>مشكلة تقنية</span><b class="tech">${c.tech}</b></div><div><span>لم تُرصد</span><b>${c.pending}</b></div><div><span>متوسط التقييم</span><b>${fmtAvg(c.avg)}</b></div><div><span>حضور الطلاب</span><b>${c.att==null?'—':c.att+'%'}</b></div></div>
+  <h2>حسب المسؤول</h2><table><thead><tr><th>المسؤول</th><th>الصفوف</th><th>الحصص</th><th>مرصودة</th><th>تمت</th><th>متأخرة</th><th>لم تُعقد</th><th>تقنية</th><th>نسبة الرصد</th><th>التقييم</th></tr></thead><tbody>${supRows}</tbody></table>
+  <h2>حسب المعلم</h2><table><thead><tr><th>المعلم</th><th>المواد</th><th>الحصص</th><th>تمت</th><th>متأخرة</th><th>لم تُعقد</th><th>تقنية</th><th>لم تُرصد</th><th>الانعقاد</th><th>التقييم</th></tr></thead><tbody>${tRows}</tbody></table>
+  <div class="sign"><div>وكيل الشؤون التعليمية</div><div>منسق المتابعة</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div></section>`}
+function weekPage(rows){const c=tStats(rows);const sups=effSup()<0?[0,1,2,3]:[effSup()];
+  const supRows=sups.map(i=>{const x=tStats(rows.filter(s=>s.sup===i));return `<tr><td>${esc(state.names[i])}</td><td>${SUPCLS[i]}</td><td>${x.total}</td><td>${x.logged}</td><td class="ok">${x.done}</td><td class="late">${x.late}</td><td class="bad">${x.absent}</td><td class="tech">${x.tech}</td><td>${pct(x.logged,x.total)}%</td><td>${fmtAvg(x.avg)}</td></tr>`}).join('');
+  const body=rows.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr><td>${DAYS[s.day].n}</td><td>${s.label}<br><small>${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</small></td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td>${esc(s.teacher)}</td><td class="${st?stCls[l.status]:'idle'}">${st?st.t:'لم تُرصد'}</td><td>${esc(l.entry||'')}</td><td>${esc(l.present??'')}</td><td>${esc(l.absent??'')}</td><td>${l.rating?l.rating+' / 5':''}</td><td>${esc(l.notes||'')}</td></tr>`}).join('')||'<tr><td colspan="11">لا توجد حصص ضمن الفلتر المحدد.</td></tr>';
+  return `<section class="page">${printHeader('التقرير الأسبوعي لمتابعة الحصص عن بُعد',effSup()<0?'ثانوية الصحافة الأهلية – جميع المسؤولين':'المسؤول: '+state.names[effSup()])}
+  <div class="stats"><div><span>الحصص</span><b>${c.total}</b></div><div><span>تمت في وقتها</span><b class="ok">${c.done}</b></div><div><span>متأخرة</span><b class="late">${c.late}</b></div><div><span>لم تُعقد</span><b class="bad">${c.absent}</b></div><div><span>مشكلة تقنية</span><b class="tech">${c.tech}</b></div><div><span>لم تُرصد</span><b>${c.pending}</b></div><div><span>متوسط التقييم</span><b>${fmtAvg(c.avg)}</b></div><div><span>حضور الطلاب</span><b>${c.att==null?'—':c.att+'%'}</b></div></div>
+  <h2>حسب المسؤول</h2><table><thead><tr><th>المسؤول</th><th>الصفوف</th><th>الحصص</th><th>مرصودة</th><th>تمت</th><th>متأخرة</th><th>لم تُعقد</th><th>تقنية</th><th>نسبة الرصد</th><th>التقييم</th></tr></thead><tbody>${supRows}</tbody></table>
+  <h2>سجل الحصص</h2><table><thead><tr><th>اليوم</th><th>الحصة</th><th>الصف</th><th>المادة</th><th>المعلم</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>التقييم</th><th>ملاحظات</th></tr></thead><tbody>${body}</tbody></table>
+  <div class="sign"><div>المتابِع</div><div>وكيل الشؤون التعليمية</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div></section>`}
+function wrapDoc(title,body,autoPrint){return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;700&display=swap"><style>${PRINT_CSS}</style></head><body><div class="toolbar"><span>${esc(title)}</span><button onclick="window.print()">طباعة</button></div><div class="wrapper">${body}</div>${autoPrint?'<script>window.addEventListener("load",function(){setTimeout(function(){window.print()},500)})<\/script>':''}</body></html>`}
+// scoped copy of the print styles for in-page PDF rendering
+const PDF_CSS=('.pdfdoc{font-family:"IBM Plex Sans Arabic",Tahoma,Arial,sans-serif;direction:rtl;color:#13231f;font-size:12.5px;line-height:1.5;background:#fff}.pdfdoc *{box-sizing:border-box}.pdfdoc .page{width:718px;background:#fff;padding:0 0 6px}.pdfdoc table{min-width:0;width:100%;table-layout:auto}.pdfdoc th,.pdfdoc td{white-space:normal;position:static}'+
+  PRINT_CSS.split('\n').filter(l=>!/^(@page|\.page|\.toolbar|\.wrapper|@media)/.test(l)).join('\n').replace(/(^|})\s*([^{}@]+)\{/g,(m,a,sel)=>a+sel.split(',').map(x=>'.pdfdoc '+x.trim()).join(',')+'{'));
+async function buildPdf(pages){const host=$('pdfhost');const {jsPDF}=window.jspdf;const pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});const W=190,H=277;let first=true;
+  host.innerHTML=`<style>${PDF_CSS}</style><div class="pdfdoc">${pages.join('')}</div>`;
+  try{await document.fonts.ready}catch(e){}
+  try{for(const el of host.querySelectorAll('.page')){
+    const canvas=await window.html2canvas(el,{scale:2,backgroundColor:'#ffffff',logging:false,useCORS:true});
+    const ratio=canvas.width/el.offsetWidth,pxPerMm=canvas.width/W,pageH=Math.floor(H*pxPerMm),top=el.getBoundingClientRect().top;
+    const breaks=[...el.querySelectorAll('tr,h2,.sign,.notes,.stats,.info,.foot')].map(n=>Math.round((n.getBoundingClientRect().top-top)*ratio)).filter(y=>y>0).sort((a,b)=>a-b);
+    let y=0;while(y<canvas.height-2){let end=y+pageH;if(end<canvas.height){const cand=breaks.filter(b=>b>y+pageH*0.3&&b<=end);if(cand.length)end=cand[cand.length-1]}else end=canvas.height;
+      const h=end-y,c2=document.createElement('canvas');c2.width=canvas.width;c2.height=h;const ctx=c2.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c2.width,h);ctx.drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h);
+      if(!first)pdf.addPage();first=false;pdf.addImage(c2.toDataURL('image/jpeg',0.92),'JPEG',10,10,W,h/pxPerMm);y=end}}}
+  finally{host.innerHTML=''}
+  return pdf.output('blob')}
+async function exportDoc(kind,title,pages){const dl=state.downloads;if(!dl){toast('التحميل غير متاح في هذا العرض');return}
+  const fname=title.trim().replace(/\s+/g,'-');
+  if(kind==='pdf'){if(!window.jspdf||!window.html2canvas){toast('تعذّر تحميل مكتبة PDF، أعد تحميل الصفحة');return}
+    $('busyTxt').textContent=`جارٍ تجهيز ملف PDF (${pages.length} صفحة)…`;$('busy').hidden=false;let blob;
+    try{blob=await buildPdf(pages)}catch(e){$('busy').hidden=true;toast('تعذّر إنشاء ملف PDF');return}
+    $('busy').hidden=true;
+    try{await dl.save({filename:fname+'.pdf',data:blob})}catch(e){if(e&&e.code!=='cancelled')toast('تعذّر التحميل')}return}
+  if(window.__STANDALONE){const f=document.createElement('iframe');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';f.srcdoc=wrapDoc(title,pages.join(''),false);
+    f.onload=()=>{setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){toast('تعذّرت الطباعة')}setTimeout(()=>f.remove(),60000)},600)};document.body.appendChild(f);return}
+  try{await dl.save({filename:fname+'-للطباعة.html',data:wrapDoc(title,pages.join(''),true)})}catch(e){if(e&&e.code!=='cancelled')toast('تعذّر التحميل')}}
+$('allPdf').onclick=()=>exportDoc('pdf','تقارير المعلمين',teachersIn(scope().filter(inRange)).map(teacherPage));
+$('allPrint').onclick=()=>exportDoc('print','تقارير المعلمين',teachersIn(scope().filter(inRange)).map(teacherPage));
+$('genPdf').onclick=()=>exportDoc('pdf','التقرير العام',[generalPage()]);
+$('genPrint').onclick=()=>exportDoc('print','التقرير العام',[generalPage()]);
+$('wkPdf').onclick=()=>{renderReport();exportDoc('pdf','التقرير الأسبوعي',[weekPage(state.reportRows||[])])};
+$('wkPrint').onclick=()=>{renderReport();exportDoc('print','التقرير الأسبوعي',[weekPage(state.reportRows||[])])};
+
+// ---------- board ----------
+function barRow(label,c){const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');
+  return `<div class="barrow"><div class="row"><span>${esc(label)}</span><b>${c.logged} / ${c.total} · ${pct(c.logged,c.total)}%</b></div><div class="stack">${seg}</div></div>`}
+function renderBoard(){const list=scope();const c=tStats(list);
+  $('bSub').textContent=(effSup()<0?'جميع المسؤولين':state.names[effSup()])+' · تتحدّث مباشرة مع كل رصد';
+  const held=c.logged?pct(c.held,c.logged):0;
+  $('bHero').innerHTML=[['نسبة الرصد',pct(c.logged,c.total)+'%',`${c.logged} من ${c.total} حصة`,pct(c.logged,c.total)],['نسبة الانعقاد',c.logged?held+'%':'—','من الحصص المرصودة',held],['متوسط التقييم',fmtAvg(c.avg),'من 5 نجوم',c.avg?c.avg*20:0],['حضور الطلاب',c.att==null?'—':c.att+'%',`${c.present} حاضر · ${c.absentSt} غائب`,c.att||0]]
+    .map(([a,b,s,m])=>`<div class="htile"><span>${a}</span><b class="num">${b}</b><small class="num">${s}</small><div class="meter"><i style="width:${Math.min(100,m)}%"></i></div></div>`).join('');
+  $('bStatus').innerHTML=['done','late','absent','tech'].map(k=>`<div class="stile s-${k}"><span>${ST[k].t}</span><b class="num">${c[k]}</b></div>`).join('')+`<div class="stile"><span>لم تُرصد بعد</span><b class="num">${c.pending}</b></div>`;
+  $('bSups').innerHTML=state.names.map((n,i)=>effSup()>=0&&i!==effSup()?'':barRow(n,counts(S.filter(s=>s.sup===i)))).join('');
+  $('bDays').innerHTML=DAYS.map((d,i)=>barRow(d.n+(i===todayIdx()?' (اليوم)':''),counts(list.filter(s=>s.day===i)))).join('');
+  const risk=teachersIn(list).map(t=>({t,c:counts(t.ss)})).filter(x=>x.c.absent+x.c.tech+x.c.late>0).sort((a,b)=>(b.c.absent*3+b.c.tech*2+b.c.late)-(a.c.absent*3+a.c.tech*2+a.c.late)).slice(0,8);
+  $('bTeachers').innerHTML=risk.length?risk.map(({t,c})=>`<div class="trow"><span>${esc(t.name)}</span><span class="chips">${c.absent?`<span class="chip s-absent">لم تُعقد ${c.absent}</span>`:''}${c.tech?`<span class="chip s-tech">تقنية ${c.tech}</span>`:''}${c.late?`<span class="chip s-late">متأخرة ${c.late}</span>`:''}</span></div>`).join(''):'<p class="empty">لا يوجد معلم عليه ملاحظات حتى الآن.</p>';}
+$('fsBtn').onclick=async()=>{const el=$('boardView');try{if(document.fullscreenElement)await document.exitFullscreen();else await el.requestFullscreen()}catch(e){toast('ملء الشاشة غير متاح هنا')}};
+
+function render(){renderSups();if(state.view==='schedule'){renderDays();renderTimeline();renderRail()}else if(state.view==='report')renderReport();else if(state.view==='teachers')renderTeachers();else renderBoard()}
+
+// filters
+const dayOpts=DAYS.map((d,i)=>`<option value="${i}">${d.n} ${d.h}</option>`).join('');
+['fFrom','fTo','tFrom','tTo'].forEach(id=>{$(id).innerHTML=dayOpts;$(id).value=String(/To$/.test(id)?state.to:state.from);
+  $(id).addEventListener('input',()=>{let f=+$(/^f/.test(id)?'fFrom':'tFrom').value,t=+$(/^f/.test(id)?'fTo':'tTo').value;if(/From$/.test(id)&&f>t)t=f;if(/To$/.test(id)&&t<f)f=t;state.from=f;state.to=t;['fFrom','tFrom'].forEach(x=>$(x).value=String(f));['fTo','tTo'].forEach(x=>$(x).value=String(t));render()})});
+$('fStatus').innerHTML='<option value="">كل الحالات</option>'+Object.entries(ST).map(([k,v])=>`<option value="${k}">${v.t}</option>`).join('')+'<option value="pending">لم تُرصد</option>';
+['fStatus','fText'].forEach(id=>$(id).addEventListener('input',renderReport));
+
+document.addEventListener('click',e=>{const t=e.target.closest('[data-sup],[data-day],[data-open]');if(!t)return;
+  if(t.dataset.sup!=null){state.sup=+t.dataset.sup;render()}
+  else if(t.dataset.day!=null){state.day=+t.dataset.day;render()}
+  else if(t.dataset.open){openDrawer(t.dataset.open)}});
+const VIEWS={schedule:['vSchedule','scheduleView'],report:['vReport','reportView'],teachers:['vTeachers','teachersView'],board:['vBoard','boardView']};
+function setView(v){state.view=v;Object.entries(VIEWS).forEach(([k,[b,s]])=>{$(b).setAttribute('aria-pressed',k===v);$(s).hidden=k!==v});$('scheduleView').style.display=v==='schedule'?'grid':'none';render()}
+Object.entries(VIEWS).forEach(([k,[b]])=>$(b).onclick=()=>setView(k));
+
+// drawer
+$('dStatus').innerHTML=Object.entries(ST).map(([k,v])=>`<button class="choice ${v.c}" data-st="${k}" aria-pressed="false">${v.t}</button>`).join('');
+$('dStars').innerHTML=[1,2,3,4,5].map(n=>`<button data-r="${n}" aria-label="${n} من 5">★</button>`).join('');
+function paintDraft(){const d=state.draft;
+  $('dStatus').querySelectorAll('[data-st]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.st===d.status));
+  $('dRec').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===d.recorded));
+  $('dStars').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.r<=(d.rating||0)));}
+async function openDrawer(id){const s=byId[id];state.open=id;const l=state.logs[id]||{};state.draft={status:l.status||'',recorded:l.recorded||'',rating:l.rating||0};
+  $('dTitle').textContent=s.subj;$('dSub').textContent=`${s.teacher} · ${CLS[s.cls]} · ${DAYS[s.day].n} ${DAYS[s.day].h}هـ · الحصة ${s.label} (${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}) · ${state.names[s.sup]}`;
+  $('dLink').value=state.links[id]||'';paintJoin();$('dEntry').value=l.entry||'';$('dPresent').value=l.present??'';$('dAbsent').value=l.absent??'';$('dNotes').value=l.notes||'';
+  $('dWho').textContent='';if(l.updatedAt){let who='';if(l.updatedBy&&state.user){try{const ps=await state.user.profiles([l.updatedBy]);who=ps[l.updatedBy]?.name||''}catch(e){}}
+    $('dWho').textContent=`آخر تحديث: ${new Date(l.updatedAt).toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',weekday:'long',hour:'numeric',minute:'2-digit'})}${who?' · بواسطة '+who:''}`}
+  const notMine=state.role==null||(state.role>=0&&s.sup!==state.role);
+  const ro=!state.db||!state.canWrite||notMine;
+  if(notMine&&state.role!=null)$('dWho').textContent=($('dWho').textContent?$('dWho').textContent+' · ':'')+'هذه الحصة من مسؤولية '+state.names[s.sup]+' (عرض فقط)';['dEntry','dPresent','dAbsent','dNotes','dLink'].forEach(x=>$(x).disabled=ro);$('dLinkSave').disabled=ro;$('dSave').disabled=ro;$('dClear').disabled=ro||!state.logs[id];
+  paintDraft();$('scrim').hidden=false;$('drawer').hidden=false;$('dClose').focus();}
+function closeDrawer(){$('scrim').hidden=true;$('drawer').hidden=true;state.open=null}
+$('dClose').onclick=closeDrawer;$('scrim').onclick=closeDrawer;
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();closeNames();if(typeof closeQueue==='function')closeQueue()}});
+$('dStatus').onclick=e=>{const b=e.target.closest('[data-st]');if(!b)return;state.draft.status=b.dataset.st;paintDraft()};
+$('dRec').onclick=e=>{const b=e.target.closest('button');if(!b)return;state.draft.recorded=state.draft.recorded===b.dataset.v?'':b.dataset.v;paintDraft()};
+$('dStars').onclick=e=>{const b=e.target.closest('[data-r]');if(!b)return;const r=+b.dataset.r;state.draft.rating=state.draft.rating===r?0:r;paintDraft()};
+function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2400)}
+const numOrNull=v=>v===''?null:Math.max(0,parseInt(v,10)||0);
+function paintJoin(){const u=safeUrl($('dLink').value);const a=$('dJoin');if(u){a.href=u;a.hidden=false}else{a.removeAttribute('href');a.hidden=true}}
+$('dLink').addEventListener('input',paintJoin);
+$('dLinkSave').onclick=async()=>{const id=state.open;if(!state.db||!id)return;const s=byId[id];if(state.role==null||(state.role>=0&&s.sup!==state.role))return;const v=$('dLink').value.trim();
+  if(v&&!safeUrl(v)){toast('الرابط يجب أن يبدأ بـ https://');return}
+  try{if(v){await state.db.doc('links/'+id).set({url:v.slice(0,500),updatedAt:new Date().toISOString()});state.links[id]=v}else{await state.db.doc('links/'+id).delete();delete state.links[id]}toast('تم حفظ الرابط');render()}
+  catch(e){toast('تعذّر حفظ الرابط')}};
+$('dSave').onclick=async()=>{const id=state.open;if(!state.db||!id)return;const d=state.draft;
+  if(!d.status){toast('اختر حالة الحصة أولاً');return}
+  const s=byId[id];if(state.role==null||(state.role>=0&&s.sup!==state.role))return;const doc={by:state.role,status:d.status,entry:$('dEntry').value||'',present:numOrNull($('dPresent').value),absent:numOrNull($('dAbsent').value),recorded:d.recorded||'',rating:d.rating||0,notes:$('dNotes').value.trim().slice(0,1000),sup:s.sup,day:s.day,updatedAt:new Date().toISOString(),updatedBy:state.uid||''};
+  $('dSave').disabled=true;
+  try{await state.db.doc('logs/'+id).set(doc);state.logs[id]=doc;toast('تم حفظ المتابعة');closeDrawer();render()}
+  catch(e){if(e&&e.code==='invalid_argument'){state.canWrite=false;toast('ليست لديك صلاحية التعديل')}else toast('تعذّر الحفظ، حاول مرة أخرى')}
+  finally{$('dSave').disabled=false}};
+$('dClear').onclick=async()=>{const id=state.open;if(!state.db||!id)return;
+  if($('dClear').dataset.confirm!=='1'){$('dClear').dataset.confirm='1';$('dClear').textContent='اضغط مرة أخرى للتأكيد';setTimeout(()=>{$('dClear').dataset.confirm='';$('dClear').textContent='مسح الرصد'},3000);return}
+  $('dClear').dataset.confirm='';$('dClear').textContent='مسح الرصد';
+  try{await state.db.doc('logs/'+id).delete();delete state.logs[id];toast('تم مسح الرصد');closeDrawer();render()}catch(e){toast('تعذّر المسح')}};
+
+// ---------- auth ----------
+const SKEY='hsf-followup-auth';
+async function sha(text){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('')}
+const roleKey=r=>r<0?'master':'s'+r;
+const hashFor=(salt,r,pw)=>sha(salt+'|'+roleKey(r)+'|'+pw);
+function randSalt(){const a=new Uint8Array(16);crypto.getRandomValues(a);return Array.from(a).map(x=>x.toString(16).padStart(2,'0')).join('')}
+const storedHash=r=>r<0?state.auth.master:(state.auth.sups||[])[r];
+function pwFields(prefix,withNames,required){return [-1,0,1,2,3].map(r=>{const lbl=r<0?'كلمة المرور الرئيسية (المدير)':`${state.names[r]} — ${SUPCLS[r]}`;
+  return `<div class="field">${withNames&&r>=0?`<label for="${prefix}n${r}">اسم المسؤول ${r+1} — ${SUPCLS[r]}</label><input id="${prefix}n${r}" value="${esc(state.names[r])}" maxlength="40">`:''}<label for="${prefix}p${r}">${withNames&&r>=0?'كلمة مرور المسؤول '+(r+1):lbl}</label><input id="${prefix}p${r}" type="password" autocomplete="new-password" minlength="6" ${required?'required':''} placeholder="${required?'6 أحرف على الأقل':'اتركها فارغة لعدم التغيير'}"></div>`}).join('')}
+function save(k,v){try{v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function load(k){try{return JSON.parse(sessionStorage.getItem(k)||'null')}catch(e){return null}}
+let loginRole=null;
+function renderRoles(){$('roles').innerHTML=[-1,0,1,2,3].map(r=>`<button type="button" class="role ${r<0?'master':''}" data-role="${r}" aria-pressed="${loginRole===r}"><b>${r<0?'المدير (كلمة المرور الرئيسية)':esc(state.names[r])}</b><span>${r<0?'عرض وتعديل كل الحصص والإعدادات':SUPCLS[r]}</span></button>`).join('')}
+$('roles').addEventListener('click',e=>{const b=e.target.closest('[data-role]');if(!b)return;loginRole=+b.dataset.role;renderRoles();$('pw').focus()});
+function showGate(mode,msg){const g=$('gate');g.hidden=false;$('gateMsg').textContent=msg||'';$('gateMsg').hidden=!msg;$('loginForm').hidden=mode!=='login';$('setupForm').hidden=mode!=='setup';
+  if(mode==='login')renderRoles();if(mode==='setup'){$('setupFields').innerHTML=pwFields('su',false,true)}}
+function enter(role){state.role=role;$('gate').hidden=true;$('logoutBtn').hidden=false;
+  $('rolePill').hidden=false;$('rolePill').textContent=role<0?'دخول: المدير':'دخول: '+state.names[role];
+  $('namesBtn').hidden=!(role<0&&state.isEditor);$('exportBtn').hidden=!(role<0&&state.downloads);$('waAllBtn').hidden=role!==-1;document.querySelectorAll('.dlx').forEach(x=>x.hidden=!state.downloads||(x.classList.contains('master-only')&&role>=0));
+  startData();render()}
+$('loginForm').onsubmit=async e=>{e.preventDefault();$('loginErr').textContent='';
+  if(loginRole==null){$('loginErr').textContent='اختر صفة الدخول أولاً';return}
+  const h=await hashFor(state.auth.salt,loginRole,$('pw').value);
+  if(h!==storedHash(loginRole)){$('loginErr').textContent='كلمة المرور غير صحيحة';$('pw').select();return}
+  $('pw').value='';save(SKEY,{role:loginRole,h});enter(loginRole)};
+$('setupForm').onsubmit=async e=>{e.preventDefault();$('setupErr').textContent='';
+  const vals=[-1,0,1,2,3].map(r=>$('sup'+r).value);
+  if(vals.some(v=>v.length<6)){$('setupErr').textContent='كل كلمة مرور لازم تكون 6 أحرف على الأقل';return}
+  if(new Set(vals).size<5){$('setupErr').textContent='استخدم كلمة مرور مختلفة لكل شخص';return}
+  const salt=randSalt();const master=await hashFor(salt,-1,vals[0]);const sups=[];for(let r=0;r<4;r++)sups.push(await hashFor(salt,r,vals[r+1]));
+  try{await state.db.doc('config/auth').set({salt,master,sups});state.auth={salt,master,sups};save(SKEY,{role:-1,h:master});enter(-1);toast('تم حفظ كلمات المرور')}
+  catch(err){$('setupErr').textContent='تعذّر الحفظ. هذا الإعداد متاح لمالك المنصة أو المحرر فقط.'}};
+$('logoutBtn').onclick=()=>{save(SKEY,null);location.reload()};
+
+// settings (names + passwords)
+function openNames(){$('nFields').innerHTML=`<div class="sec"><h3>كلمة المرور الرئيسية</h3><div class="field"><label for="setp-1">كلمة مرور المدير الجديدة</label><input id="setp-1" type="password" autocomplete="new-password" placeholder="اتركها فارغة لعدم التغيير"></div></div>`+
+  [0,1,2,3].map(r=>`<div class="sec"><h3>المسؤول ${r+1}</h3><div class="field"><label for="setn${r}">الاسم — ${SUPCLS[r]}</label><input id="setn${r}" value="${esc(state.names[r])}" maxlength="40"></div><div class="field"><label for="setp${r}">كلمة مرور جديدة</label><input id="setp${r}" type="password" autocomplete="new-password" placeholder="اتركها فارغة لعدم التغيير"></div></div>`).join('');
+  $('nErr').textContent='';$('nScrim').hidden=false;$('nDrawer').hidden=false;$('setn0').focus()}
+function closeNames(){$('nScrim').hidden=true;$('nDrawer').hidden=true}
+$('namesBtn').onclick=openNames;$('nClose').onclick=closeNames;$('nScrim').onclick=closeNames;
+$('nSave').onclick=async()=>{$('nErr').textContent='';const names=[0,1,2,3].map(i=>$('setn'+i).value.trim()||`المسؤول ${i+1}`);
+  const pws=[-1,0,1,2,3].map(r=>$('setp'+r).value);
+  if(pws.some(v=>v&&v.length<6)){$('nErr').textContent='كلمة المرور 6 أحرف على الأقل';return}
+  const auth={salt:state.auth.salt,master:state.auth.master,sups:[...state.auth.sups]};
+  for(const r of [-1,0,1,2,3]){const v=pws[r+1];if(!v)continue;const h=await hashFor(auth.salt,r,v);if(r<0)auth.master=h;else auth.sups[r]=h}
+  const all=[auth.master,...auth.sups];if(new Set(all).size<5){$('nErr').textContent='استخدم كلمة مرور مختلفة لكل شخص';return}
+  const prev=load(SKEY);save(SKEY,{role:-1,h:auth.master});
+  try{await state.db.doc('config/main').set({names});if(pws.some(Boolean))await state.db.doc('config/auth').set(auth);
+    state.names=names;state.auth=auth;$('rolePill').textContent='دخول: المدير';toast('تم حفظ الإعدادات');closeNames();render()}
+  catch(e){save(SKEY,prev);$('nErr').textContent='تعذّر الحفظ. هذه الإعدادات لمالك المنصة أو المحرر فقط.'}};
+let dataStarted=false;
+function startData(){if(dataStarted||!state.db)return;dataStarted=true;
+  state.db.doc('config/phones').onSnapshot(d=>{const v=d.exists&&d.data();state.phones=v&&v.phones&&typeof v.phones==='object'?v.phones:{};if(state.view==='teachers')renderTeachers()},()=>{});
+  state.db.collection('links').onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{const v=d.exists&&d.data();if(v&&v.url&&byId[d.id])m[d.id]=String(v.url)});state.links=m;render()},()=>{});
+  state.db.collection('logs').onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{if(d.exists&&byId[d.id])m[d.id]=d.data()});state.logs=m;render()},()=>{})}
+
+// export
+async function exportCSV(){const dl=state.downloads;if(!dl)return;const head=['اليوم','التاريخ الهجري','الحصة','الوقت','الصف / المسار','المادة','المعلم','المسؤول','الحالة','دخول المعلم','الحضور','الغياب','تسجيل الحصة','التقييم','الملاحظات'];
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const lines=[head.map(q).join(',')].concat(S.map(s=>{const l=state.logs[s.id]||{};return [DAYS[s.day].n,DAYS[s.day].h,s.label,`${SLOTS[s.slot][1]} - ${SLOTS[s.slot][2]}`,CLS[s.cls],s.subj,s.teacher,state.names[s.sup],ST[l.status]?.t||'لم تُرصد',l.entry||'',l.present??'',l.absent??'',l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':'',l.rating||'',l.notes||''].map(q).join(',')}));
+  try{await dl.save({filename:'متابعة-الحصص-1448-5.csv',data:'﻿'+lines.join('\n')})}catch(e){if(e&&e.code!=='cancelled')toast('تعذّر التصدير')}}
+$('exportBtn').onclick=exportCSV;
+
+tickClock();setInterval(()=>{const before=nowSlot();tickClock();if(state.view==='schedule')renderTimeline()},60000);
+render();
+
+// capabilities
+(async()=>{const c=window.claude;if(!c||!c.use){showGate('none','تعذّر تشغيل المنصة. أعد تحميل الصفحة.');return}
+  const [db,user,downloads]=await Promise.all([c.use('db'),c.use('user'),c.use('downloads')]);
+  state.user=user;state.downloads=downloads;
+  if(!db){showGate('none','لم يتم ربط المنصة بقاعدة البيانات بعد. أضف إعدادات Firebase في الملف، وتأكد من تفعيل Firestore وتسجيل الدخول المجهول (Anonymous).');return}
+  state.db=db;
+  if(user){try{state.uid=await user.id()}catch(e){}
+    try{const w=await user.can('data.write');if(w===false){state.canWrite=false;showBanner('لديك صلاحية الاطلاع فقط. اطلب من مدير المنصة صلاحية «مساهم» للرصد.')}}catch(e){}
+    try{state.isEditor=await user.canEdit()}catch(e){}}
+  db.doc('config/main').onSnapshot(d=>{const v=d.exists&&d.data();if(v&&Array.isArray(v.names)&&v.names.length===4){state.names=v.names.map((n,i)=>String(n||'').slice(0,40)||`المسؤول ${i+1}`);if(!$('loginForm').hidden)renderRoles();if(state.role!=null){$('rolePill').textContent=state.role<0?'دخول: المدير':'دخول: '+state.names[state.role]}render()}},()=>{});
+  db.doc('config/auth').onSnapshot(d=>{const v=d.exists&&d.data();
+    if(!v||!v.salt||!v.master||!Array.isArray(v.sups)||v.sups.length!==4){state.auth=null;
+      if(state.role==null)showGate(state.isEditor?'setup':'none',state.isEditor?'':'لم يُجهّز مدير المنصة كلمات المرور بعد. حاول لاحقاً.');return}
+    state.auth=v;
+    const sess=load(SKEY);
+    if(state.role!=null){if(!sess||sess.h!==storedHash(state.role)){save(SKEY,null);location.reload()}return}
+    if(sess&&typeof sess.role==='number'&&sess.role>=-1&&sess.role<=3&&sess.h===storedHash(sess.role)){enter(sess.role);return}
+    showGate('login','')},()=>showGate('none','تعذّر تحميل بيانات الدخول. أعد تحميل الصفحة.'));
+})();
+function showBanner(t){const b=$('banner');b.textContent=t;b.hidden=false}
+})();
+</script>
+
+</body>
+</html>
