@@ -1055,6 +1055,14 @@ $('wkPrint').onclick=()=>{renderReport();exportDoc('print','التقرير ال�
 // ---------- board ----------
 function barRow(label,c){const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');
   return `<div class="barrow"><div class="row"><span>${esc(label)}</span><b>${c.logged} / ${c.total} · ${pct(c.logged,c.total)}%</b></div><div class="stack">${seg}</div></div>`}
+// estimated class size = largest (present+absent) seen in one session of that class
+function estClassSize(){const o={};S.forEach(s=>{const l=state.logs[s.id];if(!l)return;const n=(Number(l.present)||0)+(Number(l.absent)||0);if(n>(o[s.cls]||0))o[s.cls]=n});return o}
+// actual students: per class per day = highest present count in that day's sessions; compared with class enrollment
+function actualAtt(list){const est=estClassSize(),size=state.classSize||{};const byDay=new Map();
+  list.forEach(s=>{const l=state.logs[s.id];if(!l||!ST[l.status]||l.present==null||l.present==='')return;const k=s.day;if(!byDay.has(k))byDay.set(k,{});const m=byDay.get(k);m[s.cls]=Math.max(m[s.cls]||0,Number(l.present)||0)});
+  if(!byDay.size)return null;let pres=0,enr=0,est0=false;const cfg=Object.values(size).some(v=>Number(v)>0);
+  byDay.forEach(m=>{Object.entries(m).forEach(([c,v])=>{if(cfg&&!(Number(size[c])>0))return;const z=Number(size[c])||est[c]||v;if(!cfg)est0=true;pres+=Math.min(v,z);enr+=z})});
+  if(!enr)return null;const n=byDay.size;return{present:Math.round(pres/n),enrolled:Math.round(enr/n),days:n,pct:enr?Math.round(pres*100/enr):null,estimated:est0}}
 function renderBoard(){if(state.bDay===undefined){const ti=todayIdx();state.bDay=ti>=0?ti:-1}
   $('bDay').innerHTML='<option value="-1">الأسبوع كامل</option>'+DAYS.map((d,i)=>`<option value="${i}">${d.n} ${d.h}${i===todayIdx()?' (اليوم)':''}</option>`).join('');$('bDay').value=String(state.bDay);
   const bd=state.bDay;const list=scope().filter(s=>bd<0||s.day===bd);const c=tStats(list);
@@ -1062,7 +1070,7 @@ function renderBoard(){if(state.bDay===undefined){const ti=todayIdx();state.bDay
   const slotRows=bd<0?null:SLOTS.map((sl,i)=>{const l=list.filter(s=>s.slot===i);return{i,label:sl[0],sub:sl[1],list:l,c:tStats(l)}}).filter(r=>r.list.length);
   $('bCharts').innerHTML=chartsBlock(list,PAL_SCREEN,bd<0?{from:0,to:4,cls:'t4',only:['donut','days','att','rating'],donutPx:200,colH:240}:{rows:slotRows,by:'الحصة',cls:'t4',only:['donut','days','att','rating'],donutPx:200,colH:240});
   const held=c.logged?pct(c.held,c.logged):0;
-  $('bHero').innerHTML=[['نسبة الرصد',pct(c.logged,c.total)+'%',`${c.logged} من ${c.total} حصة`,pct(c.logged,c.total)],['نسبة الانعقاد',c.logged?held+'%':'—','من الحصص المرصودة',held],['متوسط التقييم',fmtAvg(c.avg),'من 5 نجوم',c.avg?c.avg*20:0],['حضور الطلاب',c.att==null?'—':c.att+'%',c.attN?`متوسط ${c.avgPresent} حاضر من ${c.avgClass} طالب في الحصة · ${c.attN} حصة`:'لا توجد أعداد مرصودة',c.att||0]]
+  $('bHero').innerHTML=[['نسبة الرصد',pct(c.logged,c.total)+'%',`${c.logged} من ${c.total} حصة`,pct(c.logged,c.total)],['نسبة الانعقاد',c.logged?held+'%':'—','من الحصص المرصودة',held],['متوسط التقييم',fmtAvg(c.avg),'من 5 نجوم',c.avg?c.avg*20:0],(()=>{const a=actualAtt(list);return ['حضور الطلاب',a&&a.pct!=null?a.pct+'%':'—',a?`${a.present} طالب حاضر من أصل ${a.enrolled} طالب${a.days>1?` (متوسط يومي · ${a.days} أيام)`:''}${a.estimated?' · العدد تقديري':''}`:'لا توجد أعداد مرصودة',a&&a.pct||0]})()]
     .map(([a,b,s,m])=>`<div class="htile"><span>${a}</span><b class="num">${b}</b><small class="num">${s}</small><div class="meter"><i style="width:${Math.min(100,m)}%"></i></div></div>`).join('');
   $('bStatus').innerHTML=['done','late','absent','tech'].map(k=>`<div class="stile s-${k}"><span>${ST[k].t}</span><b class="num">${c[k]}</b></div>`).join('')+`<div class="stile"><span>لم تُرصد بعد</span><b class="num">${c.pending}</b></div>`;
   $('bSups').innerHTML=state.names.map((n,i)=>effSup()>=0&&i!==effSup()?'':(isMon()&&!list.some(s=>s.sup===i)?'':barRow(n,counts(list.filter(s=>s.sup===i))))).join('');
@@ -1335,6 +1343,8 @@ $('pForm').onsubmit=async e=>{e.preventDefault();$('pErr').textContent='';const 
 // settings (names + passwords)
 function openNames(){$('nFields').innerHTML=secureSection()+(state.secure?'':`<div class="sec"><h3>كلمة المرور الرئيسية</h3><div class="field"><label for="setp-1">كلمة مرور المدير الجديدة</label><input id="setp-1" type="password" autocomplete="new-password" placeholder="اتركها فارغة لعدم التغيير"></div></div>`)+
   [0,1,2,3].map(r=>`<div class="sec"><h3>المسؤول ${r+1}</h3><div class="field"><label for="setn${r}">الاسم — ${SUPCLS[r]}</label><input id="setn${r}" value="${esc(state.names[r])}" maxlength="40"></div>${state.secure?'':`<div class="field"><label for="setp${r}">كلمة مرور جديدة</label><input id="setp${r}" type="password" autocomplete="new-password" placeholder="اتركها فارغة لعدم التغيير"></div>`}</div>`).join('')+
+  `<div class="sec"><h3>عدد طلاب كل صف</h3><p class="note">يُستخدم في شاشة الأرقام لحساب حضور الطلاب الفعلي من إجمالي الطلاب. إذا كان طلاب المسارات ضمن «الثالث الثانوي» اترك المسارات فارغة.</p>
+   <div class="names">${Object.entries(CLS).map(([k,t])=>`<div class="field"><label for="cs_${k}">${t}</label><input id="cs_${k}" type="number" min="0" inputmode="numeric" value="${esc((state.classSize||{})[k]??'')}" placeholder="${estClassSize()[k]?'تقديري '+estClassSize()[k]:''}"></div>`).join('')}</div></div>`+
   `<div class="sec"><h3>مستخدم التقارير</h3><p class="note">حساب «التقارير» يعرض فقط الصفحات التي تحددها هنا، ولا يستطيع التعديل.</p>
    <div class="field"><span class="lbl">الصفحات التي تظهر له</span><div class="tpick">${Object.entries(VIEW_T).map(([k,t])=>`<label><input type="checkbox" name="repv" value="${k}" ${repViews().includes(k)?'checked':''}>${t}</label>`).join('')}</div></div>
    ${state.secure?'':`<div class="field"><label for="setrp">كلمة مرور التقارير ${storedHash(8)?'الجديدة':'(مطلوبة لتفعيل الدخول)'}</label><input id="setrp" type="password" autocomplete="new-password" placeholder="${storedHash(8)?'اتركها فارغة لعدم التغيير':'6 أحرف على الأقل'}"></div>`}</div>`+
@@ -1349,7 +1359,7 @@ $('namesBtn').onclick=openNames;$('nClose').onclick=closeNames;$('nScrim').oncli
 $('nSave').onclick=async()=>{$('nErr').textContent='';const names=[0,1,2,3].map(i=>$('setn'+i).value.trim()||`المسؤول ${i+1}`);
   const val=id=>$(id)?$(id).value:'';
   if(state.secure){const mnames=[0,1,2,3].map(m=>$('setmn'+m).value.trim()||`المشرف ${m+1}`);const mteachers=[0,1,2,3].map(m=>[...document.querySelectorAll(`#nFields .tpick[data-m="${m}"] input:checked`)].map(i=>i.value));
-    try{await state.db.doc('config/main').set({names,repViews:readRepViews()});state.repViews=readRepViews();await state.db.doc('config/monitors').set({names:mnames,teachers:{m0:mteachers[0],m1:mteachers[1],m2:mteachers[2],m3:mteachers[3]}});state.names=names;state.mnames=mnames;state.mteachers=mteachers;toast('تم حفظ الإعدادات');closeNames();render()}
+    try{await state.db.doc('config/main').set({names,repViews:readRepViews(),classSize:readClassSize()});state.repViews=readRepViews();state.classSize=readClassSize();await state.db.doc('config/monitors').set({names:mnames,teachers:{m0:mteachers[0],m1:mteachers[1],m2:mteachers[2],m3:mteachers[3]}});state.names=names;state.mnames=mnames;state.mteachers=mteachers;toast('تم حفظ الإعدادات');closeNames();render()}
     catch(e){$('nErr').textContent='تعذّر الحفظ.'}return}
   const pws=[-1,0,1,2,3].map(r=>val('setp'+r));
   if(pws.some(v=>v&&v.length<6)){$('nErr').textContent='كلمة المرور 6 أحرف على الأقل';return}
@@ -1362,7 +1372,7 @@ $('nSave').onclick=async()=>{$('nErr').textContent='';const names=[0,1,2,3].map(
   const mteachers=[0,1,2,3].map(m=>[...document.querySelectorAll(`#nFields .tpick[data-m="${m}"] input:checked`)].map(i=>i.value));
   const all=[auth.master,...auth.sups,...auth.mons.filter(Boolean),...(auth.rep?[auth.rep]:[])];if(new Set(all).size<all.length){$('nErr').textContent='استخدم كلمة مرور مختلفة لكل شخص';return}
   const prev=load(SKEY);save(SKEY,{role:-1,h:auth.master});
-  try{await state.db.doc('config/main').set({names,repViews:readRepViews()});state.repViews=readRepViews();await state.db.doc('config/monitors').set({names:mnames,teachers:{m0:mteachers[0],m1:mteachers[1],m2:mteachers[2],m3:mteachers[3]}});if(pws.some(Boolean)||mpws.some(Boolean)||rpw)await state.db.doc('config/auth').set(auth);
+  try{await state.db.doc('config/main').set({names,repViews:readRepViews(),classSize:readClassSize()});state.repViews=readRepViews();state.classSize=readClassSize();await state.db.doc('config/monitors').set({names:mnames,teachers:{m0:mteachers[0],m1:mteachers[1],m2:mteachers[2],m3:mteachers[3]}});if(pws.some(Boolean)||mpws.some(Boolean)||rpw)await state.db.doc('config/auth').set(auth);
     state.names=names;state.mnames=mnames;state.mteachers=mteachers;state.auth=auth;$('rolePill').textContent='دخول: المدير';toast('تم حفظ الإعدادات');closeNames();render()}
   catch(e){save(SKEY,prev);$('nErr').textContent='تعذّر الحفظ. هذه الإعدادات لمالك المنصة أو المحرر فقط.'}};
 // ---------- secure login setup (admin) ----------
@@ -1413,6 +1423,7 @@ async function activateSecure(){const err=t=>{$('scErr').textContent=t};err('');
     save(SKEY,null);toast('تم تفعيل الدخول الآمن');setTimeout(()=>location.reload(),900)}
   catch(e){console.error(e);err('تعذّر التفعيل: '+(e&&e.code||e&&e.message||''))}
   finally{btn.disabled=false;btn.textContent='تفعيل الدخول الآمن'}}
+function readClassSize(){const o={};Object.keys(CLS).forEach(k=>{const el=$('cs_'+k);const v=el?parseInt(el.value,10):NaN;if(v>0)o[k]=v});return o}
 function readRepViews(){const v=[...document.querySelectorAll('#nFields input[name=repv]:checked')].map(i=>i.value);return v.length?v:['report']}
 let dataStarted=false;
 function startData(){if(dataStarted||!state.db)return;dataStarted=true;
@@ -1454,7 +1465,7 @@ render();
   if(user){try{state.uid=await user.id()}catch(e){}
     try{const w=await user.can('data.write');if(w===false){state.canWrite=false;showBanner('لديك صلاحية الاطلاع فقط. اطلب من مدير المنصة صلاحية «مساهم» للرصد.')}}catch(e){}
     try{state.isEditor=await user.canEdit()}catch(e){}}
-  db.doc('config/main').onSnapshot(d=>{const v=d.exists&&d.data();if(v&&Array.isArray(v.repViews)){state.repViews=v.repViews.map(String);if(state.role!=null)applyRepViews()}if(v&&Array.isArray(v.names)&&v.names.length===4){state.names=v.names.map((n,i)=>String(n||'').slice(0,40)||`المسؤول ${i+1}`);if(!$('loginForm').hidden)renderRoles();if(state.role!=null){$('rolePill').textContent='دخول: '+roleName(state.role)}render()}},()=>{});
+  db.doc('config/main').onSnapshot(d=>{const v=d.exists&&d.data();if(v&&v.classSize&&typeof v.classSize==='object'){state.classSize=v.classSize;if(state.view==='board')renderBoard()}if(v&&Array.isArray(v.repViews)){state.repViews=v.repViews.map(String);if(state.role!=null)applyRepViews()}if(v&&Array.isArray(v.names)&&v.names.length===4){state.names=v.names.map((n,i)=>String(n||'').slice(0,40)||`المسؤول ${i+1}`);if(!$('loginForm').hidden)renderRoles();if(state.role!=null){$('rolePill').textContent='دخول: '+roleName(state.role)}render()}},()=>{});
   db.doc('config/monitors').onSnapshot(d=>{const v=d.exists&&d.data();if(v){if(Array.isArray(v.names)&&v.names.length===4)state.mnames=v.names.map((n,i)=>String(n||'').slice(0,40)||`المشرف ${i+1}`);
     if(v.teachers&&typeof v.teachers==='object')state.mteachers=[0,1,2,3].map(m=>{const a=v.teachers['m'+m];return Array.isArray(a)?a.map(String):[]});}
     if(!$('loginForm').hidden)renderRoles();if(state.role!=null){$('rolePill').textContent='دخول: '+roleName(state.role)}render()},()=>{});
