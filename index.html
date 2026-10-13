@@ -355,6 +355,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
 .board:fullscreen{background:var(--bg);padding:28px;overflow:auto}
 </style>
 
+<link rel="stylesheet" href="platform-ui.css">
 <div class="wrap">
   <header class="top">
     <div class="brand">
@@ -376,6 +377,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
   <div id="banner" class="banner" hidden></div>
   <div id="dueBar" class="duebar" hidden></div>
 
+  <section id="overviewSummary" class="overview-summary" aria-label="ملخص المتابعة"></section>
   <div class="nav">
     <div class="weeknav" role="group" aria-label="الأسبوع"><button class="iconbtn" id="wPrev" aria-label="الأسبوع السابق">→ السابق</button><select id="wSel" aria-label="اختيار الأسبوع"></select><button class="iconbtn" id="wNext" aria-label="الأسبوع التالي">التالي ←</button><button class="iconbtn" id="wNow" hidden>العودة لهذا الأسبوع</button></div>
     <div class="views" role="group" aria-label="العرض">
@@ -446,7 +448,9 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
       <header>
         <h2>تقارير المعلمين <small class="note" id="tCount"></small></h2>
         <div class="filters">
-          <input id="tSearch" type="search" placeholder="ابحث باسم المعلم" aria-label="بحث باسم المعلم">
+          <input id="tSearch" type="search" placeholder="ابحث باسم المعلم أو المادة" aria-label="بحث باسم المعلم أو المادة">
+          <select id="tSort" aria-label="ترتيب المعلمين"><option value="name">الترتيب: الاسم</option><option value="pending">الأكثر انتظارًا للرصد</option><option value="issues">الأكثر احتياجًا للمتابعة</option><option value="progress">الأعلى في نسبة الرصد</option></select>
+          <label class="teacher-filter"><input id="tOnlyPending" type="checkbox">لم تُرصد لهم حصص</label>
           <label class="rng">من <select id="tFrom" aria-label="من يوم"></select></label>
           <label class="rng">إلى <select id="tTo" aria-label="إلى يوم"></select></label>
           <button class="btn ghost" id="tRepeat" aria-pressed="false" title="المعلمون الذين تكررت عليهم حالات تُحسب عليهم (تأخر / عدم انعقاد)">تكررت ملاحظاتهم</button><select id="tRepMin" aria-label="حد التكرار"><option value="2">مرتين فأكثر</option><option value="3" selected>3 مرات فأكثر</option><option value="4">4 مرات فأكثر</option></select>
@@ -939,11 +943,11 @@ function printLetters(kind,list){list=list||repeatTeachers();if(!list.length){to
 $('tRepeat').onclick=()=>{state.repeatOnly=!state.repeatOnly;$('tRepeat').setAttribute('aria-pressed',String(!!state.repeatOnly));renderTeachers()};
 $('tRepMin').onchange=renderTeachers;
 $('letPrint').onclick=()=>printLetters('print');$('letPdf').onclick=()=>printLetters('pdf');
-function renderTeachers(){const q=$('tSearch').value.trim();const all=teachersIn(scope().filter(inRange));const noted=new Set(teachersIn(scope().filter(s=>inRange(s)&&noteOf(s))).map(t=>t.name));const rmin=repMin();const reps=new Set(all.filter(t=>incOf(t).length>=rmin).map(t=>t.name));
-  const list=all.filter(t=>(!q||t.name.includes(q))&&(!state.notesOnly||noted.has(t.name))&&(!state.repeatOnly||reps.has(t.name)));
-  $('tCount').textContent=`${all.length} معلم · ${noted.size} عليهم ملاحظات · ${reps.size} تكررت ملاحظاتهم`;
-  $('tGrid').innerHTML=list.map(t=>{const c=tStats(t.ss);const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');
-    return `<button class="tcard" data-teacher="${esc(t.name)}" aria-pressed="${state.teacher===t.name}"><div class="row"><b>${esc(t.name)}</b><span class="pct num">${c.logged?pct(c.held,c.logged)+'%':'—'}</span></div><div class="subjs">${esc(subjOf(t.ss))} · <span class="num">${c.total}</span> حصة${normPhone(state.phones[t.name])?' · <span class="tag wa-ok">واتساب</span>':''}${reps.has(t.name)?` <span class="tag rep">تكرر ×${incOf(t).length}</span>`:''}</div><div class="stack">${seg}</div>${state.notesOnly?`<div class="tnote">${t.ss.filter(noteOf).map(s=>esc(DAYS[s.day].n+' · '+s.label+': '+noteOf(s).replace(/\n/g,' · '))).join('\n')}</div>`:''}</button>`}).join('')||`<p class="empty">${state.repeatOnly?'لا يوجد معلم تكررت عليه الحالات في الأيام المحددة.':state.notesOnly?'لا يوجد معلم عليه ملاحظات في الأيام المحددة.':'لا يوجد معلم بهذا الاسم.'}</p>`;
+function renderTeachers(){const normal=s=>String(s).normalize('NFKC').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/\s/g,'');const q=normal($('tSearch').value);const all=teachersIn(scope().filter(inRange));const noted=new Set(teachersIn(scope().filter(s=>inRange(s)&&noteOf(s))).map(t=>t.name));const reps=new Set(all.filter(t=>incOf(t).length>=repMin()).map(t=>t.name));const list=all.filter(t=>(!q||normal(t.name+' '+subjOf(t.ss)).includes(q))&&(!state.notesOnly||noted.has(t.name))&&(!state.repeatOnly||reps.has(t.name))&&(!$('tOnlyPending').checked||tStats(t.ss).pending>0));
+  const sort=$('tSort').value;list.sort((a,b)=>{const x=tStats(a.ss),y=tStats(b.ss);return (sort==='pending'?y.pending-x.pending:sort==='issues'?(y.absent+y.tech+y.late)-(x.absent+x.tech+x.late):sort==='progress'?pct(y.logged,y.total)-pct(x.logged,x.total):0)||a.name.localeCompare(b.name,'ar')});
+  $('tCount').textContent=`${list.length} من ${all.length} معلم · ${noted.size} عليهم ملاحظات · ${reps.size} تكررت ملاحظاتهم`;
+  $('tGrid').innerHTML=list.map(t=>{const c=tStats(t.ss),progress=pct(c.logged,c.total);const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');const wa=waLink(t);
+    return `<article class="tcard teacher-card" aria-pressed="${state.teacher===t.name}"><div class="row"><b>${esc(t.name)}</b><span class="pct num">${progress}%</span></div><p class="subjs">${esc(subjOf(t.ss))}</p><div class="stack" aria-label="توزيع حالات الحصص">${seg}</div><div class="teacher-counts"><div><b class="num">${c.total}</b><span>حصة</span></div><div><b class="num">${c.logged}</b><span>مرصودة</span></div><div><b class="num">${c.pending}</b><span>لم تُرصد</span></div></div><p class="teacher-phone">نسبة الرصد ${progress}% · ${wa?'الجوال متوفر ✓':'الجوال غير مسجل'}</p>${reps.has(t.name)?`<span class="tag rep">تكرر ×${incOf(t).length}</span>`:''}${state.notesOnly?`<div class="tnote">${t.ss.filter(noteOf).map(s=>esc(DAYS[s.day].n+' · '+s.label+': '+noteOf(s))).join('\n')}</div>`:''}<div class="teacher-actions"><button class="btn" data-teacher="${esc(t.name)}">عرض التقرير</button>${wa?`<a class="wabtn" href="${esc(wa)}" target="_blank" rel="noopener noreferrer">واتساب</a>`:'<span class="note">أضف الجوال من التقرير</span>'}</div></article>`}).join('')||'<p class="empty">لا يوجد معلم مطابق للبحث أو الفلتر.</p>';
   const sel=all.find(t=>t.name===state.teacher);const box=$('tDetail');
   if(!sel){box.hidden=true;return}box.hidden=false;const c=tStats(sel.ss);
   box.innerHTML=`<div class="tdetail-head"><div><h2>${esc(sel.name)}</h2><p>${esc(subjOf(sel.ss))} · ${esc(clsOf(sel.ss))}</p></div><div class="filters">${state.downloads?'<button class="btn ghost" id="tPrint">طباعة</button><button class="btn" id="tPdf">تحميل PDF</button>'+(incOf(sel).length?`<button class="btn ghost" id="tLetter">خطاب تنبيه (${incOf(sel).length})</button>`:''):''}<button class="btn ghost" id="tClose">إغلاق</button></div></div>
@@ -957,6 +961,7 @@ function renderTeachers(){const q=$('tSearch').value.trim();const all=teachersIn
     const phones={...state.phones};if(raw)phones[sel.name]=raw.slice(0,20);else delete phones[sel.name];
     try{await state.db.doc('config/phones').set({phones});state.phones=phones;toast('تم حفظ الرقم');renderTeachers()}catch(e){toast('تعذّر حفظ الرقم')}};}
 $('tSearch').addEventListener('input',renderTeachers);
+['tSort','tOnlyPending'].forEach(id=>$(id).addEventListener('change',renderTeachers));
 $('tGrid').addEventListener('click',e=>{const b=e.target.closest('[data-teacher]');if(!b)return;state.teacher=b.dataset.teacher;renderTeachers();$('tDetail').scrollIntoView({behavior:'smooth',block:'start'})});
 
 // ---------- whatsapp queue ----------
@@ -1138,7 +1143,8 @@ function staffPage(){const {rows,mons}=staffData();const tr=r=>`<tr><td><b>${esc
   <p class="foot">صدر من منصة متابعة الحصص عن بُعد · إعداد وتنفيذ / بكر الدوخي · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
 $('stDay').onchange=()=>{state.stDay=+$('stDay').value;renderStaff()};
 $('stPrint').onclick=()=>exportDoc('print','متابعة المسؤولين والمشرفين',[staffPage()]);$('stPdf').onclick=()=>exportDoc('pdf','متابعة المسؤولين والمشرفين',[staffPage()]);
-function render(){renderDue();renderSups();if(state.view==='staff'){renderStaff();return}if(state.view==='schedule'){renderDays();renderTimeline();renderRail()}else if(state.view==='report')renderReport();else if(state.view==='teachers')renderTeachers();else renderBoard()}
+function renderOverview(){const c=counts(scope().filter(inRange));const teachers=teachersIn(scope().filter(inRange)).length;$('overviewSummary').innerHTML=`<div class="overview-welcome"><h2>المتابعة في مكان واحد</h2><p>${esc(scopeLabel())} · ${teachers} معلم · ${esc(rangeText())}</p></div><div class="overview-metric"><span>حصص الفترة</span><strong>${c.total}</strong><small>كل الحصص ضمن اختيارك</small></div><div class="overview-metric"><span>الحصص المرصودة</span><strong>${c.logged}</strong><small>نسبة الرصد ${pct(c.logged,c.total)}%</small></div><div class="overview-metric"><span>بانتظار الرصد</span><strong>${c.pending}</strong><small>تحتاج استكمال المتابعة</small></div>`}
+function render(){renderOverview();renderDue();renderSups();if(state.view==='staff'){renderStaff();return}if(state.view==='schedule'){renderDays();renderTimeline();renderRail()}else if(state.view==='report')renderReport();else if(state.view==='teachers')renderTeachers();else renderBoard()}
 
 // filters
 function paintDayOpts(){const o=DAYS.map((d,i)=>`<option value="${i}">${d.n} ${d.h}</option>`).join('');['fFrom','fTo','tFrom','tTo'].forEach(id=>{$(id).innerHTML=o;$(id).value=String(/To$/.test(id)?state.to:state.from)})}
@@ -1324,7 +1330,7 @@ function showGate(mode,msg){const g=$('gate');g.hidden=false;$('gateMsg').textCo
 function enter(role){state.role=role;$('gate').hidden=true;$('logoutBtn').hidden=false;
   $('rolePill').hidden=false;$('rolePill').textContent='دخول: '+roleName(role);$('pwBtn').hidden=!state.secure;
   $('namesBtn').hidden=!(role<0&&state.isEditor);$('exportBtn').hidden=!(role<0&&state.downloads);$('impBtn').hidden=!(role>=-1&&role<=3&&state.db);$('waAllBtn').hidden=role!==-1;document.querySelectorAll('.dlx').forEach(x=>x.hidden=!state.downloads||(x.classList.contains('master-only')&&role>=0));
-  applyRepViews();startData();render()}
+  applyRepViews();startData();if(role===-1)setView('teachers');else render()}
 $('loginForm').onsubmit=async e=>{e.preventDefault();$('loginErr').textContent='';
   if(loginRole==null){$('loginErr').textContent='اختر صفة الدخول أولاً';return}
   if(state.secure){const btn=$('loginForm').querySelector('[type=submit]');btn.disabled=true;
