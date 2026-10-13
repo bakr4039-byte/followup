@@ -259,20 +259,40 @@ tr.clickable:hover td{background:var(--surface-2)}
 body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important}
 @media print{.credit-fix{display:none}}
 /* gate */
-.gate{position:fixed;inset:0;z-index:40;background:var(--bg);display:grid;place-items:center;padding-inline:16px;padding-block:24px;overflow:auto}
-.gate-card{width:min(440px,100%);background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:26px 24px;display:grid;gap:18px}
-.gate-card .brand{justify-content:center;text-align:center;flex-direction:column;gap:10px}
+.gate{position:fixed;inset:0;z-index:40;background:radial-gradient(1200px 600px at 85% -10%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 60%),radial-gradient(900px 500px at 0% 110%,color-mix(in srgb,var(--brass) 14%,transparent),transparent 60%),var(--bg);display:grid;justify-items:center;align-items:start;padding-inline:16px;padding-block:24px 64px;overflow:auto}
+.gate-card{margin-block:auto;width:min(980px,100%);background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:0 20px 60px rgba(17,48,43,.14);display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);overflow:hidden}
+.gate-side{background:linear-gradient(160deg,var(--accent),color-mix(in srgb,var(--accent) 70%,#000));color:#fff;padding:32px 30px;display:flex;flex-direction:column;gap:22px;position:relative}
+.gate-side::after{content:"";position:absolute;inset:auto -60px -60px auto;width:220px;height:220px;border-radius:50%;border:28px solid rgba(255,255,255,.07);pointer-events:none}
+.gs-top{display:flex;gap:14px;align-items:center}.gs-top .seal{background:#fff;color:var(--accent);width:56px;height:56px;font-size:26px;box-shadow:none}
+.gs-top h1{font-family:var(--f-display);font-weight:600;font-size:clamp(22px,2.6vw,28px);margin:0;line-height:1.25}.gs-top p{margin:4px 0 0;opacity:.85;font-size:13.5px}
+.gs-week{margin:0;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:10px 14px;font-size:13.5px;line-height:1.7}
+.gs-list{margin:0;padding:0;list-style:none;display:grid;gap:10px;font-size:14px}.gs-list li{display:flex;gap:10px;align-items:center}.gs-list li::before{content:"✓";display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.16);font-size:12px;flex:none}
+.gs-teacher{margin-top:auto;display:grid;gap:8px;font-size:13px}.gs-teacher span{opacity:.85}
+.gs-teacher .btn{background:#fff;color:var(--accent);border:0;font-weight:700;padding:11px 14px;text-align:center;text-decoration:none;display:block}
+.gate-main{padding:30px 30px 26px;display:grid;gap:16px;align-content:start}
+.gm-head h2{font-family:var(--f-display);font-weight:600;font-size:22px;margin:0}.gm-head .hint{margin-top:4px}
+.gm-msg{text-align:center;padding:10px;border-radius:10px;background:var(--surface-2)}
+.gm-form{display:grid;gap:14px}
 .gate-card h2{font-family:var(--f-display);font-weight:600;font-size:18px;margin:0}
 .roles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.role{border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:10px;text-align:right;display:grid;gap:1px;min-width:0}
+.role{border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:9px 10px;text-align:right;display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;align-items:center;min-width:0;transition:border-color .15s,background .15s,box-shadow .15s}
+.role:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.role .av{grid-row:span 2;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-family:var(--f-display);font-weight:700;font-size:15px}
+.role.master .av{background:var(--accent);color:var(--accent-ink)}.role.mon .av{background:color-mix(in srgb,var(--brass) 18%,transparent);color:var(--brass)}.role.repr .av{background:var(--tech-soft);color:var(--tech)}
 .role b{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .role span{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.role.master{grid-column:1/-1;border-style:dashed}
-.role[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);border-style:solid}
-.gate input[type=password],.names input[type=password]{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:16px;direction:ltr;text-align:right}
+.role.master{grid-column:1/-1}
+.role[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+.role[aria-pressed="true"] .av{background:var(--accent);color:var(--accent-ink)}
+.pwrow{display:flex;gap:6px}.pwrow input{flex:1;min-width:0}.pweye{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:0 12px;font-size:12.5px;color:var(--muted)}
+.gate input[type=password],.gate input[type=text]#pw,.names input[type=password]{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:11px 12px;font-size:16px;direction:ltr;text-align:right}
+.gate input#pw:focus{outline:2px solid var(--accent);outline-offset:1px;background:var(--surface)}
 .err{color:var(--bad);font-size:13px;margin:0;min-height:1.2em}
-.gate .btn{width:100%;padding:11px}
+.gate .btn{width:100%;padding:12px}.gm-go{font-size:16px}
 .hint{font-size:12.5px;color:var(--muted);margin:0}
+#setupForm{display:grid;gap:12px}
+@media (max-width:820px){.gate-card{grid-template-columns:minmax(0,1fr)}.gate-side{padding:22px 20px;gap:14px}.gs-list{display:none}.gate-main{padding:22px 18px}.gate-side::after{display:none}}
+@media (max-width:420px){.roles{grid-template-columns:minmax(0,1fr)}}
 .rolepill{display:inline-flex;gap:6px;align-items:center}
 .sec{display:grid;gap:10px;padding-top:6px;border-top:1px solid var(--line)}
 .sec h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:16px}
@@ -280,8 +300,8 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
 .tpick label{display:flex;gap:6px;align-items:center;justify-content:flex-start;font-size:13px;font-weight:400;white-space:nowrap}
 .tpick label input{width:auto!important;flex:none;margin:0;padding:0}
 .tpick label.taken{color:var(--muted)}
-.rolesH{grid-column:1/-1;margin:6px 0 0;font-size:12.5px;color:var(--muted)}
-.role.mon{border-style:dashed}
+.rolesH{grid-column:1/-1;margin:8px 0 0;font-size:12px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px}.rolesH::after{content:"";flex:1;height:1px;background:var(--line)}.roles>.rolesH:first-child{margin-top:0}
+
 #drawer.monmode #dStatus,#drawer.monmode #dRec,#drawer.monmode #dStars,#drawer.supmode #dStarsM{pointer-events:none;opacity:.55}
 .hidef{display:none!important}
 .views{flex-wrap:wrap;border-radius:16px}
@@ -549,15 +569,21 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
 
 <div class="gate" id="gate">
   <div class="gate-card">
-    <div class="brand"><div class="seal" aria-hidden="true">ص</div><div><h1>متابعة الحصص عن بُعد</h1><p>ثانوية الصحافة الأهلية</p></div></div>
-    <a class="btn" href="teacher.html">دخول المعلم برقم الهوية</a>
-    <div id="gateMsg" class="hint" style="text-align:center">جارٍ التحميل…</div>
-    <form id="loginForm" hidden style="display:grid;gap:14px">
-      <div class="field"><span class="lbl">الدخول بصفة</span><div class="roles" id="roles"></div></div>
-      <div class="field"><label for="pw">كلمة المرور</label><input id="pw" type="password" autocomplete="current-password" required></div>
-      <p class="err" id="loginErr"></p>
-      <button class="btn" type="submit">دخول</button>
-    </form>
+    <aside class="gate-side">
+      <div class="gs-top"><div class="seal" aria-hidden="true">ص</div><div><h1>متابعة الحصص عن بُعد</h1><p>مدارس الصحافة الأهلية · القسم الثانوي</p></div></div>
+      <p class="gs-week" id="gateWeek"></p>
+      <ul class="gs-list"><li>رصد الحصص لحظة بلحظة</li><li>تقارير أسبوعية ودورية جاهزة للطباعة</li><li>متابعة المعلمين والمسؤولين والمشرفين</li></ul>
+      <div class="gs-teacher"><span>أنت معلم؟</span><a class="btn ghost" href="teacher.html">دخول المعلم برقم الهوية ←</a></div>
+    </aside>
+    <div class="gate-main">
+      <div class="gm-head"><h2>تسجيل الدخول</h2><p class="hint">اختر صفتك ثم اكتب كلمة المرور</p></div>
+      <div id="gateMsg" class="hint gm-msg">جارٍ التحميل…</div>
+      <form id="loginForm" hidden class="gm-form">
+        <div class="roles" id="roles" role="radiogroup" aria-label="الدخول بصفة"></div>
+        <div class="field pwf"><label for="pw">كلمة المرور <span id="pwFor" class="note"></span></label><div class="pwrow"><input id="pw" type="password" autocomplete="current-password" required><button type="button" class="pweye" id="pwEye" aria-label="إظهار كلمة المرور">إظهار</button></div></div>
+        <p class="err" id="loginErr"></p>
+        <button class="btn gm-go" type="submit">دخول</button>
+      </form>
     <form id="setupForm" hidden style="display:grid;gap:12px">
       <h2>تهيئة كلمات المرور</h2>
       <p class="hint">أول دخول: حدّد كلمة المرور الرئيسية (للمدير) وكلمة مرور لكل مسؤول. تقدر تغيّرها لاحقاً من الإعدادات.</p>
@@ -565,6 +591,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
       <p class="err" id="setupErr"></p>
       <button class="btn" type="submit">حفظ والدخول كمدير</button>
     </form>
+    </div>
   </div>
 </div>
 
@@ -1308,12 +1335,15 @@ function pwFields(prefix,withNames,required){return [-1,0,1,2,3].map(r=>{const l
 function save(k,v){try{v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 function load(k){try{return JSON.parse(sessionStorage.getItem(k)||'null')}catch(e){return null}}
 let loginRole=null;
-function renderRoles(){const btn=r=>`<button type="button" class="role ${r<0?'master':''} ${r>=4&&r<8?'mon':''}" data-role="${r}" aria-pressed="${loginRole===r}"><b>${r<0?'المدير (كلمة المرور الرئيسية)':esc(roleName(r))}</b><span>${r<0?'عرض وتعديل كل الحصص والإعدادات':r===8?'عرض التقارير فقط':r>=4?'مشرف · '+(state.mteachers[r-4]||[]).length+' معلم':SUPCLS[r]}</span></button>`;
+function renderRoles(){const ini=r=>{const n=String(r<0?'المدير':roleName(r)||'').replace(/^(أ\.|ا\.|أ\/)\s*/,'').trim();return r<0?'م':r===8?'ت':(n.match(/\d/)?n.match(/\d/)[0]:n.charAt(0))||'•'};
+  const btn=r=>`<button type="button" role="radio" class="role ${r<0?'master':''} ${r>=4&&r<8?'mon':''} ${r===8?'repr':''}" data-role="${r}" aria-pressed="${loginRole===r}" aria-checked="${loginRole===r}"><i class="av" aria-hidden="true">${esc(ini(r))}</i><b>${r<0?'المدير':esc(roleName(r))}</b><span>${r<0?'عرض وتعديل كل الحصص والإعدادات':r===8?'عرض التقارير فقط':r>=4?'مشرف · '+(state.mteachers[r-4]||[]).length+' معلم':SUPCLS[r]}</span></button>`;
   const mons=[4,5,6,7].filter(r=>state.secure?secureMons()[r-4]:state.auth&&(state.auth.mons||[])[r-4]);
   const repOn=state.secure?!!(state.secureDoc&&(state.secureDoc.rep||(state.secureDoc.ready||{}).rep===true)):!!storedHash(8);
-  $('roles').innerHTML=[-1,0,1,2,3].map(btn).join('')+(mons.length?'<p class="rolesH">المشرفون على المعلمين</p>'+mons.map(btn).join(''):'')+(repOn?'<p class="rolesH">التقارير</p>'+btn(8):'')}
-$('roles').addEventListener('click',e=>{const b=e.target.closest('[data-role]');if(!b)return;loginRole=+b.dataset.role;renderRoles();$('pw').focus()});
-function showGate(mode,msg){const g=$('gate');g.hidden=false;$('gateMsg').textContent=msg||'';$('gateMsg').hidden=!msg;$('loginForm').hidden=mode!=='login';$('setupForm').hidden=mode!=='setup';
+  $('roles').innerHTML='<p class="rolesH">الإدارة</p>'+btn(-1)+'<p class="rolesH">المسؤولون المتابعون</p>'+[0,1,2,3].map(btn).join('')+(mons.length?'<p class="rolesH">المشرفون على المعلمين</p>'+mons.map(btn).join(''):'')+(repOn?'<p class="rolesH">التقارير</p>'+btn(8):'');
+  $('pwFor').textContent=loginRole==null?'':'· '+(loginRole<0?'المدير':roleName(loginRole))}
+$('roles').addEventListener('click',e=>{const b=e.target.closest('[data-role]');if(!b)return;loginRole=+b.dataset.role;renderRoles();$('loginErr').textContent='';$('pw').focus({preventScroll:true});$('pw').scrollIntoView({block:'nearest',behavior:'smooth'})});
+$('pwEye').onclick=()=>{const i=$('pw');const show=i.type==='password';i.type=show?'text':'password';$('pwEye').textContent=show?'إخفاء':'إظهار'};
+function showGate(mode,msg){const g=$('gate');g.hidden=false;$('gateWeek').textContent=`الأسبوع الدراسي: من الأحد ${DAYS[0].h}هـ إلى الخميس ${DAYS[4].h}هـ`;$('gateMsg').textContent=msg||'';$('gateMsg').hidden=!msg;$('loginForm').hidden=mode!=='login';$('setupForm').hidden=mode!=='setup';
   if(mode==='login')renderRoles();if(mode==='setup'){$('setupFields').innerHTML=pwFields('su',false,true)}}
 function enter(role){state.role=role;$('gate').hidden=true;$('logoutBtn').hidden=false;
   $('rolePill').hidden=false;$('rolePill').textContent='دخول: '+roleName(role);$('pwBtn').hidden=!state.secure;
