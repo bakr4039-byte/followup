@@ -3,7 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<style>:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<style>:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}
+/* charts */
+.cgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.cgrid .c-days{grid-column:span 2}
+.cgrid.t4 .c-rat{grid-column:span 2}
+@media (max-width:900px){.cgrid{grid-template-columns:minmax(0,1fr)}.cgrid .c-days,.cgrid.t4 .c-rat{grid-column:auto}}
+.cbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:10px;align-content:start;min-width:0}
+.cbox h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:16px}
+.cbox h3 small{font-family:var(--f-body);font-weight:400;color:var(--muted);font-size:12px;margin-inline-start:6px}
+.cchart{width:100%;height:auto;display:block;overflow:visible;font-family:var(--f-body)}
+.cdonut{font-family:var(--f-body);flex:none}
+.cdwrap{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center}
+.clegend{display:grid;gap:6px;font-size:13px;min-width:150px;flex:1}
+.clegend span{display:flex;align-items:center;gap:8px}
+.clegend i{width:12px;height:12px;border-radius:3px;flex:none}
+.clegend b{margin-inline-start:auto;font-variant-numeric:tabular-nums}
+.cstack{display:grid;gap:12px}
+.cshead{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin-bottom:5px}
+.cshead b{font-variant-numeric:tabular-nums}.cshead small{color:var(--muted);font-weight:400}
+.csbar{display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px}
+.csbar i{display:block;height:100%}
+.cgrid .hit{cursor:crosshair}.cgrid .hit:hover{fill:color-mix(in srgb,var(--ink) 5%,transparent)!important}
+.ctip{position:fixed;z-index:99;pointer-events:none;background:var(--ink);color:var(--surface);font-size:12.5px;padding:6px 10px;border-radius:8px;max-width:300px;box-shadow:var(--shadow);line-height:1.5}
+#tDetail .cgrid{padding:0 16px 14px}
+.board .cgrid .cbox{border-radius:18px}
+</style>
 <title>منصة متابعة الحصص عن بُعد</title>
 </head>
 <body>
@@ -342,6 +367,7 @@ tr.clickable:hover td{background:var(--surface-2)}
 
   <section id="reportView" class="report" hidden>
     <div class="kpis" id="kpis"></div>
+    <div id="rCharts"></div>
     <div class="tablebox">
       <header>
         <h2>سجل الحصص</h2>
@@ -388,6 +414,7 @@ tr.clickable:hover td{background:var(--surface-2)}
     </div>
     <div class="hero" id="bHero"></div>
     <div class="bstatus" id="bStatus"></div>
+    <div id="bCharts"></div>
     <div class="bgrid">
       <div class="panel"><h2>الإنجاز حسب المسؤول</h2><div class="bars" id="bSups"></div></div>
       <div class="panel"><h2>الإنجاز حسب اليوم</h2><div class="bars" id="bDays"></div></div>
@@ -614,7 +641,67 @@ function renderReport(){
   const fs=$('fStatus').value,ft=$('fText').value.trim();
   const rows=scope().filter(s=>{const l=state.logs[s.id];if(!inRange(s))return false;if(fs==='pending'&&l&&ST[l.status])return false;if(fs&&fs!=='pending'&&(!l||l.status!==fs))return false;if(ft&&!(s.subj+s.teacher+CLS[s.cls]).includes(ft))return false;return true});
   state.reportRows=rows;
+  {const R=scope().filter(inRange);const sups=state.names.map((n,i)=>({label:n,c:counts(R.filter(s=>s.sup===i))})).filter((x,i)=>(effSup()<0||i===effSup())&&x.c.total);
+   $('rCharts').innerHTML=chartsBlock(R,PAL_SCREEN,{sups:sups.length>1?sups:null,cls:sups.length>1?'':'t4'});}
   $('tbody').innerHTML=rows.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr class="clickable" data-open="${s.id}"><td>${DAYS[s.day].n}</td><td>${s.label}</td><td class="num">${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td>${esc(s.teacher)}</td><td>${esc(state.names[s.sup])}</td><td><span class="status ${st?st.c:''}">${st?st.t:'لم تُرصد'}</span></td><td class="num">${esc(l.entry||'')}</td><td class="num">${esc(l.present??'')}</td><td class="num">${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${l.rating?'★'.repeat(l.rating):''}</td><td class="wrap">${esc(l.notes||'')}</td></tr>`}).join('')||'<tr><td colspan="14" class="empty">لا توجد نتائج.</td></tr>';}
+// ---------- charts ----------
+const SKEYS=['done','late','absent','tech'];
+const PAL_SCREEN={done:'var(--ok)',late:'var(--warn)',absent:'var(--bad)',tech:'var(--tech)',pending:'var(--idle-soft)',ink:'var(--ink)',muted:'var(--muted)',grid:'var(--line)',surface:'var(--surface)',accent:'var(--accent)',accentSoft:'var(--accent-soft)',brass:'var(--brass)'};
+const PAL_PRINT={done:'#1C8A4E',late:'#B7791F',absent:'#C2413A',tech:'#6B4FB8',pending:'#E3E9E7',ink:'#13231f',muted:'#5B726D',grid:'#D5DFDC',surface:'#ffffff',accent:'#0E6B57',accentSoft:'#DCEFE9',brass:'#A87B2D'};
+const PEND_T='لم تُرصد';
+const fill=(c)=>`style="fill:${c}"`;
+// hatch pattern for "late" & "tech" = secondary encoding so status never relies on color alone
+function chartDefs(P,id){return `<defs><pattern id="hl${id}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" ${fill(P.late)}/><line x1="0" y1="0" x2="0" y2="6" style="stroke:${P.surface};stroke-width:1.6;opacity:.45"/></pattern><pattern id="ht${id}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(135)"><rect width="6" height="6" ${fill(P.tech)}/><line x1="0" y1="0" x2="0" y2="6" style="stroke:${P.surface};stroke-width:1.6;opacity:.45"/></pattern></defs>`}
+let _cid=0;
+const segFill=(k,P,id)=>k==='late'?`url(#hl${id})`:k==='tech'?`url(#ht${id})`:P[k];
+const swatch=(k,P)=>P===PAL_PRINT?`background:${P[k]}`:k==='late'?`background:repeating-linear-gradient(45deg,${P.late} 0 3px,color-mix(in srgb,${P.late} 60%,${P.surface}) 3px 5px)`:k==='tech'?`background:repeating-linear-gradient(135deg,${P.tech} 0 3px,color-mix(in srgb,${P.tech} 60%,${P.surface}) 3px 5px)`:`background:${P[k]}`;
+function legendHTML(c,P){return `<div class="clegend">${SKEYS.map(k=>`<span><i style="${swatch(k,P)}"></i>${ST[k].t}<b>${c[k]}</b></span>`).join('')}<span><i style="background:${P.pending};outline:1px solid ${P.grid}"></i>${PEND_T}<b>${c.pending}</b></span></div>`}
+// donut: share of each status out of all sessions; center = logging %
+function donutSVG(c,P,o={}){const id=++_cid,S=o.size||170,R=S/2-14,W=o.stroke||18,C=2*Math.PI*R,cx=S/2;let off=0;
+  const parts=[...SKEYS.map(k=>[k,c[k]]),['pending',c.pending]].filter(x=>x[1]>0);const gap=parts.length>1?2.5:0;
+  const segs=parts.map(([k,v])=>{const len=C*v/c.total;const d=Math.max(len-gap,0.5);const tip=`${k==='pending'?PEND_T:ST[k].t}: ${v} من ${c.total} (${pct(v,c.total)}%)`;
+    const s=`<circle cx="${cx}" cy="${cx}" r="${R}" fill="none" style="stroke:${segFill(k,P,id)}" stroke-width="${W}" stroke-dasharray="${d} ${C-d}" stroke-dashoffset="${-off}" transform="rotate(-90 ${cx} ${cx})" data-tip="${esc(tip)}"><title>${esc(tip)}</title></circle>`;off+=len;return s}).join('');
+  return `<svg class="cdonut" viewBox="0 0 ${S} ${S}" width="${o.px||S}" height="${o.px||S}" role="img" aria-label="توزيع الحالات">${chartDefs(P,id)}${c.total?segs:`<circle cx="${cx}" cy="${cx}" r="${R}" fill="none" style="stroke:${P.pending}" stroke-width="${W}"/>`}
+  <text x="${cx}" y="${cx+2}" text-anchor="middle" style="fill:${P.ink};font-size:${S*.2}px;font-weight:700">${pct(c.logged,c.total)}%</text><text x="${cx}" y="${cx+S*.15}" text-anchor="middle" style="fill:${P.muted};font-size:${Math.max(10,S*.075)}px">${esc(o.sub||'نسبة الرصد')}</text></svg>`}
+// stacked columns per day (RTL: first day on the right)
+function dayColumnsSVG(rows,P,o={}){const id=++_cid,W=o.w||560,H=o.h||220,mT=24,mB=38,mX=14,n=rows.length;if(!n)return'';
+  const step=(W-2*mX)/n,bw=Math.min(54,step*.52),max=Math.max(1,...rows.map(r=>r.c.total)),ph=H-mT-mB,base=H-mB;
+  const grid=[.5,1].map(f=>`<line x1="${mX}" x2="${W-mX}" y1="${base-ph*f}" y2="${base-ph*f}" style="stroke:${P.grid}" stroke-dasharray="3 4"/>`).join('');
+  const cols=rows.map((r,i)=>{const x=W-mX-(i+.5)*step-bw/2;let y=base;const c=r.c;const h=c.total/max*ph;const top=base-h;const clip=`cc${id}_${i}`;
+    const parts=[...SKEYS.map(k=>[k,c[k]]),['pending',c.pending]].filter(x=>x[1]>0);
+    const segs=parts.map(([k,v],j)=>{const sh=v/max*ph;y-=sh;const g=j<parts.length-1?2:0;const tip=`${r.label} · ${k==='pending'?PEND_T:ST[k].t}: ${v}`;
+      return `<rect x="${x}" y="${y+g}" width="${bw}" height="${Math.max(sh-g,0.5)}" style="fill:${segFill(k,P,id)}" data-tip="${esc(tip)}"><title>${esc(tip)}</title></rect>`}).join('');
+    return `<clipPath id="${clip}"><path d="M${x},${base}V${top+4}q0,-4 4,-4h${bw-8}q4,0 4,4V${base}Z"/></clipPath><g clip-path="url(#${clip})">${segs}</g>
+    <rect x="${x-(step-bw)/2+2}" y="${mT-10}" width="${step-4}" height="${ph+10}" fill="transparent" data-tip="${esc(`${r.label}: ${c.total} حصة · تمت ${c.done} · متأخرة ${c.late} · لم تُعقد ${c.absent} · تقنية ${c.tech} · لم تُرصد ${c.pending}`)}" class="hit"/>
+    <text x="${x+bw/2}" y="${top-6}" text-anchor="middle" style="fill:${P.ink};font-size:12px;font-weight:600">${c.total}</text>
+    <text x="${x+bw/2}" y="${base+16}" text-anchor="middle" style="fill:${P.ink};font-size:12px">${esc(r.label)}</text>${r.sub?`<text x="${x+bw/2}" y="${base+30}" text-anchor="middle" style="fill:${P.muted};font-size:10px">${esc(r.sub)}</text>`:''}`}).join('');
+  return `<svg class="cchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.label||'الحصص حسب اليوم')}">${chartDefs(P,id)}${grid}<line x1="${mX}" x2="${W-mX}" y1="${base}" y2="${base}" style="stroke:${P.muted}" stroke-width="1"/>${cols}</svg>`}
+// single-series line per day; nulls break the line
+function dayLineSVG(pts,P,o={}){const W=o.w||560,H=o.h||190,mT=26,mB=30,mX=26,n=pts.length;if(!n)return'';const max=o.max||100,color=o.color||P.accent,step=(W-2*mX)/n,ph=H-mT-mB,base=H-mB;
+  const X=i=>W-mX-(i+.5)*step,Y=v=>base-v/max*ph;
+  const grid=[0,.5,1].map(f=>`<line x1="${mX}" x2="${W-mX}" y1="${base-ph*f}" y2="${base-ph*f}" style="stroke:${f?P.grid:P.muted}" ${f?'stroke-dasharray="3 4"':''}/><text x="${W-4}" y="${base-ph*f+4}" text-anchor="end" style="fill:${P.muted};font-size:10px">${o.fmtAxis?o.fmtAxis(max*f):Math.round(max*f)}</text>`).join('');
+  let d='',area='',run=[];const flush=()=>{if(run.length>1){d+=`<path d="M${run.map(([i,v])=>`${X(i)},${Y(v)}`).join('L')}" fill="none" style="stroke:${color}" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>`;area+=`<path d="M${X(run[0][0])},${base}L${run.map(([i,v])=>`${X(i)},${Y(v)}`).join('L')}L${X(run[run.length-1][0])},${base}Z" style="fill:${color};opacity:.10"/>`}run=[]};
+  pts.forEach((p,i)=>{if(p.v==null)flush();else run.push([i,p.v])});flush();
+  const dots=pts.map((p,i)=>{const lab=`<text x="${X(i)}" y="${base+18}" text-anchor="middle" style="fill:${P.ink};font-size:12px">${esc(p.label)}</text>`;if(p.v==null)return lab+`<text x="${X(i)}" y="${base-6}" text-anchor="middle" style="fill:${P.muted};font-size:11px">—</text>`;const tip=`${p.label}: ${o.fmt?o.fmt(p.v):p.v}${p.note?' · '+p.note:''}`;
+    return lab+`<circle cx="${X(i)}" cy="${Y(p.v)}" r="5" style="fill:${color};stroke:${P.surface}" stroke-width="2"/><text x="${X(i)}" y="${Y(p.v)-10}" text-anchor="middle" style="fill:${P.ink};font-size:11.5px;font-weight:600">${o.fmt?o.fmt(p.v):p.v}</text><rect x="${X(i)-step/2+2}" y="${mT-14}" width="${step-4}" height="${ph+14}" fill="transparent" class="hit" data-tip="${esc(tip)}"><title>${esc(tip)}</title></rect>`}).join('');
+  return `<svg class="cchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.label||'')}">${grid}${area}${d}${dots}</svg>`}
+// horizontal stacked status bar per row (HTML, prints well)
+function stackRowsHTML(rows,P){return `<div class="cstack">${rows.map(r=>{const c=r.c;return `<div class="csrow" data-tip="${esc(`${r.label}: رُصدت ${c.logged} من ${c.total} · تمت ${c.done} · متأخرة ${c.late} · لم تُعقد ${c.absent} · تقنية ${c.tech}`)}"><div class="cshead"><span>${esc(r.label)}</span><b>${pct(c.logged,c.total)}% <small>(${c.logged}/${c.total})</small></b></div><div class="csbar" style="background:${P.pending}">${SKEYS.map(k=>c[k]?`<i style="width:${c[k]*100/c.total}%;${swatch(k,P)}"></i>`:'').join('')}</div></div>`}).join('')}</div>`}
+// per-day data helpers
+function perDay(list,f=state.from,t=state.to){const out=[];for(let i=f;i<=t;i++){const l=list.filter(s=>s.day===i);out.push({i,label:DAYS[i].n,sub:DAYS[i].h,list:l,c:tStats(l)})}return out}
+function chartsBlock(list,P,o={}){const days=perDay(list,o.from??state.from,o.to??state.to),c=tStats(list);const box=(t,body,cls='')=>`<div class="cbox ${cls}"><h3>${t}</h3>${body}</div>`;
+  const att=dayLineSVG(days.map(d=>({label:d.label,v:d.c.att,note:d.c.present+d.c.absentSt?`${d.c.present} حاضر · ${d.c.absentSt} غائب`:''})),P,{max:100,fmt:v=>v+'%',fmtAxis:v=>v+'%',label:'نسبة حضور الطلاب حسب اليوم',color:P.accent,w:360,h:o.lineH||210});
+  const rat=dayLineSVG(days.map(d=>({label:d.label,v:d.c.avg==null?null:+d.c.avg.toFixed(1),note:d.c.rating.length?d.c.rating.length+' تقييم':''})),P,{max:5,fmt:v=>v.toFixed(1),fmtAxis:v=>v.toFixed(1),label:'متوسط التقييم حسب اليوم',color:P.brass,w:/\bt4\b/.test(o.cls||'')?560:360,h:o.lineH||(/\bt4\b/.test(o.cls||'')?190:210)});
+  const B={donut:box('توزيع الحالات',`<div class="cdwrap">${donutSVG(c,P,{px:o.donutPx})}${legendHTML(c,P)}</div>`,'c-donut'),
+    days:box('الحصص حسب اليوم',dayColumnsSVG(days,P,{h:o.colH}),'c-days'),
+    att:box('نسبة حضور الطلاب حسب اليوم',att,'c-att'),rating:box('متوسط التقييم حسب اليوم <small>من 5</small>',rat,'c-rat'),
+    sups:o.sups?box('الرصد حسب المسؤول',stackRowsHTML(o.sups,P),'c-sups'):''};
+  return `<div class="cgrid ${o.cls||''}">${(o.only||['donut','days','att','rating','sups']).map(k=>B[k]||'').join('')}</div>`}
+// tooltip for every [data-tip] inside a chart
+(function(){const tip=document.createElement('div');tip.className='ctip';tip.hidden=true;document.body.appendChild(tip);
+  document.addEventListener('pointermove',e=>{const t=e.target.closest&&e.target.closest('.cgrid [data-tip]');if(!t){tip.hidden=true;return}tip.textContent=t.dataset.tip;tip.hidden=false;
+    const r=tip.getBoundingClientRect();let x=e.clientX-r.width/2,y=e.clientY-r.height-14;x=Math.max(8,Math.min(x,innerWidth-r.width-8));if(y<8)y=e.clientY+18;tip.style.left=x+'px';tip.style.top=y+'px'},{passive:true});
+  document.addEventListener('pointerleave',()=>tip.hidden=true)})();
 // ---------- teachers ----------
 const avgOf=a=>a.length?(a.reduce((x,y)=>x+y,0)/a.length):null;
 function tStats(list){const c=counts(list);let pr=0,ab=0,rec=0,recN=0,ent=[];list.forEach(s=>{const l=state.logs[s.id];if(!l||!ST[l.status])return;if(typeof l.present==='number')pr+=l.present;if(typeof l.absent==='number')ab+=l.absent;if(l.recorded){recN++;if(l.recorded==='yes')rec++}});
@@ -652,6 +739,7 @@ function renderTeachers(){const q=$('tSearch').value.trim();const all=teachersIn
   <div class="wa"><label for="tPhone">جوال المعلم</label><input id="tPhone" type="tel" inputmode="tel" placeholder="05xxxxxxxx" value="${esc(state.phones[sel.name]||'')}" ${state.role===-1&&state.isEditor&&state.db?'':'disabled'}>${state.role===-1&&state.isEditor&&state.db?'<button class="btn ghost" id="tPhoneSave">حفظ الرقم</button>':''}<a class="wabtn" id="tWa" target="_blank" rel="noopener noreferrer" aria-disabled="${waLink(sel)?'false':'true'}" ${waLink(sel)?`href="${esc(waLink(sel))}"`:''}>إرسال التقرير بالواتساب</a><span class="note" id="tWaNote">${waLink(sel)?'يفتح واتساب برسالة جاهزة فيها ملخص التقرير. لإرفاق ملف PDF: حمّله أولاً ثم أرفقه في المحادثة.':(state.role===-1&&state.isEditor?'أضف رقم الجوال ثم احفظه لتفعيل الإرسال.':'لم يُضف رقم جوال لهذا المعلم بعد (يضيفه المدير).')}</span></div>
   <div class="tstats"><div class="tstat"><span>عدد الحصص</span><b class="num">${c.total}</b></div><div class="tstat s-done"><span>تمت في وقتها</span><b class="num">${c.done}</b></div><div class="tstat s-late"><span>بدأت متأخرة</span><b class="num">${c.late}</b></div><div class="tstat s-absent"><span>لم تُعقد</span><b class="num">${c.absent}</b></div><div class="tstat s-tech"><span>مشكلة تقنية</span><b class="num">${c.tech}</b></div><div class="tstat"><span>لم تُرصد</span><b class="num">${c.pending}</b></div><div class="tstat"><span>متوسط التقييم</span><b class="num">${fmtAvg(c.avg)}</b></div><div class="tstat"><span>نسبة حضور الطلاب</span><b class="num">${c.att==null?'—':c.att+'%'}</b></div></div>
   <div class="scroll"><table><thead><tr><th>اليوم</th><th>الحصة</th><th>الوقت</th><th>الصف / المسار</th><th>المادة</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>تسجيل</th><th>تقييم</th><th>ملاحظات</th></tr></thead><tbody>${sel.ss.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr class="clickable" data-open="${s.id}"><td>${DAYS[s.day].n}</td><td>${s.label}</td><td class="num">${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td><span class="status ${st?st.c:''}">${st?st.t:'لم تُرصد'}</span></td><td class="num">${esc(l.entry||'')}</td><td class="num">${esc(l.present??'')}</td><td class="num">${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${l.rating?'★'.repeat(l.rating):''}</td><td class="wrap">${esc(l.notes||'')}</td></tr>`}).join('')}</tbody></table></div>`;
+  box.querySelector('.tstats').insertAdjacentHTML('afterend',chartsBlock(sel.ss,PAL_SCREEN,{cls:'t4',only:['donut','days','att','rating']}));
   if($('tPdf')){$('tPdf').onclick=()=>exportDoc('pdf','تقرير المعلم '+sel.name,[teacherPage(sel)]);$('tPrint').onclick=()=>exportDoc('print','تقرير المعلم '+sel.name,[teacherPage(sel)])}$('tClose').onclick=()=>{state.teacher=null;renderTeachers()};
   const ps=$('tPhoneSave');if(ps)ps.onclick=async()=>{const raw=$('tPhone').value.trim();if(raw&&!normPhone(raw)){toast('رقم غير صحيح، اكتبه مثل 0551234567');return}
     const phones={...state.phones};if(raw)phones[sel.name]=raw.slice(0,20);else delete phones[sel.name];
@@ -689,6 +777,10 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid 
 .notes{min-height:60px;border:1px solid #bccbc7;border-radius:6px;padding:8px;margin-top:8px}
 .sign{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px;text-align:center;font-size:12px}.sign div{padding-top:30px;border-top:1px dashed #889}
 .foot{margin-top:10px;font-size:10px;color:#889;text-align:center}
+.cgrid{display:grid;grid-template-columns:1fr 2fr;gap:8px;margin:4px 0 12px}.cgrid.two{grid-template-columns:1fr 1fr}
+.cbox{border:1px solid #cfdcd8;border-radius:6px;padding:6px 8px;break-inside:avoid;page-break-inside:avoid}.cbox h3{margin:0 0 4px;font-size:12px;color:#0E6B57}.cbox h3 small{color:#667;font-weight:400}
+.cchart{width:100%;height:auto;display:block}.cdwrap{display:flex;gap:8px;align-items:center}.clegend{display:grid;gap:3px;font-size:10.5px;flex:1}.clegend span{display:flex;align-items:center;gap:5px}.clegend i{width:10px;height:10px;border-radius:2px;display:inline-block}.clegend b{margin-right:auto}
+.cstack{display:grid;gap:6px}.cshead{display:flex;justify-content:space-between;font-size:10.5px}.cshead small{color:#667;font-weight:400}.csbar{display:flex;height:9px;border-radius:4px;overflow:hidden;gap:1px}.csbar i{display:block;height:100%}
 .toolbar{position:sticky;top:0;background:#0E6B57;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px}
 .toolbar button{background:#fff;color:#0E6B57;border:0;border-radius:6px;padding:6px 14px;font-weight:700;cursor:pointer;font-family:inherit}
 .wrapper{max-width:900px;margin:0 auto;padding:18px}
@@ -700,6 +792,7 @@ function teacherPage(t){const c=tStats(t.ss);const sups=[...new Set(t.ss.map(s=>
   return `<section class="page">${printHeader('تقرير متابعة الحصص عن بُعد','ثانوية الصحافة الأهلية')}
   <div class="info"><div><span>اسم المعلم</span><b>${esc(t.name)}</b></div><div><span>المواد</span><b>${esc(subjOf(t.ss))}</b></div><div><span>الصفوف / المسارات</span><b>${esc(clsOf(t.ss))}</b></div><div><span>المتابِع</span><b>${esc(sups)}</b></div><div><span>نسبة الانعقاد من المرصود</span><b>${c.logged?pct(c.held,c.logged)+'%':'—'}</b></div><div><span>نسبة تسجيل الحصص</span><b>${c.rec==null?'—':c.rec+'%'}</b></div></div>
   <div class="stats"><div><span>الحصص</span><b>${c.total}</b></div><div><span>تمت في وقتها</span><b class="ok">${c.done}</b></div><div><span>متأخرة</span><b class="late">${c.late}</b></div><div><span>لم تُعقد</span><b class="bad">${c.absent}</b></div><div><span>مشكلة تقنية</span><b class="tech">${c.tech}</b></div><div><span>لم تُرصد</span><b>${c.pending}</b></div><div><span>متوسط التقييم</span><b>${fmtAvg(c.avg)}</b></div><div><span>حضور الطلاب</span><b>${c.att==null?'—':c.att+'%'}</b></div></div>
+  ${chartsBlock(t.ss,PAL_PRINT,{only:['donut','days'],donutPx:120,colH:160})}
   <table><thead><tr><th>اليوم</th><th>الحصة</th><th>الصف</th><th>المادة</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>تسجيل</th><th>التقييم</th><th>ملاحظات المتابعة</th></tr></thead><tbody>${rows}</tbody></table>
   <h2>توصيات ومرئيات</h2><div class="notes"></div>
   <div class="sign"><div>توقيع المعلم</div><div>المتابِع</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div>
@@ -709,6 +802,7 @@ function generalPage(){const R=S.filter(inRange);const c=tStats(R);
   const tRows=teachersIn(R).map(t=>{const x=tStats(t.ss);return `<tr><td>${esc(t.name)}</td><td>${esc(subjOf(t.ss))}</td><td>${x.total}</td><td class="ok">${x.done}</td><td class="late">${x.late}</td><td class="bad">${x.absent}</td><td class="tech">${x.tech}</td><td>${x.pending}</td><td>${x.logged?pct(x.held,x.logged)+'%':'—'}</td><td>${fmtAvg(x.avg)}</td></tr>`}).join('');
   return `<section class="page">${printHeader('التقرير العام لمتابعة الحصص عن بُعد','ثانوية الصحافة الأهلية – جميع الصفوف')}
   <div class="stats"><div><span>إجمالي الحصص</span><b>${c.total}</b></div><div><span>تمت في وقتها</span><b class="ok">${c.done}</b></div><div><span>متأخرة</span><b class="late">${c.late}</b></div><div><span>لم تُعقد</span><b class="bad">${c.absent}</b></div><div><span>مشكلة تقنية</span><b class="tech">${c.tech}</b></div><div><span>لم تُرصد</span><b>${c.pending}</b></div><div><span>متوسط التقييم</span><b>${fmtAvg(c.avg)}</b></div><div><span>حضور الطلاب</span><b>${c.att==null?'—':c.att+'%'}</b></div></div>
+  ${chartsBlock(R,PAL_PRINT,{only:['donut','days'],donutPx:120,colH:160})}${chartsBlock(R,PAL_PRINT,{only:['sups','att'],cls:'two',lineH:150,sups:state.names.map((n,i)=>({label:n,c:counts(R.filter(s=>s.sup===i))})).filter(x=>x.c.total)})}
   <h2>حسب المسؤول</h2><table><thead><tr><th>المسؤول</th><th>الصفوف</th><th>الحصص</th><th>مرصودة</th><th>تمت</th><th>متأخرة</th><th>لم تُعقد</th><th>تقنية</th><th>نسبة الرصد</th><th>التقييم</th></tr></thead><tbody>${supRows}</tbody></table>
   <h2>حسب المعلم</h2><table><thead><tr><th>المعلم</th><th>المواد</th><th>الحصص</th><th>تمت</th><th>متأخرة</th><th>لم تُعقد</th><th>تقنية</th><th>لم تُرصد</th><th>الانعقاد</th><th>التقييم</th></tr></thead><tbody>${tRows}</tbody></table>
   <div class="sign"><div>وكيل الشؤون التعليمية</div><div>منسق المتابعة</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div></section>`}
@@ -717,6 +811,7 @@ function weekPage(rows){const c=tStats(rows);const sups=(effSup()<0?[0,1,2,3]:[e
   const body=rows.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr><td>${DAYS[s.day].n}</td><td>${s.label}<br><small>${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</small></td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td>${esc(s.teacher)}</td><td class="${st?stCls[l.status]:'idle'}">${st?st.t:'لم تُرصد'}</td><td>${esc(l.entry||'')}</td><td>${esc(l.present??'')}</td><td>${esc(l.absent??'')}</td><td>${l.rating?l.rating+' / 5':''}</td><td>${esc(l.notes||'')}</td></tr>`}).join('')||'<tr><td colspan="11">لا توجد حصص ضمن الفلتر المحدد.</td></tr>';
   return `<section class="page">${printHeader('التقرير الأسبوعي لمتابعة الحصص عن بُعد',isMon()?scopeLabel():effSup()<0?'ثانوية الصحافة الأهلية – جميع المسؤولين':'المسؤول: '+state.names[effSup()])}
   <div class="stats"><div><span>الحصص</span><b>${c.total}</b></div><div><span>تمت في وقتها</span><b class="ok">${c.done}</b></div><div><span>متأخرة</span><b class="late">${c.late}</b></div><div><span>لم تُعقد</span><b class="bad">${c.absent}</b></div><div><span>مشكلة تقنية</span><b class="tech">${c.tech}</b></div><div><span>لم تُرصد</span><b>${c.pending}</b></div><div><span>متوسط التقييم</span><b>${fmtAvg(c.avg)}</b></div><div><span>حضور الطلاب</span><b>${c.att==null?'—':c.att+'%'}</b></div></div>
+  ${chartsBlock(rows,PAL_PRINT,{only:['donut','days'],donutPx:120,colH:160})}${chartsBlock(rows,PAL_PRINT,{only:['att','rating'],cls:'two',lineH:150})}
   <h2>حسب المسؤول</h2><table><thead><tr><th>المسؤول</th><th>الصفوف</th><th>الحصص</th><th>مرصودة</th><th>تمت</th><th>متأخرة</th><th>لم تُعقد</th><th>تقنية</th><th>نسبة الرصد</th><th>التقييم</th></tr></thead><tbody>${supRows}</tbody></table>
   <h2>سجل الحصص</h2><table><thead><tr><th>اليوم</th><th>الحصة</th><th>الصف</th><th>المادة</th><th>المعلم</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>التقييم</th><th>ملاحظات</th></tr></thead><tbody>${body}</tbody></table>
   <div class="sign"><div>المتابِع</div><div>وكيل الشؤون التعليمية</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div></section>`}
@@ -730,7 +825,7 @@ async function buildPdf(pages){const host=$('pdfhost');const {jsPDF}=window.jspd
   try{for(const el of host.querySelectorAll('.page')){
     const canvas=await window.html2canvas(el,{scale:2,backgroundColor:'#ffffff',logging:false,useCORS:true});
     const ratio=canvas.width/el.offsetWidth,pxPerMm=canvas.width/W,pageH=Math.floor(H*pxPerMm),top=el.getBoundingClientRect().top;
-    const breaks=[...el.querySelectorAll('tr,h2,.sign,.notes,.stats,.info,.foot')].map(n=>Math.round((n.getBoundingClientRect().top-top)*ratio)).filter(y=>y>0).sort((a,b)=>a-b);
+    const breaks=[...el.querySelectorAll('tr,h2,.sign,.notes,.stats,.info,.foot,.cgrid')].map(n=>Math.round((n.getBoundingClientRect().top-top)*ratio)).filter(y=>y>0).sort((a,b)=>a-b);
     let y=0;while(y<canvas.height-2){let end=y+pageH;if(end<canvas.height){const cand=breaks.filter(b=>b>y+pageH*0.3&&b<=end);if(cand.length)end=cand[cand.length-1]}else end=canvas.height;
       const h=end-y,c2=document.createElement('canvas');c2.width=canvas.width;c2.height=h;const ctx=c2.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c2.width,h);ctx.drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h);
       if(!first)pdf.addPage();first=false;pdf.addImage(c2.toDataURL('image/jpeg',0.92),'JPEG',10,10,W,h/pxPerMm);y=end}}}
@@ -758,6 +853,7 @@ function barRow(label,c){const seg=['done','late','absent','tech'].map(k=>c[k]?`
   return `<div class="barrow"><div class="row"><span>${esc(label)}</span><b>${c.logged} / ${c.total} · ${pct(c.logged,c.total)}%</b></div><div class="stack">${seg}</div></div>`}
 function renderBoard(){const list=scope();const c=tStats(list);
   $('bSub').textContent=scopeLabel()+' · تتحدّث مباشرة مع كل رصد';
+  $('bCharts').innerHTML=chartsBlock(list,PAL_SCREEN,{from:0,to:4,cls:'t4',only:['donut','days','att','rating'],donutPx:200,colH:240});
   const held=c.logged?pct(c.held,c.logged):0;
   $('bHero').innerHTML=[['نسبة الرصد',pct(c.logged,c.total)+'%',`${c.logged} من ${c.total} حصة`,pct(c.logged,c.total)],['نسبة الانعقاد',c.logged?held+'%':'—','من الحصص المرصودة',held],['متوسط التقييم',fmtAvg(c.avg),'من 5 نجوم',c.avg?c.avg*20:0],['حضور الطلاب',c.att==null?'—':c.att+'%',`${c.present} حاضر · ${c.absentSt} غائب`,c.att||0]]
     .map(([a,b,s,m])=>`<div class="htile"><span>${a}</span><b class="num">${b}</b><small class="num">${s}</small><div class="meter"><i style="width:${Math.min(100,m)}%"></i></div></div>`).join('');
