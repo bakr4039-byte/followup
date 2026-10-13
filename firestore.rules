@@ -14,7 +14,8 @@ service cloud.firestore {
           'sup1@staff.alsahafa-followup.invalid', 'sup2@staff.alsahafa-followup.invalid',
           'sup3@staff.alsahafa-followup.invalid', 'sup4@staff.alsahafa-followup.invalid',
           'mon1@staff.alsahafa-followup.invalid', 'mon2@staff.alsahafa-followup.invalid',
-          'mon3@staff.alsahafa-followup.invalid', 'mon4@staff.alsahafa-followup.invalid'
+          'mon3@staff.alsahafa-followup.invalid', 'mon4@staff.alsahafa-followup.invalid',
+          'rep@staff.alsahafa-followup.invalid'
         ];
     }
     function adminEmail() {
@@ -29,6 +30,8 @@ service cloud.firestore {
         && !secureOn();
     }
     function staff() { return staffEmail() || legacyStaff(); }
+    // the reports account can read but never write
+    function writer() { return (staffEmail() && request.auth.token.email != 'rep@staff.alsahafa-followup.invalid') || legacyStaff(); }
     function admin() { return adminEmail() || legacyStaff(); }
 
     // ---- teachers (unchanged) ----
@@ -47,13 +50,15 @@ service cloud.firestore {
 
     match /logs/{id} {
       allow get: if staff() || ownLesson(id);
-      allow list, write: if staff();
+      allow list: if staff();
+      allow write: if writer();
     }
     match /weeks/{week}/logs/{id} {
       allow get: if staff() || ownLesson(id);
-      allow list, write: if staff();
+      allow list: if staff();
+      allow write: if writer();
     }
-    match /links/{id} { allow read, write: if staff(); }
+    match /links/{id} { allow read: if staff(); allow write: if writer(); }
 
     // names are needed on the login screen
     match /config/main { allow read: if true; }

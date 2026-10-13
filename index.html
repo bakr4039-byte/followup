@@ -268,7 +268,8 @@ tr.clickable:hover td{background:var(--surface-2)}
 .tpick label.taken{color:var(--muted)}
 .rolesH{grid-column:1/-1;margin:6px 0 0;font-size:12.5px;color:var(--muted)}
 .role.mon{border-style:dashed}
-#drawer.monmode #dStatus,#drawer.monmode #dRec,#drawer.monmode #dStars{pointer-events:none;opacity:.55}
+#drawer.monmode #dStatus,#drawer.monmode #dRec,#drawer.monmode #dStars,#drawer.supmode #dStarsM{pointer-events:none;opacity:.55}
+.hidef{display:none!important}
 .views{flex-wrap:wrap;border-radius:16px}
 /* teachers */
 .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:14px 16px}
@@ -477,7 +478,9 @@ tr.clickable:hover td{background:var(--surface-2)}
       <div class="field"><label for="dAbsent">الغياب</label><input id="dAbsent" type="number" min="0" inputmode="numeric"></div>
     </div>
     <div class="field"><span class="lbl">هل سُجّلت الحصة؟</span><div class="toggle" id="dRec"><button data-v="yes" aria-pressed="false">نعم</button><button data-v="no" aria-pressed="false">لا</button></div></div>
-    <div class="field"><span class="lbl">تقييم الحصة</span><div class="stars" id="dStars"></div></div>
+    <div class="field"><span class="lbl">تقييم المسؤول المتابع</span><div class="stars" id="dStars"></div></div>
+    <div class="field"><span class="lbl">تقييم المشرف</span><div class="stars" id="dStarsM"></div></div>
+    <p class="note" id="dRateAvg" style="margin:-8px 0 0"></p>
     <div class="notes3"><p class="nh">ملاحظات المتابعة</p>
       <div class="field"><label for="nVC">حسب فيوكلاس</label><textarea id="nVC" placeholder="مثال: دخل المعلم 06:51، حاضر 4 + متأخر 9"></textarea></div>
       <div class="field"><label for="nSup">حسب المسؤول المتابع</label><textarea id="nSup" placeholder="مثال: تفاعل جيد من الطلاب، الصوت غير واضح"></textarea></div>
@@ -707,13 +710,21 @@ const inRange=s=>s.day>=state.from&&s.day<=state.to;
 const rangeText=()=>state.from===0&&state.to===4?`الأسبوع: من الأحد ${DAYS[0].h}هـ (${DAYS[0].g.replace(/-/g,'/')}م) إلى الخميس ${DAYS[4].h}هـ (${DAYS[4].g.replace(/-/g,'/')}م)`:state.from===state.to?`يوم ${DAYS[state.from].n} ${DAYS[state.from].h}هـ (${DAYS[state.from].g.replace(/-/g,'/')}م)`:`الفترة: من ${DAYS[state.from].n} ${DAYS[state.from].h}هـ إلى ${DAYS[state.to].n} ${DAYS[state.to].h}هـ`;
 const isSupRole=r=>r!=null&&r>=0&&r<=3;const isMonRole=r=>r!=null&&r>=4&&r<=7;
 const isMon=()=>isMonRole(state.role);
-const roleName=r=>r<0?'المدير':isMonRole(r)?state.mnames[r-4]:state.names[r];
+const REP=8;const isRep=()=>state.role===REP;
+const roleName=r=>r<0?'المدير':r===REP?'التقارير':isMonRole(r)?state.mnames[r-4]:state.names[r];
+// final rating = average of supervisor + monitor ratings (whichever exist)
+function rateOf(l){if(!l)return 0;const v=[l.rating,l.ratingMon].map(Number).filter(x=>x>0);return v.length?v.reduce((a,b)=>a+b,0)/v.length:0}
+const fmtR=v=>Number.isInteger(v)?String(v):v.toFixed(1);
+const starTxt=l=>{const v=rateOf(l);return v?'★ '+fmtR(v):''};
+// which note parts this account may see: supervisors don't see monitor notes and vice versa
+function notePartsFor(){const r=state.role;if(isMonRole(r))return ['notesVC','notesAdm'];if(isSupRole(r))return ['notesVC','notesSup'];return ['notesVC','notesSup','notesAdm']}
+function notesFor(l){if(!l)return '';const p=splitNotes(l);const keep=notePartsFor();return NOTE_PARTS.filter(([k])=>keep.includes(k)&&(p[k]||'').trim()).map(([k,t])=>t+': '+p[k].trim()).join('\n')}
 const monTeachers=r=>new Set(state.mteachers[r-4]||[]);
 const effSup=()=>isSupRole(state.role)?state.role:isMon()?-1:state.sup;
 const scope=()=>{if(isMon()){const T=monTeachers(state.role);return S.filter(s=>T.has(s.teacher))}const k=effSup();return S.filter(s=>k<0||s.sup===k)};
 const scopeLabel=()=>isMon()?'المشرف: '+state.mnames[state.role-4]:effSup()<0?'كل المسؤولين':state.names[effSup()];
 const ALL_TEACHERS=[...new Set(S.map(s=>s.teacher))].sort((a,b)=>a.localeCompare(b,'ar'));
-function counts(list){const c={total:list.length,done:0,late:0,absent:0,tech:0,pending:0,rating:[],present:0};list.forEach(s=>{const l=state.logs[s.id];if(l&&ST[l.status]){c[l.status]++;if(l.rating)c.rating.push(l.rating)}else c.pending++});c.logged=c.total-c.pending;c.held=c.done+c.late;return c}
+function counts(list){const c={total:list.length,done:0,late:0,absent:0,tech:0,pending:0,rating:[],present:0};list.forEach(s=>{const l=state.logs[s.id];if(l&&ST[l.status]){c[l.status]++;{const rv=rateOf(l);if(rv)c.rating.push(rv)}}else c.pending++});c.logged=c.total-c.pending;c.held=c.done+c.late;return c}
 const pct=(a,b)=>b?Math.round(a*100/b):0;
 
 function renderSups(){const el=$('sups');
@@ -723,7 +734,7 @@ function renderSups(){const el=$('sups');
   el.innerHTML=all.map(x=>`<button class="sup" aria-pressed="${state.sup===x.i}" data-sup="${x.i}"><span>${esc(x.n)}</span><span class="badge num">${x.c}</span></button>`).join('');}
 function renderDays(){const ti=todayIdx();$('days').innerHTML=DAYS.map((d,i)=>{const l=scope().filter(s=>s.day===i),c=counts(l);const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');
   return `<button class="day" aria-pressed="${state.day===i}" data-day="${i}">${i===ti?'<span class="today">اليوم</span>':''}<b>${d.n}</b><span class="num">${d.h}هـ · ${d.gs}</span><span class="num">${c.logged} / ${c.total} مرصودة</span><span class="bar">${seg}</span></button>`}).join('');}
-function cardHTML(s){const l=state.logs[s.id];const st=l&&ST[l.status];const meta=[];if(l){if(l.entry)meta.push('دخول '+esc(l.entry));if(l.present!=null&&l.present!=='')meta.push('حضور '+esc(l.present));if(l.rating)meta.push('★'.repeat(l.rating))}
+function cardHTML(s){const l=state.logs[s.id];const st=l&&ST[l.status];const meta=[];if(l){if(l.entry)meta.push('دخول '+esc(l.entry));if(l.present!=null&&l.present!=='')meta.push('حضور '+esc(l.present));if(rateOf(l))meta.push(starTxt(l))}
   return `<div class="cardbox"><button class="card ${st?st.c:''}" data-open="${s.id}"><div class="row"><span class="subj">${esc(s.subj)}</span><span class="status">${st?st.t:'لم تُرصد'}</span></div><div class="teacher">${esc(s.teacher)}</div><div class="row"><span class="tag ${s.cls==='ba'||s.cls==='cs'?'track':''}">${CLS[s.cls]}</span>${effSup()<0?`<span class="tag">${esc(state.names[s.sup])}</span>`:''}</div>${meta.length?`<div class="meta num">${meta.join(' · ')}</div>`:''}</button>${linkHTML(s)}</div>`}
 function safeUrl(u){u=String(u||'').trim();return /^https:\/\//i.test(u)?u:''}
 function linkHTML(s){const u=safeUrl(state.links[s.id]);return u?`<a class="join" href="${esc(u)}" target="_blank" rel="noopener noreferrer">دخول الحصة ↗</a>`:`<span class="nolink">لا يوجد رابط</span>`}
@@ -738,7 +749,7 @@ function renderRail(){const list=scope().filter(s=>s.day===state.day),c=counts(l
   $('ring').innerHTML=ringSVG(c)+`<div><div class="big num">${pct(c.logged,c.total)}%</div><p class="num">رُصدت ${c.logged} من ${c.total} حصة</p><p class="num">انعقاد ${c.logged?pct(c.held,c.logged):0}% من المرصود</p></div>`;
   $('legend').innerHTML=[['done'],['late'],['absent'],['tech']].map(([k])=>`<div class="lg s-${k}"><span>${ST[k].t}</span><b class="num">${c[k]}</b></div>`).join('')+`<div class="lg" style="grid-column:1/-1"><span>لم تُرصد بعد</span><b class="num">${c.pending}</b></div>`;
   const issues=scope().filter(s=>{const l=state.logs[s.id];return l&&(l.status==='absent'||l.status==='tech'||l.status==='late')});
-  $('alerts').innerHTML=issues.length?issues.map(s=>{const l=state.logs[s.id],st=ST[l.status];return `<button class="alert ${st.c}" data-open="${s.id}"><b>${st.t}</b><span>${esc(s.subj)} · ${esc(s.teacher)}</span><span class="note">${DAYS[s.day].n} · ${s.label} · ${CLS[s.cls]}${l.notes?' — '+esc(l.notes):''}</span></button>`}).join(''):'<p class="empty">لا توجد حصص متعثرة حتى الآن.</p>';}
+  $('alerts').innerHTML=issues.length?issues.map(s=>{const l=state.logs[s.id],st=ST[l.status];return `<button class="alert ${st.c}" data-open="${s.id}"><b>${st.t}</b><span>${esc(s.subj)} · ${esc(s.teacher)}</span><span class="note">${DAYS[s.day].n} · ${s.label} · ${CLS[s.cls]}${notesFor(l)?' — '+esc(notesFor(l)):''}</span></button>`}).join(''):'<p class="empty">لا توجد حصص متعثرة حتى الآن.</p>';}
 function renderReport(){
   $('kpis').innerHTML=state.names.map((n,i)=>{if(effSup()>=0&&i!==effSup())return'';const c=counts(scope().filter(s=>s.sup===i&&inRange(s)));if(isMon()&&!c.total)return'';const avg=c.rating.length?(c.rating.reduce((a,b)=>a+b,0)/c.rating.length).toFixed(1):'—';
     const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');
@@ -748,7 +759,7 @@ function renderReport(){
   state.reportRows=rows;
   {const R=scope().filter(inRange);const sups=state.names.map((n,i)=>({label:n,c:counts(R.filter(s=>s.sup===i))})).filter((x,i)=>(effSup()<0||i===effSup())&&x.c.total);
    $('rCharts').innerHTML=chartsBlock(R,PAL_SCREEN,{sups:sups.length>1?sups:null,cls:sups.length>1?'':'t4'});}
-  $('tbody').innerHTML=rows.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr class="clickable" data-open="${s.id}"><td>${DAYS[s.day].n}</td><td>${s.label}</td><td class="num">${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td>${esc(s.teacher)}</td><td>${esc(state.names[s.sup])}</td><td><span class="status ${st?st.c:''}">${st?st.t:'لم تُرصد'}</span>${rsnHTML(l)}</td><td class="num">${esc(l.entry||'')}</td><td class="num">${esc(l.present??'')}</td><td class="num">${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${l.rating?'★'.repeat(l.rating):''}</td><td class="wrap">${esc(l.notes||'')}</td></tr>`}).join('')||'<tr><td colspan="14" class="empty">لا توجد نتائج.</td></tr>';}
+  $('tbody').innerHTML=rows.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr class="clickable" data-open="${s.id}"><td>${DAYS[s.day].n}</td><td>${s.label}</td><td class="num">${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td>${esc(s.teacher)}</td><td>${esc(state.names[s.sup])}</td><td><span class="status ${st?st.c:''}">${st?st.t:'لم تُرصد'}</span>${rsnHTML(l)}</td><td class="num">${esc(l.entry||'')}</td><td class="num">${esc(l.present??'')}</td><td class="num">${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${starTxt(l)}</td><td class="wrap">${esc(notesFor(l))}</td></tr>`}).join('')||'<tr><td colspan="14" class="empty">لا توجد نتائج.</td></tr>';}
 // ---------- charts ----------
 const SKEYS=['done','late','absent','tech'];
 const PAL_SCREEN={done:'var(--ok)',late:'var(--warn)',absent:'var(--bad)',tech:'var(--tech)',pending:'var(--idle-soft)',ink:'var(--ink)',muted:'var(--muted)',grid:'var(--line)',surface:'var(--surface)',accent:'var(--accent)',accentSoft:'var(--accent-soft)',brass:'var(--brass)'};
@@ -840,7 +851,7 @@ paintArchOpts();
 // per-day data helpers
 function perDay(list,f=state.from,t=state.to){const out=[];for(let i=f;i<=t;i++){const l=list.filter(s=>s.day===i);out.push({i,label:DAYS[i].n,sub:DAYS[i].h,list:l,c:tStats(l)})}return out}
 function chartsBlock(list,P,o={}){const days=perDay(list,o.from??state.from,o.to??state.to),c=tStats(list);const box=(t,body,cls='')=>`<div class="cbox ${cls}"><h3>${t}</h3>${body}</div>`;
-  const att=dayLineSVG(days.map(d=>({label:d.label,v:d.c.att,note:d.c.present+d.c.absentSt?`${d.c.present} حاضر · ${d.c.absentSt} غائب`:''})),P,{max:100,fmt:v=>v+'%',fmtAxis:v=>v+'%',label:'نسبة حضور الطلاب حسب اليوم',color:P.accent,w:360,h:o.lineH||210});
+  const att=dayLineSVG(days.map(d=>({label:d.label,v:d.c.att,note:d.c.attN?`متوسط ${d.c.avgPresent} حاضر من ${d.c.avgClass} في الحصة · ${d.c.attN} حصة`:''})),P,{max:100,fmt:v=>v+'%',fmtAxis:v=>v+'%',label:'نسبة حضور الطلاب حسب اليوم',color:P.accent,w:360,h:o.lineH||210});
   const rat=dayLineSVG(days.map(d=>({label:d.label,v:d.c.avg==null?null:+d.c.avg.toFixed(1),note:d.c.rating.length?d.c.rating.length+' تقييم':''})),P,{max:5,fmt:v=>v.toFixed(1),fmtAxis:v=>v.toFixed(1),label:'متوسط التقييم حسب اليوم',color:P.brass,w:/\bt4\b/.test(o.cls||'')?560:360,h:o.lineH||(/\bt4\b/.test(o.cls||'')?190:210)});
   const B={donut:box('توزيع الحالات',`<div class="cdwrap">${donutSVG(c,P,{px:o.donutPx})}${legendHTML(c,P)}</div>`,'c-donut'),
     days:box('الحصص حسب اليوم',dayColumnsSVG(days,P,{h:o.colH}),'c-days'),
@@ -856,6 +867,7 @@ function chartsBlock(list,P,o={}){const days=perDay(list,o.from??state.from,o.to
 // ---------- teachers ----------
 const avgOf=a=>a.length?(a.reduce((x,y)=>x+y,0)/a.length):null;
 function tStats(list){const c=counts(list);let pr=0,ab=0,rec=0,recN=0,ent=[];list.forEach(s=>{const l=state.logs[s.id];if(!l||!ST[l.status])return;if(typeof l.present==='number')pr+=l.present;if(typeof l.absent==='number')ab+=l.absent;if(l.recorded){recN++;if(l.recorded==='yes')rec++}});
+  {let n=0;list.forEach(s=>{const l=state.logs[s.id];if(l&&ST[l.status]&&(typeof l.present==='number'||typeof l.absent==='number'))n++});c.attN=n;c.avgPresent=n?Math.round(pr/n):0;c.avgClass=n?Math.round((pr+ab)/n):0}
   c.avg=avgOf(c.rating);c.present=pr;c.absentSt=ab;c.att=pr+ab?Math.round(pr*100/(pr+ab)):null;c.rec=recN?Math.round(rec*100/recN):null;return c}
 function teachersIn(list){const m=new Map();list.forEach(s=>{if(!m.has(s.teacher))m.set(s.teacher,[]);m.get(s.teacher).push(s)});return [...m.entries()].map(([name,ss])=>({name,ss})).sort((a,b)=>a.name.localeCompare(b.name,'ar'))}
 function subjOf(ss){return [...new Set(ss.map(s=>s.subj))].join('، ')}
@@ -866,11 +878,11 @@ function waText(t){const c=tStats(t.ss);const L=[];
   L.push(`السلام عليكم ورحمة الله، أ. ${t.name}`);L.push('تقرير متابعة الحصص عن بُعد – ثانوية الصحافة الأهلية');L.push(rangeText());L.push('');
   L.push(`عدد الحصص: ${c.total}`);L.push(`تمت في وقتها: ${c.done} | بدأت متأخرة: ${c.late}`);L.push(`لم تُعقد: ${c.absent} | مشكلة تقنية: ${c.tech}`);
   if(c.pending)L.push(`لم تُرصد بعد: ${c.pending}`);if(c.avg!=null)L.push(`متوسط التقييم: ${c.avg.toFixed(1)} من 5`);if(c.att!=null)L.push(`نسبة حضور الطلاب: ${c.att}%`);
-  const notes=t.ss.map(s=>{const l=state.logs[s.id];if(!l||!ST[l.status])return null;if(l.status==='done'&&!l.notes)return null;return `• ${DAYS[s.day].n} – الحصة ${s.label} (${s.subj}، ${CLS[s.cls]}): ${ST[l.status].t}${l.notes?' – '+l.notes:''}`}).filter(Boolean);
+  const notes=t.ss.map(s=>{const l=state.logs[s.id];if(!l||!ST[l.status])return null;if(l.status==='done'&&!notesFor(l))return null;return `• ${DAYS[s.day].n} – الحصة ${s.label} (${s.subj}، ${CLS[s.cls]}): ${ST[l.status].t}${notesFor(l)?' – '+notesFor(l):''}`}).filter(Boolean);
   if(notes.length){L.push('');L.push('ملاحظات المتابعة:');notes.slice(0,15).forEach(n=>L.push(n))}
   L.push('');L.push('شاكرين جهودكم، وتقبلوا تحياتنا.');L.push('إدارة ثانوية الصحافة الأهلية');return L.join('\n')}
 function waLink(t){const ph=normPhone(state.phones[t.name]);return ph?`https://wa.me/${ph}?text=${encodeURIComponent(waText(t))}`:''}
-function noteOf(s){const l=state.logs[s.id];if(!l)return '';const n=(l.notes||'').trim();return n||joinNotes(splitNotes(l)).trim()}
+function noteOf(s){return notesFor(state.logs[s.id]).trim()}
 function notedTeachers(){const q=$('tSearch').value.trim();return teachersIn(scope().filter(s=>inRange(s)&&noteOf(s))).filter(t=>!q||t.name.includes(q))}
 function notesPage(list){const n=list.reduce((a,t)=>a+t.ss.length,0);
   const body=list.map(t=>`<h2>${esc(t.name)} <small style="color:#667;font-weight:400">· ${esc(subjOf(t.ss))} · ${t.ss.length} ملاحظة</small></h2><table><thead><tr><th style="width:13%">اليوم</th><th style="width:11%">الحصة</th><th style="width:16%">الصف / المسار</th><th style="width:14%">المادة</th><th style="width:11%">الحالة</th><th>الملاحظات</th></tr></thead><tbody>${t.ss.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr><td>${DAYS[s.day].n}<br><small>${DAYS[s.day].h}هـ</small></td><td>${s.label}<br><small>${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</small></td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td class="${st?stCls[l.status]:'idle'}">${st?st.t:'لم تُرصد'}</td><td>${esc(noteOf(s))}</td></tr>`}).join('')}</tbody></table>`).join('')||'<p>لا توجد ملاحظات ضمن الأيام المحددة.</p>';
@@ -908,7 +920,7 @@ function renderTeachers(){const q=$('tSearch').value.trim();const all=teachersIn
   box.innerHTML=`<div class="tdetail-head"><div><h2>${esc(sel.name)}</h2><p>${esc(subjOf(sel.ss))} · ${esc(clsOf(sel.ss))}</p></div><div class="filters">${state.downloads?'<button class="btn ghost" id="tPrint">طباعة</button><button class="btn" id="tPdf">تحميل PDF</button>'+(incOf(sel).length?`<button class="btn ghost" id="tLetter">خطاب تنبيه (${incOf(sel).length})</button>`:''):''}<button class="btn ghost" id="tClose">إغلاق</button></div></div>
   <div class="wa"><label for="tPhone">جوال المعلم</label><input id="tPhone" type="tel" inputmode="tel" placeholder="05xxxxxxxx" value="${esc(state.phones[sel.name]||'')}" ${state.role===-1&&state.isEditor&&state.db?'':'disabled'}>${state.role===-1&&state.isEditor&&state.db?'<button class="btn ghost" id="tPhoneSave">حفظ الرقم</button>':''}<a class="wabtn" id="tWa" target="_blank" rel="noopener noreferrer" aria-disabled="${waLink(sel)?'false':'true'}" ${waLink(sel)?`href="${esc(waLink(sel))}"`:''}>إرسال التقرير بالواتساب</a><span class="note" id="tWaNote">${waLink(sel)?'يفتح واتساب برسالة جاهزة فيها ملخص التقرير. لإرفاق ملف PDF: حمّله أولاً ثم أرفقه في المحادثة.':(state.role===-1&&state.isEditor?'أضف رقم الجوال ثم احفظه لتفعيل الإرسال.':'لم يُضف رقم جوال لهذا المعلم بعد (يضيفه المدير).')}</span></div>
   <div class="tstats"><div class="tstat"><span>عدد الحصص</span><b class="num">${c.total}</b></div><div class="tstat s-done"><span>تمت في وقتها</span><b class="num">${c.done}</b></div><div class="tstat s-late"><span>بدأت متأخرة</span><b class="num">${c.late}</b></div><div class="tstat s-absent"><span>لم تُعقد</span><b class="num">${c.absent}</b></div><div class="tstat s-tech"><span>مشكلة تقنية</span><b class="num">${c.tech}</b></div><div class="tstat"><span>لم تُرصد</span><b class="num">${c.pending}</b></div><div class="tstat"><span>متوسط التقييم</span><b class="num">${fmtAvg(c.avg)}</b></div><div class="tstat"><span>نسبة حضور الطلاب</span><b class="num">${c.att==null?'—':c.att+'%'}</b></div></div>
-  <div class="scroll"><table><thead><tr><th>اليوم</th><th>الحصة</th><th>الوقت</th><th>الصف / المسار</th><th>المادة</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>تسجيل</th><th>تقييم</th><th>ملاحظات</th></tr></thead><tbody>${sel.ss.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr class="clickable" data-open="${s.id}"><td>${DAYS[s.day].n}</td><td>${s.label}</td><td class="num">${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td><span class="status ${st?st.c:''}">${st?st.t:'لم تُرصد'}</span>${rsnHTML(l)}</td><td class="num">${esc(l.entry||'')}</td><td class="num">${esc(l.present??'')}</td><td class="num">${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${l.rating?'★'.repeat(l.rating):''}</td><td class="wrap">${esc(l.notes||'')}</td></tr>`}).join('')}</tbody></table></div>`;
+  <div class="scroll"><table><thead><tr><th>اليوم</th><th>الحصة</th><th>الوقت</th><th>الصف / المسار</th><th>المادة</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>تسجيل</th><th>تقييم</th><th>ملاحظات</th></tr></thead><tbody>${sel.ss.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr class="clickable" data-open="${s.id}"><td>${DAYS[s.day].n}</td><td>${s.label}</td><td class="num">${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td><span class="status ${st?st.c:''}">${st?st.t:'لم تُرصد'}</span>${rsnHTML(l)}</td><td class="num">${esc(l.entry||'')}</td><td class="num">${esc(l.present??'')}</td><td class="num">${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${starTxt(l)}</td><td class="wrap">${esc(notesFor(l))}</td></tr>`}).join('')}</tbody></table></div>`;
   box.querySelector('.tstats').insertAdjacentHTML('afterend',chartsBlock(sel.ss,PAL_SCREEN,{cls:'t4',only:['donut','days','att','rating','reasons']}));
   if($('tLetter'))$('tLetter').onclick=()=>printLetters('print',[sel]);
   if($('tPdf')){$('tPdf').onclick=()=>exportDoc('pdf','تقرير المعلم '+sel.name,[teacherPage(sel)]);$('tPrint').onclick=()=>exportDoc('print','تقرير المعلم '+sel.name,[teacherPage(sel)])}$('tClose').onclick=()=>{state.teacher=null;renderTeachers()};
@@ -961,7 +973,7 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid 
 const stCls={done:'ok',late:'late',absent:'bad',tech:'tech'};
 function printHeader(title,sub){return `<div class="hdr"><div class="org">المملكة العربية السعودية<br>وزارة التعليم<br>الإدارة العامة للتعليم بمنطقة الرياض<br>مدارس الصحافة الأهلية – القسم الثانوي</div><div class="ttl"><h1>${esc(title)}</h1><p>${esc(sub)}</p><p>${rangeText()}</p></div></div>`}
 function teacherPage(t){const c=tStats(t.ss);const sups=[...new Set(t.ss.map(s=>state.names[s.sup]))].join('، ');
-  const rows=t.ss.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr><td>${DAYS[s.day].n}<br><small>${DAYS[s.day].h}هـ</small></td><td>${s.label}<br><small>${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</small></td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td class="${st?stCls[l.status]:'idle'}">${st?st.t:'لم تُرصد'}${reasonOf(l)?'<br><small style="color:#667;font-weight:400">'+esc(REASONS[reasonOf(l)].t)+'</small>':''}</td><td>${esc(l.entry||'')}</td><td>${esc(l.present??'')}</td><td>${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${l.rating?l.rating+' / 5':''}</td><td>${esc(l.notes||'')}</td></tr>`}).join('');
+  const rows=t.ss.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr><td>${DAYS[s.day].n}<br><small>${DAYS[s.day].h}هـ</small></td><td>${s.label}<br><small>${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</small></td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td class="${st?stCls[l.status]:'idle'}">${st?st.t:'لم تُرصد'}${reasonOf(l)?'<br><small style="color:#667;font-weight:400">'+esc(REASONS[reasonOf(l)].t)+'</small>':''}</td><td>${esc(l.entry||'')}</td><td>${esc(l.present??'')}</td><td>${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${rateOf(l)?fmtR(rateOf(l))+' / 5':''}</td><td>${esc(notesFor(l))}</td></tr>`}).join('');
   return `<section class="page">${printHeader('تقرير متابعة الحصص عن بُعد','ثانوية الصحافة الأهلية')}
   <div class="info"><div><span>اسم المعلم</span><b>${esc(t.name)}</b></div><div><span>المواد</span><b>${esc(subjOf(t.ss))}</b></div><div><span>الصفوف / المسارات</span><b>${esc(clsOf(t.ss))}</b></div><div><span>المتابِع</span><b>${esc(sups)}</b></div><div><span>نسبة الانعقاد من المرصود</span><b>${c.logged?pct(c.held,c.logged)+'%':'—'}</b></div><div><span>نسبة تسجيل الحصص</span><b>${c.rec==null?'—':c.rec+'%'}</b></div></div>
   <div class="stats"><div><span>الحصص</span><b>${c.total}</b></div><div><span>تمت في وقتها</span><b class="ok">${c.done}</b></div><div><span>متأخرة</span><b class="late">${c.late}</b></div><div><span>لم تُعقد</span><b class="bad">${c.absent}</b></div><div><span>مشكلة تقنية</span><b class="tech">${c.tech}</b></div><div><span>لم تُرصد</span><b>${c.pending}</b></div><div><span>متوسط التقييم</span><b>${fmtAvg(c.avg)}</b></div><div><span>حضور الطلاب</span><b>${c.att==null?'—':c.att+'%'}</b></div></div>
@@ -981,7 +993,7 @@ function generalPage(){const R=S.filter(inRange);const c=tStats(R);
   <div class="sign"><div>وكيل الشؤون التعليمية</div><div>منسق المتابعة</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div></section>`}
 function weekPage(rows){const c=tStats(rows);const sups=(effSup()<0?[0,1,2,3]:[effSup()]).filter(i=>rows.some(s=>s.sup===i));
   const supRows=sups.map(i=>{const x=tStats(rows.filter(s=>s.sup===i));return `<tr><td>${esc(state.names[i])}</td><td>${SUPCLS[i]}</td><td>${x.total}</td><td>${x.logged}</td><td class="ok">${x.done}</td><td class="late">${x.late}</td><td class="bad">${x.absent}</td><td class="tech">${x.tech}</td><td>${pct(x.logged,x.total)}%</td><td>${fmtAvg(x.avg)}</td></tr>`}).join('');
-  const body=rows.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr><td>${DAYS[s.day].n}</td><td>${s.label}<br><small>${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</small></td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td>${esc(s.teacher)}</td><td class="${st?stCls[l.status]:'idle'}">${st?st.t:'لم تُرصد'}${reasonOf(l)?'<br><small style="color:#667;font-weight:400">'+esc(REASONS[reasonOf(l)].t)+'</small>':''}</td><td>${esc(l.entry||'')}</td><td>${esc(l.present??'')}</td><td>${esc(l.absent??'')}</td><td>${l.rating?l.rating+' / 5':''}</td><td>${esc(l.notes||'')}</td></tr>`}).join('')||'<tr><td colspan="11">لا توجد حصص ضمن الفلتر المحدد.</td></tr>';
+  const body=rows.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr><td>${DAYS[s.day].n}</td><td>${s.label}<br><small>${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</small></td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td>${esc(s.teacher)}</td><td class="${st?stCls[l.status]:'idle'}">${st?st.t:'لم تُرصد'}${reasonOf(l)?'<br><small style="color:#667;font-weight:400">'+esc(REASONS[reasonOf(l)].t)+'</small>':''}</td><td>${esc(l.entry||'')}</td><td>${esc(l.present??'')}</td><td>${esc(l.absent??'')}</td><td>${rateOf(l)?fmtR(rateOf(l))+' / 5':''}</td><td>${esc(notesFor(l))}</td></tr>`}).join('')||'<tr><td colspan="11">لا توجد حصص ضمن الفلتر المحدد.</td></tr>';
   return `<section class="page">${printHeader('التقرير الأسبوعي لمتابعة الحصص عن بُعد',isMon()?scopeLabel():effSup()<0?'ثانوية الصحافة الأهلية – جميع المسؤولين':'المسؤول: '+state.names[effSup()])}
   <div class="stats"><div><span>الحصص</span><b>${c.total}</b></div><div><span>تمت في وقتها</span><b class="ok">${c.done}</b></div><div><span>متأخرة</span><b class="late">${c.late}</b></div><div><span>لم تُعقد</span><b class="bad">${c.absent}</b></div><div><span>مشكلة تقنية</span><b class="tech">${c.tech}</b></div><div><span>لم تُرصد</span><b>${c.pending}</b></div><div><span>متوسط التقييم</span><b>${fmtAvg(c.avg)}</b></div><div><span>حضور الطلاب</span><b>${c.att==null?'—':c.att+'%'}</b></div></div>
   ${chartsBlock(rows,PAL_PRINT,{only:['donut','days'],donutPx:120,colH:160})}${chartsBlock(rows,PAL_PRINT,{only:['att','rating','reasons'],cls:'two',lineH:150})}
@@ -1028,7 +1040,7 @@ function renderBoard(){const list=scope();const c=tStats(list);
   $('bSub').textContent=scopeLabel()+' · تتحدّث مباشرة مع كل رصد';
   $('bCharts').innerHTML=chartsBlock(list,PAL_SCREEN,{from:0,to:4,cls:'t4',only:['donut','days','att','rating'],donutPx:200,colH:240});
   const held=c.logged?pct(c.held,c.logged):0;
-  $('bHero').innerHTML=[['نسبة الرصد',pct(c.logged,c.total)+'%',`${c.logged} من ${c.total} حصة`,pct(c.logged,c.total)],['نسبة الانعقاد',c.logged?held+'%':'—','من الحصص المرصودة',held],['متوسط التقييم',fmtAvg(c.avg),'من 5 نجوم',c.avg?c.avg*20:0],['حضور الطلاب',c.att==null?'—':c.att+'%',`${c.present} حاضر · ${c.absentSt} غائب`,c.att||0]]
+  $('bHero').innerHTML=[['نسبة الرصد',pct(c.logged,c.total)+'%',`${c.logged} من ${c.total} حصة`,pct(c.logged,c.total)],['نسبة الانعقاد',c.logged?held+'%':'—','من الحصص المرصودة',held],['متوسط التقييم',fmtAvg(c.avg),'من 5 نجوم',c.avg?c.avg*20:0],['حضور الطلاب',c.att==null?'—':c.att+'%',c.attN?`متوسط ${c.avgPresent} حاضر من ${c.avgClass} طالب في الحصة · ${c.attN} حصة`:'لا توجد أعداد مرصودة',c.att||0]]
     .map(([a,b,s,m])=>`<div class="htile"><span>${a}</span><b class="num">${b}</b><small class="num">${s}</small><div class="meter"><i style="width:${Math.min(100,m)}%"></i></div></div>`).join('');
   $('bStatus').innerHTML=['done','late','absent','tech'].map(k=>`<div class="stile s-${k}"><span>${ST[k].t}</span><b class="num">${c[k]}</b></div>`).join('')+`<div class="stile"><span>لم تُرصد بعد</span><b class="num">${c.pending}</b></div>`;
   $('bSups').innerHTML=state.names.map((n,i)=>effSup()>=0&&i!==effSup()?'':(isMon()&&!scope().some(s=>s.sup===i)?'':barRow(n,counts(scope().filter(s=>s.sup===i))))).join('');
@@ -1067,17 +1079,22 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-sup],[data
   if(t.dataset.sup!=null){state.sup=+t.dataset.sup;render()}
   else if(t.dataset.day!=null){state.day=+t.dataset.day;render()}
   else if(t.dataset.open){openDrawer(t.dataset.open)}});
+const VIEW_T={report:'التقرير الأسبوعي',teachers:'تقارير المعلمين',board:'شاشة الأرقام'};
+function repViews(){const v=Array.isArray(state.repViews)?state.repViews.filter(x=>VIEW_T[x]):[];return v.length?v:['report']}
+function applyRepViews(){const rep=isRep();const allow=rep?repViews():null;Object.entries(VIEWS).forEach(([k,[b]])=>{$(b).hidden=!!allow&&!allow.includes(k)});if(allow&&!allow.includes(state.view))setView(allow[0])}
 const VIEWS={schedule:['vSchedule','scheduleView'],report:['vReport','reportView'],teachers:['vTeachers','teachersView'],board:['vBoard','boardView']};
-function setView(v){state.view=v;Object.entries(VIEWS).forEach(([k,[b,s]])=>{$(b).setAttribute('aria-pressed',k===v);$(s).hidden=k!==v});$('scheduleView').style.display=v==='schedule'?'grid':'none';render()}
+function setView(v){if(isRep()&&!repViews().includes(v))v=repViews()[0];state.view=v;Object.entries(VIEWS).forEach(([k,[b,s]])=>{$(b).setAttribute('aria-pressed',k===v);$(s).hidden=k!==v});$('scheduleView').style.display=v==='schedule'?'grid':'none';render()}
 Object.entries(VIEWS).forEach(([k,[b]])=>$(b).onclick=()=>setView(k));
 
 // drawer
 $('dStatus').innerHTML=Object.entries(ST).map(([k,v])=>`<button class="choice ${v.c}" data-st="${k}" aria-pressed="false">${v.t}</button>`).join('');
-$('dStars').innerHTML=[1,2,3,4,5].map(n=>`<button data-r="${n}" aria-label="${n} من 5">★</button>`).join('');
+$('dStars').innerHTML=[1,2,3,4,5].map(n=>`<button data-r="${n}" aria-label="${n} من 5">★</button>`).join('');$('dStarsM').innerHTML=$('dStars').innerHTML;
 function paintDraft(){const d=state.draft;
   $('dStatus').querySelectorAll('[data-st]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.st===d.status));
   $('dRec').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===d.recorded));
   $('dStars').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.r<=(d.rating||0)));
+  $('dStarsM').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.r<=(d.ratingMon||0)));
+  {const v=rateOf({rating:d.rating,ratingMon:d.ratingMon});$('dRateAvg').textContent=v?`التقييم النهائي (متوسط المسؤول والمشرف): ${fmtR(v)} من 5`:'التقييم النهائي = متوسط تقييم المسؤول والمشرف';}
   const rs=Object.entries(REASONS).filter(([k,v])=>v.f.includes(d.status));$('dReasonF').hidden=!rs.length;
   if(d.reason&&!(REASONS[d.reason]&&REASONS[d.reason].f.includes(d.status)))d.reason='';
   $('dReason').innerHTML=rs.map(([k,v])=>`<button type="button" data-rs="${k}" aria-pressed="${d.reason===k}">${v.t}<span class="k">${RKINDS[v.k]}</span></button>`).join('');
@@ -1090,9 +1107,9 @@ function splitNotes(l){if(!l)return {notesVC:'',notesSup:'',notesAdm:''};
   const n=(l.notes||'').trim();const m=n.match(/^حسب فيوكلاس:\s*/);
   return m?{notesVC:n.slice(m[0].length),notesSup:'',notesAdm:''}:{notesVC:'',notesSup:n,notesAdm:''};}
 function joinNotes(p){return NOTE_PARTS.filter(([k])=>(p[k]||'').trim()).map(([k,t])=>t+': '+p[k].trim()).join('\n')}
-function paintCombined(){const t=joinNotes({notesVC:$('nVC').value,notesSup:$('nSup').value,notesAdm:$('nAdm').value});$('nAll').textContent=t||'—'}
+function paintCombined(){const vis=notePartsFor();const t=joinNotes({notesVC:$('nVC').value,notesSup:vis.includes('notesSup')?$('nSup').value:'',notesAdm:vis.includes('notesAdm')?$('nAdm').value:''});$('nAll').textContent=t||'—'}
 ['nVC','nSup','nAdm'].forEach(x=>$(x).addEventListener('input',paintCombined));
-async function openDrawer(id){const s=byId[id];state.open=id;const l=state.logs[id]||{};state.draft={status:l.status||'',recorded:l.recorded||'',rating:l.rating||0,reason:reasonOf(l)};
+async function openDrawer(id){const s=byId[id];state.open=id;const l=state.logs[id]||{};state.draft={status:l.status||'',recorded:l.recorded||'',rating:l.rating||0,ratingMon:l.ratingMon||0,reason:reasonOf(l)};
   $('dTitle').textContent=s.subj;$('dSub').textContent=`${s.teacher} · ${CLS[s.cls]} · ${DAYS[s.day].n} ${DAYS[s.day].h}هـ · الحصة ${s.label} (${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}) · ${state.names[s.sup]}`;
   $('dLink').value=state.links[id]||'';paintJoin();$('dEntry').value=l.entry||'';$('dPresent').value=l.present??'';$('dAbsent').value=l.absent??'';{const p=splitNotes(l);$('nVC').value=p.notesVC;$('nSup').value=p.notesSup;$('nAdm').value=p.notesAdm;paintCombined()}
   $('dWho').textContent='';if(l.updatedAt){let who='';if(l.updatedBy&&state.user){try{const ps=await state.user.profiles([l.updatedBy]);who=ps[l.updatedBy]?.name||''}catch(e){}}
@@ -1100,14 +1117,15 @@ async function openDrawer(id){const s=byId[id];state.open=id;const l=state.logs[
   const notMine=state.role==null||(state.role>=0&&s.sup!==state.role);
   const ro=!state.db||!state.canWrite||notMine;
   const monOk=isMon()&&monTeachers(state.role).has(s.teacher);
-  if(notMine&&state.role!=null)$('dWho').textContent=($('dWho').textContent?$('dWho').textContent+' · ':'')+(isMon()?(monOk?'صلاحيتك: تعبئة ملاحظات المشرف فقط':'هذا المعلم ليس ضمن معلميك (عرض فقط)'):'هذه الحصة من مسؤولية '+state.names[s.sup]+' (عرض فقط)');['dEntry','dPresent','dAbsent','nVC','nSup','dLink'].forEach(x=>$(x).disabled=ro);const admOk=!!state.db&&state.canWrite&&(state.role===-1||monOk);$('nAdm').disabled=!admOk;$('drawer').classList.toggle('monmode',isMon());$('dLinkSave').disabled=ro;$('dSave').disabled=ro&&!monOk;$('dClear').disabled=ro||!state.logs[id];
+  if(notMine&&state.role!=null)$('dWho').textContent=($('dWho').textContent?$('dWho').textContent+' · ':'')+(isMon()?(monOk?'صلاحيتك: تقييم المشرف وملاحظاته فقط':'هذا المعلم ليس ضمن معلميك (عرض فقط)'):'هذه الحصة من مسؤولية '+state.names[s.sup]+' (عرض فقط)');['dEntry','dPresent','dAbsent','nVC','nSup','dLink'].forEach(x=>$(x).disabled=ro);const admOk=!!state.db&&state.canWrite&&(state.role===-1||monOk);$('nAdm').disabled=!admOk;$('drawer').classList.toggle('monmode',isMon());$('drawer').classList.toggle('supmode',isSupRole(state.role)||isRep());{const vis=notePartsFor();NOTE_PARTS.forEach(([k,,el])=>$(el).closest('.field').classList.toggle('hidef',!vis.includes(k)))}$('dLinkSave').disabled=ro;$('dSave').disabled=ro&&!monOk;$('dClear').disabled=ro||!state.logs[id];
   paintDraft();$('scrim').hidden=false;$('drawer').hidden=false;$('dClose').focus();}
 function closeDrawer(){$('scrim').hidden=true;$('drawer').hidden=true;state.open=null}
 $('dClose').onclick=closeDrawer;$('scrim').onclick=closeDrawer;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();closeNames();closeImport();if(typeof closeQueue==='function')closeQueue()}});
 $('dStatus').onclick=e=>{const b=e.target.closest('[data-st]');if(!b)return;state.draft.status=b.dataset.st;paintDraft()};
 $('dRec').onclick=e=>{const b=e.target.closest('button');if(!b)return;state.draft.recorded=state.draft.recorded===b.dataset.v?'':b.dataset.v;paintDraft()};
-$('dStars').onclick=e=>{const b=e.target.closest('[data-r]');if(!b)return;const r=+b.dataset.r;state.draft.rating=state.draft.rating===r?0:r;paintDraft()};
+$('dStars').onclick=e=>{const b=e.target.closest('[data-r]');if(!b||isMon())return;const r=+b.dataset.r;state.draft.rating=state.draft.rating===r?0:r;paintDraft()};
+$('dStarsM').onclick=e=>{const b=e.target.closest('[data-r]');if(!b||!(isMon()||state.role===-1))return;const r=+b.dataset.r;state.draft.ratingMon=state.draft.ratingMon===r?0:r;paintDraft()};
 function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2400)}
 const numOrNull=v=>v===''?null:Math.max(0,parseInt(v,10)||0);
 function paintJoin(){const u=safeUrl($('dLink').value);const a=$('dJoin');if(u){a.href=u;a.hidden=false}else{a.removeAttribute('href');a.hidden=true}}
@@ -1118,10 +1136,10 @@ $('dLinkSave').onclick=async()=>{const id=state.open;if(!state.db||!id)return;co
   catch(e){toast('تعذّر حفظ الرابط')}};
 $('dSave').onclick=async()=>{const id=state.open;if(!state.db||!id)return;const d=state.draft;
   if(isMon()){const s=byId[id];if(!monTeachers(state.role).has(s.teacher))return;const prev=state.logs[id]||{sup:s.sup,day:s.day};const p={...splitNotes(prev),notesAdm:$('nAdm').value.trim().slice(0,600)};
-    const doc={...prev,...p,notes:joinNotes(p).slice(0,2000),teacher:s.teacher,week:state.week,monBy:state.role-4,monAt:new Date().toISOString()};
-    $('dSave').disabled=true;try{await state.db.doc(logsCol(state.week)+'/'+id).set(doc);state.logs[id]=doc;toast('تم حفظ ملاحظة المشرف');closeDrawer();render()}catch(e){toast('تعذّر الحفظ، حاول مرة أخرى')}finally{$('dSave').disabled=false}return}
+    const doc={...prev,...p,ratingMon:d.ratingMon||0,notes:joinNotes(p).slice(0,2000),teacher:s.teacher,week:state.week,monBy:state.role-4,monAt:new Date().toISOString()};
+    $('dSave').disabled=true;try{await state.db.doc(logsCol(state.week)+'/'+id).set(doc);state.logs[id]=doc;toast('تم حفظ ملاحظة وتقييم المشرف');closeDrawer();render()}catch(e){toast('تعذّر الحفظ، حاول مرة أخرى')}finally{$('dSave').disabled=false}return}
   if(!d.status){toast('اختر حالة الحصة أولاً');return}
-  const s=byId[id];if(state.role==null||(state.role>=0&&s.sup!==state.role))return;const doc={by:state.role,status:d.status,entry:$('dEntry').value||'',present:numOrNull($('dPresent').value),absent:numOrNull($('dAbsent').value),recorded:d.recorded||'',rating:d.rating||0,...(()=>{const prev=splitNotes(state.logs[id]);const p={notesVC:$('nVC').value.trim().slice(0,600),notesSup:$('nSup').value.trim().slice(0,600),notesAdm:(state.role===-1?$('nAdm').value:prev.notesAdm).trim().slice(0,600)};const o=state.logs[id]||{};return {...p,notes:joinNotes(p).slice(0,2000),...(o.monBy!=null?{monBy:o.monBy,monAt:o.monAt}:{})}})(),reason:(REASONS[d.reason]&&REASONS[d.reason].f.includes(d.status))?d.reason:'',teacher:s.teacher,week:state.week,sup:s.sup,day:s.day,updatedAt:new Date().toISOString(),updatedBy:state.uid||''};
+  const s=byId[id];if(state.role==null||(state.role>=0&&s.sup!==state.role))return;const doc={by:state.role,status:d.status,entry:$('dEntry').value||'',present:numOrNull($('dPresent').value),absent:numOrNull($('dAbsent').value),recorded:d.recorded||'',rating:d.rating||0,ratingMon:(state.role===-1?d.ratingMon:(state.logs[id]||{}).ratingMon)||0,...(()=>{const prev=splitNotes(state.logs[id]);const p={notesVC:$('nVC').value.trim().slice(0,600),notesSup:$('nSup').value.trim().slice(0,600),notesAdm:(state.role===-1?$('nAdm').value:prev.notesAdm).trim().slice(0,600)};const o=state.logs[id]||{};return {...p,notes:joinNotes(p).slice(0,2000),...(o.monBy!=null?{monBy:o.monBy,monAt:o.monAt}:{})}})(),reason:(REASONS[d.reason]&&REASONS[d.reason].f.includes(d.status))?d.reason:'',teacher:s.teacher,week:state.week,sup:s.sup,day:s.day,updatedAt:new Date().toISOString(),updatedBy:state.uid||''};
   $('dSave').disabled=true;
   try{await state.db.doc(logsCol(state.week)+'/'+id).set(doc);state.logs[id]=doc;toast('تم حفظ المتابعة');closeDrawer();render()}
   catch(e){if(e&&e.code==='invalid_argument'){state.canWrite=false;toast('ليست لديك صلاحية التعديل')}else toast('تعذّر الحفظ، حاول مرة أخرى')}
@@ -1207,30 +1225,31 @@ $('iGo').onclick=async()=>{const sel=[...$('iPrev').querySelectorAll('[data-ii]:
 // ---------- auth ----------
 const SKEY='hsf-followup-auth';
 const STAFF_DOMAIN='staff.alsahafa-followup.invalid';
-const roleEmail=r=>(r<0?'admin':r>=4?'mon'+(r-3):'sup'+(r+1))+'@'+STAFF_DOMAIN;
-function roleFromEmail(e){const m=String(e||'').match(/^(admin|sup([1-4])|mon([1-4]))@staff\.alsahafa-followup\.invalid$/);if(!m)return null;return m[1]==='admin'?-1:m[2]?+m[2]-1:+m[3]+3}
-const RULES_TEXT="rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    // ---- secure staff login (Firebase Auth accounts created from the platform settings) ----\n    function secureOn() {\n      return exists(/databases/$(database)/documents/config/secure)\n        && get(/databases/$(database)/documents/config/secure).data.enabled == true;\n    }\n    function staffEmail() {\n      return request.auth != null\n        && request.auth.token.firebase.sign_in_provider == 'password'\n        && request.auth.token.email in [\n          'admin@staff.alsahafa-followup.invalid',\n          'sup1@staff.alsahafa-followup.invalid', 'sup2@staff.alsahafa-followup.invalid',\n          'sup3@staff.alsahafa-followup.invalid', 'sup4@staff.alsahafa-followup.invalid',\n          'mon1@staff.alsahafa-followup.invalid', 'mon2@staff.alsahafa-followup.invalid',\n          'mon3@staff.alsahafa-followup.invalid', 'mon4@staff.alsahafa-followup.invalid'\n        ];\n    }\n    function adminEmail() {\n      return request.auth != null\n        && request.auth.token.firebase.sign_in_provider == 'password'\n        && request.auth.token.email == 'admin@staff.alsahafa-followup.invalid';\n    }\n    // old password-hash login: works only until secure login is switched on\n    function legacyStaff() {\n      return request.auth != null\n        && request.auth.token.firebase.sign_in_provider == 'anonymous'\n        && !secureOn();\n    }\n    function staff() { return staffEmail() || legacyStaff(); }\n    function admin() { return adminEmail() || legacyStaff(); }\n\n    // ---- teachers (unchanged) ----\n    function teacher() {\n      return request.auth != null\n        && request.auth.token.get('teacher', false) == true\n        && get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.active == true;\n    }\n    function ownLesson(id) {\n      return teacher()\n        && get(/databases/$(database)/documents/teacherLessonAccess/$(request.auth.uid)).data.lessonIds.get(id, false) == true;\n    }\n\n    // marker the platform reads to confirm these rules are published\n    match /meta/rules2 { allow get: if true; }\n\n    match /logs/{id} {\n      allow get: if staff() || ownLesson(id);\n      allow list, write: if staff();\n    }\n    match /weeks/{week}/logs/{id} {\n      allow get: if staff() || ownLesson(id);\n      allow list, write: if staff();\n    }\n    match /links/{id} { allow read, write: if staff(); }\n\n    // names are needed on the login screen\n    match /config/main { allow read: if true; }\n    match /config/monitors { allow read: if true; }\n    match /config/secure { allow read: if true; }\n    match /config/{id} {\n      allow read: if staff();\n      allow write: if admin();\n    }\n\n    match /teacherProfiles/{uid} {\n      allow get: if request.auth != null && request.auth.uid == uid && teacher();\n    }\n    match /{document=**} { allow read, write: if false; }\n  }\n}\n";
+const roleEmail=r=>(r<0?'admin':r===8?'rep':r>=4?'mon'+(r-3):'sup'+(r+1))+'@'+STAFF_DOMAIN;
+function roleFromEmail(e){const m=String(e||'').match(/^(admin|rep|sup([1-4])|mon([1-4]))@staff\.alsahafa-followup\.invalid$/);if(!m)return null;return m[1]==='admin'?-1:m[1]==='rep'?8:m[2]?+m[2]-1:+m[3]+3}
+const RULES_TEXT="rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    // ---- secure staff login (Firebase Auth accounts created from the platform settings) ----\n    function secureOn() {\n      return exists(/databases/$(database)/documents/config/secure)\n        && get(/databases/$(database)/documents/config/secure).data.enabled == true;\n    }\n    function staffEmail() {\n      return request.auth != null\n        && request.auth.token.firebase.sign_in_provider == 'password'\n        && request.auth.token.email in [\n          'admin@staff.alsahafa-followup.invalid',\n          'sup1@staff.alsahafa-followup.invalid', 'sup2@staff.alsahafa-followup.invalid',\n          'sup3@staff.alsahafa-followup.invalid', 'sup4@staff.alsahafa-followup.invalid',\n          'mon1@staff.alsahafa-followup.invalid', 'mon2@staff.alsahafa-followup.invalid',\n          'mon3@staff.alsahafa-followup.invalid', 'mon4@staff.alsahafa-followup.invalid',\n          'rep@staff.alsahafa-followup.invalid'\n        ];\n    }\n    function adminEmail() {\n      return request.auth != null\n        && request.auth.token.firebase.sign_in_provider == 'password'\n        && request.auth.token.email == 'admin@staff.alsahafa-followup.invalid';\n    }\n    // old password-hash login: works only until secure login is switched on\n    function legacyStaff() {\n      return request.auth != null\n        && request.auth.token.firebase.sign_in_provider == 'anonymous'\n        && !secureOn();\n    }\n    function staff() { return staffEmail() || legacyStaff(); }\n    // the reports account can read but never write\n    function writer() { return (staffEmail() && request.auth.token.email != 'rep@staff.alsahafa-followup.invalid') || legacyStaff(); }\n    function admin() { return adminEmail() || legacyStaff(); }\n\n    // ---- teachers (unchanged) ----\n    function teacher() {\n      return request.auth != null\n        && request.auth.token.get('teacher', false) == true\n        && get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.active == true;\n    }\n    function ownLesson(id) {\n      return teacher()\n        && get(/databases/$(database)/documents/teacherLessonAccess/$(request.auth.uid)).data.lessonIds.get(id, false) == true;\n    }\n\n    // marker the platform reads to confirm these rules are published\n    match /meta/rules2 { allow get: if true; }\n\n    match /logs/{id} {\n      allow get: if staff() || ownLesson(id);\n      allow list: if staff();\n      allow write: if writer();\n    }\n    match /weeks/{week}/logs/{id} {\n      allow get: if staff() || ownLesson(id);\n      allow list: if staff();\n      allow write: if writer();\n    }\n    match /links/{id} { allow read: if staff(); allow write: if writer(); }\n\n    // names are needed on the login screen\n    match /config/main { allow read: if true; }\n    match /config/monitors { allow read: if true; }\n    match /config/secure { allow read: if true; }\n    match /config/{id} {\n      allow read: if staff();\n      allow write: if admin();\n    }\n\n    match /teacherProfiles/{uid} {\n      allow get: if request.auth != null && request.auth.uid == uid && teacher();\n    }\n    match /{document=**} { allow read, write: if false; }\n  }\n}\n";
 const secureMons=()=>((state.secureDoc&&state.secureDoc.mons)||[]);
 async function sha(text){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('')}
-const roleKey=r=>r<0?'master':r>=4?'m'+(r-4):'s'+r;
+const roleKey=r=>r<0?'master':r===8?'rep':r>=4?'m'+(r-4):'s'+r;
 const hashFor=(salt,r,pw)=>sha(salt+'|'+roleKey(r)+'|'+pw);
 function randSalt(){const a=new Uint8Array(16);crypto.getRandomValues(a);return Array.from(a).map(x=>x.toString(16).padStart(2,'0')).join('')}
-const storedHash=r=>r<0?state.auth.master:r>=4?(state.auth.mons||[])[r-4]:(state.auth.sups||[])[r];
+const storedHash=r=>!state.auth?'':r<0?state.auth.master:r===8?state.auth.rep||'':r>=4?(state.auth.mons||[])[r-4]:(state.auth.sups||[])[r];
 function pwFields(prefix,withNames,required){return [-1,0,1,2,3].map(r=>{const lbl=r<0?'كلمة المرور الرئيسية (المدير)':`${state.names[r]} — ${SUPCLS[r]}`;
   return `<div class="field">${withNames&&r>=0?`<label for="${prefix}n${r}">اسم المسؤول ${r+1} — ${SUPCLS[r]}</label><input id="${prefix}n${r}" value="${esc(state.names[r])}" maxlength="40">`:''}<label for="${prefix}p${r}">${withNames&&r>=0?'كلمة مرور المسؤول '+(r+1):lbl}</label><input id="${prefix}p${r}" type="password" autocomplete="new-password" minlength="6" ${required?'required':''} placeholder="${required?'6 أحرف على الأقل':'اتركها فارغة لعدم التغيير'}"></div>`}).join('')}
 function save(k,v){try{v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 function load(k){try{return JSON.parse(sessionStorage.getItem(k)||'null')}catch(e){return null}}
 let loginRole=null;
-function renderRoles(){const btn=r=>`<button type="button" class="role ${r<0?'master':''} ${r>=4?'mon':''}" data-role="${r}" aria-pressed="${loginRole===r}"><b>${r<0?'المدير (كلمة المرور الرئيسية)':esc(roleName(r))}</b><span>${r<0?'عرض وتعديل كل الحصص والإعدادات':r>=4?'مشرف · '+(state.mteachers[r-4]||[]).length+' معلم':SUPCLS[r]}</span></button>`;
+function renderRoles(){const btn=r=>`<button type="button" class="role ${r<0?'master':''} ${r>=4&&r<8?'mon':''}" data-role="${r}" aria-pressed="${loginRole===r}"><b>${r<0?'المدير (كلمة المرور الرئيسية)':esc(roleName(r))}</b><span>${r<0?'عرض وتعديل كل الحصص والإعدادات':r===8?'عرض التقارير فقط':r>=4?'مشرف · '+(state.mteachers[r-4]||[]).length+' معلم':SUPCLS[r]}</span></button>`;
   const mons=[4,5,6,7].filter(r=>state.secure?secureMons()[r-4]:state.auth&&(state.auth.mons||[])[r-4]);
-  $('roles').innerHTML=[-1,0,1,2,3].map(btn).join('')+(mons.length?'<p class="rolesH">المشرفون على المعلمين</p>'+mons.map(btn).join(''):'')}
+  const repOn=state.secure?!!(state.secureDoc&&(state.secureDoc.rep||(state.secureDoc.ready||{}).rep===true)):!!storedHash(8);
+  $('roles').innerHTML=[-1,0,1,2,3].map(btn).join('')+(mons.length?'<p class="rolesH">المشرفون على المعلمين</p>'+mons.map(btn).join(''):'')+(repOn?'<p class="rolesH">التقارير</p>'+btn(8):'')}
 $('roles').addEventListener('click',e=>{const b=e.target.closest('[data-role]');if(!b)return;loginRole=+b.dataset.role;renderRoles();$('pw').focus()});
 function showGate(mode,msg){const g=$('gate');g.hidden=false;$('gateMsg').textContent=msg||'';$('gateMsg').hidden=!msg;$('loginForm').hidden=mode!=='login';$('setupForm').hidden=mode!=='setup';
   if(mode==='login')renderRoles();if(mode==='setup'){$('setupFields').innerHTML=pwFields('su',false,true)}}
 function enter(role){state.role=role;$('gate').hidden=true;$('logoutBtn').hidden=false;
   $('rolePill').hidden=false;$('rolePill').textContent='دخول: '+roleName(role);$('pwBtn').hidden=!state.secure;
   $('namesBtn').hidden=!(role<0&&state.isEditor);$('exportBtn').hidden=!(role<0&&state.downloads);$('impBtn').hidden=!(role>=-1&&role<=3&&state.db);$('waAllBtn').hidden=role!==-1;document.querySelectorAll('.dlx').forEach(x=>x.hidden=!state.downloads||(x.classList.contains('master-only')&&role>=0));
-  startData();render()}
+  applyRepViews();startData();render()}
 $('loginForm').onsubmit=async e=>{e.preventDefault();$('loginErr').textContent='';
   if(loginRole==null){$('loginErr').textContent='اختر صفة الدخول أولاً';return}
   if(state.secure){const btn=$('loginForm').querySelector('[type=submit]');btn.disabled=true;
@@ -1261,18 +1280,21 @@ $('pForm').onsubmit=async e=>{e.preventDefault();$('pErr').textContent='';const 
 // settings (names + passwords)
 function openNames(){$('nFields').innerHTML=secureSection()+(state.secure?'':`<div class="sec"><h3>كلمة المرور الرئيسية</h3><div class="field"><label for="setp-1">كلمة مرور المدير الجديدة</label><input id="setp-1" type="password" autocomplete="new-password" placeholder="اتركها فارغة لعدم التغيير"></div></div>`)+
   [0,1,2,3].map(r=>`<div class="sec"><h3>المسؤول ${r+1}</h3><div class="field"><label for="setn${r}">الاسم — ${SUPCLS[r]}</label><input id="setn${r}" value="${esc(state.names[r])}" maxlength="40"></div>${state.secure?'':`<div class="field"><label for="setp${r}">كلمة مرور جديدة</label><input id="setp${r}" type="password" autocomplete="new-password" placeholder="اتركها فارغة لعدم التغيير"></div>`}</div>`).join('')+
+  `<div class="sec"><h3>مستخدم التقارير</h3><p class="note">حساب «التقارير» يعرض فقط الصفحات التي تحددها هنا، ولا يستطيع التعديل.</p>
+   <div class="field"><span class="lbl">الصفحات التي تظهر له</span><div class="tpick">${Object.entries(VIEW_T).map(([k,t])=>`<label><input type="checkbox" name="repv" value="${k}" ${repViews().includes(k)?'checked':''}>${t}</label>`).join('')}</div></div>
+   ${state.secure?'':`<div class="field"><label for="setrp">كلمة مرور التقارير ${storedHash(8)?'الجديدة':'(مطلوبة لتفعيل الدخول)'}</label><input id="setrp" type="password" autocomplete="new-password" placeholder="${storedHash(8)?'اتركها فارغة لعدم التغيير':'6 أحرف على الأقل'}"></div>`}</div>`+
   `<div class="sec"><h3>المشرفون على المعلمين</h3><p class="note">كل مشرف يرى جدول معلميه فقط ويعبّئ خانة «حسب المشرف». المعلم المحدد لمشرف آخر يظهر باهتاً.</p></div>`+
   [0,1,2,3].map(m=>{const mine=new Set(state.mteachers[m]||[]);const others=new Set([0,1,2,3].filter(x=>x!==m).flatMap(x=>state.mteachers[x]||[]));const has=state.auth&&(state.auth.mons||[])[m];
     return `<div class="sec"><h3>المشرف ${m+1}</h3><div class="field"><label for="setmn${m}">الاسم</label><input id="setmn${m}" value="${esc(state.mnames[m])}" maxlength="40"></div>${state.secure?'':`<div class="field"><label for="setmp${m}">كلمة مرور ${has?'جديدة':'(مطلوبة لتفعيل دخوله)'}</label><input id="setmp${m}" type="password" autocomplete="new-password" placeholder="${has?'اتركها فارغة لعدم التغيير':'6 أحرف على الأقل'}"></div>`}<div class="field"><span class="lbl">معلمو المشرف (<span id="setmc${m}">${mine.size}</span>)</span><div class="tpick" data-m="${m}">${ALL_TEACHERS.map(t=>`<label class="${others.has(t)&&!mine.has(t)?'taken':''}"><input type="checkbox" value="${esc(t)}" ${mine.has(t)?'checked':''}>${esc(t)}</label>`).join('')}</div></div></div>`}).join('');
   wireSecure();
-  document.querySelectorAll('#nFields .tpick').forEach(el=>el.addEventListener('change',()=>{$('setmc'+el.dataset.m).textContent=el.querySelectorAll('input:checked').length}));
+  document.querySelectorAll('#nFields .tpick[data-m]').forEach(el=>el.addEventListener('change',()=>{$('setmc'+el.dataset.m).textContent=el.querySelectorAll('input:checked').length}));
   $('nErr').textContent='';$('nScrim').hidden=false;$('nDrawer').hidden=false;$('nFields').scrollTop=0;$('nClose').focus({preventScroll:true})}
 function closeNames(){$('nScrim').hidden=true;$('nDrawer').hidden=true}
 $('namesBtn').onclick=openNames;$('nClose').onclick=closeNames;$('nScrim').onclick=closeNames;
 $('nSave').onclick=async()=>{$('nErr').textContent='';const names=[0,1,2,3].map(i=>$('setn'+i).value.trim()||`المسؤول ${i+1}`);
   const val=id=>$(id)?$(id).value:'';
   if(state.secure){const mnames=[0,1,2,3].map(m=>$('setmn'+m).value.trim()||`المشرف ${m+1}`);const mteachers=[0,1,2,3].map(m=>[...document.querySelectorAll(`#nFields .tpick[data-m="${m}"] input:checked`)].map(i=>i.value));
-    try{await state.db.doc('config/main').set({names});await state.db.doc('config/monitors').set({names:mnames,teachers:{m0:mteachers[0],m1:mteachers[1],m2:mteachers[2],m3:mteachers[3]}});state.names=names;state.mnames=mnames;state.mteachers=mteachers;toast('تم حفظ الإعدادات');closeNames();render()}
+    try{await state.db.doc('config/main').set({names,repViews:readRepViews()});state.repViews=readRepViews();await state.db.doc('config/monitors').set({names:mnames,teachers:{m0:mteachers[0],m1:mteachers[1],m2:mteachers[2],m3:mteachers[3]}});state.names=names;state.mnames=mnames;state.mteachers=mteachers;toast('تم حفظ الإعدادات');closeNames();render()}
     catch(e){$('nErr').textContent='تعذّر الحفظ.'}return}
   const pws=[-1,0,1,2,3].map(r=>val('setp'+r));
   if(pws.some(v=>v&&v.length<6)){$('nErr').textContent='كلمة المرور 6 أحرف على الأقل';return}
@@ -1280,11 +1302,12 @@ $('nSave').onclick=async()=>{$('nErr').textContent='';const names=[0,1,2,3].map(
   for(const r of [-1,0,1,2,3]){const v=pws[r+1];if(!v)continue;const h=await hashFor(auth.salt,r,v);if(r<0)auth.master=h;else auth.sups[r]=h}
   const mpws=[0,1,2,3].map(m=>val('setmp'+m));if(mpws.some(v=>v&&v.length<6)){$('nErr').textContent='كلمة المرور 6 أحرف على الأقل';return}
   auth.mons=[0,1,2,3].map(m=>(state.auth.mons||[])[m]||'');for(let m=0;m<4;m++){if(mpws[m])auth.mons[m]=await hashFor(auth.salt,m+4,mpws[m])}
+  const rpw=val('setrp');if(rpw&&rpw.length<6){$('nErr').textContent='كلمة المرور 6 أحرف على الأقل';return}auth.rep=state.auth.rep||'';if(rpw)auth.rep=await hashFor(auth.salt,8,rpw);
   const mnames=[0,1,2,3].map(m=>$('setmn'+m).value.trim()||`المشرف ${m+1}`);
   const mteachers=[0,1,2,3].map(m=>[...document.querySelectorAll(`#nFields .tpick[data-m="${m}"] input:checked`)].map(i=>i.value));
-  const all=[auth.master,...auth.sups,...auth.mons.filter(Boolean)];if(new Set(all).size<all.length){$('nErr').textContent='استخدم كلمة مرور مختلفة لكل شخص';return}
+  const all=[auth.master,...auth.sups,...auth.mons.filter(Boolean),...(auth.rep?[auth.rep]:[])];if(new Set(all).size<all.length){$('nErr').textContent='استخدم كلمة مرور مختلفة لكل شخص';return}
   const prev=load(SKEY);save(SKEY,{role:-1,h:auth.master});
-  try{await state.db.doc('config/main').set({names});await state.db.doc('config/monitors').set({names:mnames,teachers:{m0:mteachers[0],m1:mteachers[1],m2:mteachers[2],m3:mteachers[3]}});if(pws.some(Boolean)||mpws.some(Boolean))await state.db.doc('config/auth').set(auth);
+  try{await state.db.doc('config/main').set({names,repViews:readRepViews()});state.repViews=readRepViews();await state.db.doc('config/monitors').set({names:mnames,teachers:{m0:mteachers[0],m1:mteachers[1],m2:mteachers[2],m3:mteachers[3]}});if(pws.some(Boolean)||mpws.some(Boolean)||rpw)await state.db.doc('config/auth').set(auth);
     state.names=names;state.mnames=mnames;state.mteachers=mteachers;state.auth=auth;$('rolePill').textContent='دخول: المدير';toast('تم حفظ الإعدادات');closeNames();render()}
   catch(e){save(SKEY,prev);$('nErr').textContent='تعذّر الحفظ. هذه الإعدادات لمالك المنصة أو المحرر فقط.'}};
 // ---------- secure login setup (admin) ----------
@@ -1292,9 +1315,9 @@ const RULES_URL='https://console.firebase.google.com/project/alsahafa-followup/f
 function secureSection(){if(state.role!==-1)return '';
   if(state.secure){return `<div class="secbox on"><h3>الدخول الآمن مفعّل ✓</h3><p class="note" style="margin:0">كل شخص يدخل بحساب محمي في Firebase، وكل واحد يغيّر كلمة مروره من زر «تغيير كلمة المرور» أعلى الصفحة.</p>
     <details><summary>نسي أحدهم كلمة المرور؟</summary><ol><li>افتح Firebase Console ← Authentication ← Users واحذف حسابه (مثل <code>${roleEmail(0)}</code>).</li><li>ارجع هنا واختر الحساب واكتب كلمة مرور جديدة ثم «إنشاء الحساب».</li></ol>
-    <div class="row2"><select id="scRole">${[-1,0,1,2,3,4,5,6,7].map(r=>`<option value="${r}">${esc(roleName(r))} · ${roleEmail(r).split('@')[0]}</option>`).join('')}</select><input id="scPw" type="password" placeholder="كلمة مرور جديدة (8 أحرف+)" autocomplete="new-password"><button type="button" class="btn ghost" id="scGo">إنشاء الحساب</button></div></details></div>`}
+    <div class="row2"><select id="scRole">${[-1,0,1,2,3,4,5,6,7,8].map(r=>`<option value="${r}">${esc(roleName(r))} · ${roleEmail(r).split('@')[0]}</option>`).join('')}</select><input id="scPw" type="password" placeholder="كلمة مرور جديدة (8 أحرف+)" autocomplete="new-password"><button type="button" class="btn ghost" id="scGo">إنشاء الحساب</button></div></details></div>`}
   const rd=(state.secureDoc&&state.secureDoc.ready)||{};const hasHash=r=>!!(state.auth&&storedHash(r));
-  const roles=[-1,0,1,2,3,4,5,6,7].filter(r=>r<4||hasHash(r));
+  const roles=[-1,0,1,2,3,4,5,6,7,8].filter(r=>r<4||hasHash(r));
   const st=r=>{const v=rd[roleKey(r)];return v===true?'<b style="color:var(--ok)">✓ جاهز</b>':v==='other'?'<b style="color:var(--bad)">⚠ يوجد حساب بكلمة مرور مختلفة</b>':'<span class="note">⏳ ينتظر دخوله مرة واحدة بكلمة مروره الحالية</span>'};
   return `<div class="secbox"><h3>الدخول الآمن بكلمات المرور الحالية</h3>
   <p class="note" style="margin:0">كل شخص يدخل المنصة مرة واحدة بكلمة مروره الحالية، فيُنشأ له حساب محمي في Firebase بنفس كلمة المرور تلقائيًا. لما يجهز الجميع اضغط «تفعيل الدخول الآمن» فتنقفل قاعدة البيانات على أصحاب الحسابات، وكل واحد يدخل بنفس كلمة مروره.</p>
@@ -1315,7 +1338,7 @@ function wireSecure(){const cp=$('scCopy');if(cp){cp.onclick=async()=>{$('scRule
   const on=$('scOn');if(on)on.onclick=activateSecure;
   const go=$('scGo');if(go)go.onclick=async()=>{const r=+$('scRole').value,pw=$('scPw').value;if(pw.length<8){toast('كلمة المرور 8 أحرف على الأقل');return}go.disabled=true;
     try{const res=await state.authApi.createAccount(roleEmail(r),pw);toast(res==='created'?'تم إنشاء الحساب':res==='exists'?'الحساب موجود بنفس كلمة المرور':'الحساب موجود بكلمة مرور أخرى، احذفه من Firebase أولاً');
-      if(r>=4&&res!=='exists-other'){const mons=[...secureMons()];mons[r-4]=true;await state.db.doc('config/secure').set({...state.secureDoc,mons});}}catch(e){toast('تعذّر إنشاء الحساب')}finally{go.disabled=false}}}
+      if(r===8&&res!=='exists-other'){await state.db.doc('config/secure').set({...state.secureDoc,rep:true})}else if(r>=4&&res!=='exists-other'){const mons=[...secureMons()];mons[r-4]=true;await state.db.doc('config/secure').set({...state.secureDoc,mons});}}catch(e){toast('تعذّر إنشاء الحساب')}finally{go.disabled=false}}}
 async function activateSecure(){const err=t=>{$('scErr').textContent=t};err('');const api=state.authApi;if(!api){err('خدمة الحسابات غير متاحة');return}
   const apw=$('scAdm').value;if(!apw){err('اكتب كلمة مرور المدير الحالية');return}
   if(!state.auth||await hashFor(state.auth.salt,-1,apw)!==state.auth.master){err('كلمة مرور المدير غير صحيحة');return}
@@ -1323,18 +1346,19 @@ async function activateSecure(){const err=t=>{$('scErr').textContent=t};err('');
   const btn=$('scOn');btn.disabled=true;btn.textContent='جارٍ التجهيز…';
   try{const m=await migrateAccount(-1,apw);if(m!==true){err('تعذّر تجهيز حساب المدير'+(m==='other'?': يوجد حساب بكلمة مرور مختلفة، احذفه من Firebase ← Authentication':''));return}
     const rd=(state.secureDoc&&state.secureDoc.ready)||{};
-    const missing=[0,1,2,3,4,5,6,7].filter(r=>(r<4||storedHash(r))&&rd[roleKey(r)]!==true);
+    const missing=[0,1,2,3,4,5,6,7,8].filter(r=>(r<4||storedHash(r))&&rd[roleKey(r)]!==true);
     if(missing.length&&!confirm(`لم يجهز بعد: ${missing.map(roleName).join('، ')}.\nلن يستطيعوا الدخول حتى تنشئ لهم حسابًا من الإعدادات بكلمة مرور جديدة.\nهل تريد التفعيل الآن؟`)){return}
     // lock unused monitor emails with random passwords so nobody else can claim them
-    for(const r of [4,5,6,7])if(!storedHash(r)&&rd[roleKey(r)]!==true){try{await api.createAccount(roleEmail(r),randPw())}catch(e){}}
+    for(const r of [4,5,6,7,8])if(!storedHash(r)&&rd[roleKey(r)]!==true){try{await api.createAccount(roleEmail(r),randPw())}catch(e){}}
     btn.textContent='جارٍ التفعيل…';
     await api.signIn(roleEmail(-1),apw);
     const mons=[4,5,6,7].map(r=>!!storedHash(r)&&rd[roleKey(r)]===true);
-    await state.db.doc('config/secure').set({enabled:true,at:new Date().toISOString(),mons,ready:rd});
+    await state.db.doc('config/secure').set({enabled:true,at:new Date().toISOString(),mons,rep:!!storedHash(8)&&rd.rep===true,ready:rd});
     try{await state.db.doc('config/auth').delete()}catch(e){}
     save(SKEY,null);toast('تم تفعيل الدخول الآمن');setTimeout(()=>location.reload(),900)}
   catch(e){console.error(e);err('تعذّر التفعيل: '+(e&&e.code||e&&e.message||''))}
   finally{btn.disabled=false;btn.textContent='تفعيل الدخول الآمن'}}
+function readRepViews(){const v=[...document.querySelectorAll('#nFields input[name=repv]:checked')].map(i=>i.value);return v.length?v:['report']}
 let dataStarted=false;
 function startData(){if(dataStarted||!state.db)return;dataStarted=true;
   state.db.doc('config/phones').onSnapshot(d=>{const v=d.exists&&d.data();state.phones=v&&v.phones&&typeof v.phones==='object'?v.phones:{};if(state.view==='teachers')renderTeachers()},()=>{});
@@ -1359,7 +1383,7 @@ paintWeekNav();
 // export
 async function exportCSV(){const dl=state.downloads;if(!dl)return;const head=['اليوم','التاريخ الهجري','الحصة','الوقت','الصف / المسار','المادة','المعلم','المسؤول','الحالة','دخول المعلم','الحضور','الغياب','تسجيل الحصة','التقييم','الملاحظات'];
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-  const lines=[head.map(q).join(',')].concat(S.map(s=>{const l=state.logs[s.id]||{};return [DAYS[s.day].n,DAYS[s.day].h,s.label,`${SLOTS[s.slot][1]} - ${SLOTS[s.slot][2]}`,CLS[s.cls],s.subj,s.teacher,state.names[s.sup],ST[l.status]?.t||'لم تُرصد',l.entry||'',l.present??'',l.absent??'',l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':'',l.rating||'',l.notes||''].map(q).join(',')}));
+  const lines=[head.map(q).join(',')].concat(S.map(s=>{const l=state.logs[s.id]||{};return [DAYS[s.day].n,DAYS[s.day].h,s.label,`${SLOTS[s.slot][1]} - ${SLOTS[s.slot][2]}`,CLS[s.cls],s.subj,s.teacher,state.names[s.sup],ST[l.status]?.t||'لم تُرصد',l.entry||'',l.present??'',l.absent??'',l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':'',rateOf(l)?fmtR(rateOf(l)):'',notesFor(l)].map(q).join(',')}));
   try{await dl.save({filename:`متابعة-الحصص-${DAYS[0].h.replace(/\//g,'-')}.csv`,data:'﻿'+lines.join('\n')})}catch(e){if(e&&e.code!=='cancelled')toast('تعذّر التصدير')}}
 $('exportBtn').onclick=exportCSV;
 
@@ -1375,7 +1399,7 @@ render();
   if(user){try{state.uid=await user.id()}catch(e){}
     try{const w=await user.can('data.write');if(w===false){state.canWrite=false;showBanner('لديك صلاحية الاطلاع فقط. اطلب من مدير المنصة صلاحية «مساهم» للرصد.')}}catch(e){}
     try{state.isEditor=await user.canEdit()}catch(e){}}
-  db.doc('config/main').onSnapshot(d=>{const v=d.exists&&d.data();if(v&&Array.isArray(v.names)&&v.names.length===4){state.names=v.names.map((n,i)=>String(n||'').slice(0,40)||`المسؤول ${i+1}`);if(!$('loginForm').hidden)renderRoles();if(state.role!=null){$('rolePill').textContent='دخول: '+roleName(state.role)}render()}},()=>{});
+  db.doc('config/main').onSnapshot(d=>{const v=d.exists&&d.data();if(v&&Array.isArray(v.repViews)){state.repViews=v.repViews.map(String);if(state.role!=null)applyRepViews()}if(v&&Array.isArray(v.names)&&v.names.length===4){state.names=v.names.map((n,i)=>String(n||'').slice(0,40)||`المسؤول ${i+1}`);if(!$('loginForm').hidden)renderRoles();if(state.role!=null){$('rolePill').textContent='دخول: '+roleName(state.role)}render()}},()=>{});
   db.doc('config/monitors').onSnapshot(d=>{const v=d.exists&&d.data();if(v){if(Array.isArray(v.names)&&v.names.length===4)state.mnames=v.names.map((n,i)=>String(n||'').slice(0,40)||`المشرف ${i+1}`);
     if(v.teachers&&typeof v.teachers==='object')state.mteachers=[0,1,2,3].map(m=>{const a=v.teachers['m'+m];return Array.isArray(a)?a.map(String):[]});}
     if(!$('loginForm').hidden)renderRoles();if(state.role!=null){$('rolePill').textContent='دخول: '+roleName(state.role)}render()},()=>{});
@@ -1392,7 +1416,7 @@ render();
     state.auth=v;
     const sess=load(SKEY);
     if(state.role!=null){if(!sess||sess.h!==storedHash(state.role)){save(SKEY,null);location.reload()}return}
-    if(sess&&typeof sess.role==='number'&&sess.role>=-1&&sess.role<=7&&sess.h===storedHash(sess.role)){enter(sess.role);return}
+    if(sess&&typeof sess.role==='number'&&sess.role>=-1&&sess.role<=8&&sess.h===storedHash(sess.role)){enter(sess.role);return}
     showGate('login','')},()=>showGate('none','تعذّر تحميل بيانات الدخول. أعد تحميل الصفحة.'));}
 })();
 function showBanner(t){const b=$('banner');b.textContent=t;b.hidden=false}
