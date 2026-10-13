@@ -1092,10 +1092,10 @@ function isDue(s){if(state.week<CUR_WEEK)return true;if(state.week>CUR_WEEK)retu
 const monDone=l=>!!l&&(Number(l.ratingMon)>0||!!(splitNotes(l).notesAdm||'').trim());
 function staffData(){const bd=state.stDay;const inDay=s=>bd<0||s.day===bd;const rows=[];
   state.names.forEach((n,i)=>{const ss=S.filter(s=>s.sup===i&&inDay(s));const done=ss.filter(s=>state.logs[s.id]&&ST[state.logs[s.id].status]);const pend=ss.filter(s=>!done.includes(s));
-    const last=Object.values(state.logs).filter(l=>l&&l.by===i&&l.updatedAt).map(l=>l.updatedAt).sort().pop();
+    const last=S.filter(s=>s.sup===i).map(s=>state.logs[s.id]).filter(l=>l&&(l.updatedAt||l.monAt)).map(l=>l.updatedAt||'').filter(Boolean).sort().pop();
     rows.push({kind:'sup',name:n,sub:SUPCLS[i],ss,done:done.length,due:pend.filter(isDue),later:pend.filter(s=>!isDue(s)).length,last})});
   const mons=[];[0,1,2,3].forEach(m=>{const T=new Set(state.mteachers[m]||[]);if(!T.size)return;const ss=S.filter(s=>T.has(s.teacher)&&inDay(s));const done=ss.filter(s=>monDone(state.logs[s.id]));const pend=ss.filter(s=>!done.includes(s));
-    const last=Object.values(state.logs).filter(l=>l&&l.monBy===m&&l.monAt).map(l=>l.monAt).sort().pop();
+    const last=S.filter(s=>T.has(s.teacher)).map(s=>state.logs[s.id]).filter(l=>l&&l.monAt&&(l.monBy==null||l.monBy===m)).map(l=>l.monAt).sort().pop();
     mons.push({kind:'mon',name:state.mnames[m],sub:T.size+' معلم',ss,done:done.length,due:pend.filter(isDue),later:pend.filter(s=>!isDue(s)).length,last})});
   return{rows,mons}}
 const fmtWhen=iso=>iso?new Date(iso).toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',weekday:'long',hour:'numeric',minute:'2-digit'}):'لا يوجد';
