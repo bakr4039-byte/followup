@@ -37,6 +37,7 @@
 <title>منصة متابعة الحصص عن بُعد</title>
 </head>
 <body>
+<div class="credit-fix">إعداد وتنفيذ / بكر الدوخي</div>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;600;700&display=swap">
@@ -252,7 +253,9 @@ tr.clickable:hover td{background:var(--surface-2)}
 .names{display:grid;gap:10px}
 .names input{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:9px 10px}
 .foot{color:var(--muted);font-size:12.5px;text-align:center}
-.foot.credit{margin-top:-10px;font-weight:600;color:var(--ink);opacity:.75}
+.credit-fix{position:fixed;left:0;right:0;bottom:0;z-index:60;text-align:center;font-size:12.5px;font-weight:600;color:var(--ink);padding:6px 12px calc(6px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(6px);border-top:1px solid var(--line)}
+body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important}
+@media print{.credit-fix{display:none}}
 /* gate */
 .gate{position:fixed;inset:0;z-index:40;background:var(--bg);display:grid;place-items:center;padding-inline:16px;padding-block:24px;overflow:auto}
 .gate-card{width:min(440px,100%);background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:26px 24px;display:grid;gap:18px}
@@ -480,7 +483,6 @@ tr.clickable:hover td{background:var(--surface-2)}
   </section>
 
   <p class="foot">يتحدّث الرصد مباشرة لكل المسؤولين · اضغط على أي حصة لتسجيل المتابعة</p>
-  <p class="foot credit">إعداد وتنفيذ / بكر الدوخي</p>
 </div>
 
 <div class="scrim" id="scrim" hidden></div>
@@ -859,7 +861,7 @@ function archiveBody(a,P,print){const c=a.total;const pc=v=>v==null?'—':v+'%';
     +(print?'<h2>حسب المعلم (مرتب حسب الحالات المحسوبة عليه)</h2>':'<h3 style="margin:0">حسب المعلم <small class="note">مرتب حسب الحالات المحسوبة عليه</small></h3>')+tbl('<th>المعلم</th><th>المواد</th><th>الحصص</th><th>تمت</th><th>متأخرة</th><th>لم تُعقد</th><th>تقنية</th><th>الانعقاد</th><th>التقييم</th><th>على المعلم</th>',trows)}
 function periodPage(a){return `<section class="page">${printHeader('التقرير الدوري لمتابعة الحصص عن بُعد',(isMon()||effSup()>=0?scopeLabel()+' · ':'')+periodText(a)).replace(/<p>الأسبوع:[^<]*<\/p>|<p>(يوم|الفترة)[^<]*<\/p>/,'')}${archiveBody(a,PAL_PRINT,true)}
   <div class="sign"><div>منسق المتابعة</div><div>وكيل الشؤون التعليمية</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div>
-  <p class="foot">صدر من منصة متابعة الحصص عن بُعد · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
+  <p class="foot">صدر من منصة متابعة الحصص عن بُعد · إعداد وتنفيذ / بكر الدوخي · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
 function paintArchOpts(){const ws=allWeeks();const o=ws.map(w=>`<option value="${w}">${weekLabel(w)}</option>`).join('');const f=$('aFrom').value,t=$('aTo').value;$('aFrom').innerHTML=o;$('aTo').innerHTML=o;
   $('aFrom').value=f&&ws.includes(f)?f:ws[Math.max(0,ws.length-4)];$('aTo').value=t&&ws.includes(t)?t:ws[ws.length-1]}
 async function runArchive(){if(!state.db){toast('قاعدة البيانات غير متصلة');return null}let f=$('aFrom').value,t=$('aTo').value;if(f>t){[f,t]=[t,f];$('aFrom').value=f;$('aTo').value=t}
@@ -909,7 +911,7 @@ function notesPage(list){const n=list.reduce((a,t)=>a+t.ss.length,0);
   const body=list.map(t=>`<h2>${esc(t.name)} <small style="color:#667;font-weight:400">· ${esc(subjOf(t.ss))} · ${t.ss.length} ملاحظة</small></h2><table><thead><tr><th style="width:13%">اليوم</th><th style="width:11%">الحصة</th><th style="width:16%">الصف / المسار</th><th style="width:14%">المادة</th><th style="width:11%">الحالة</th><th>الملاحظات</th></tr></thead><tbody>${t.ss.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr><td>${DAYS[s.day].n}<br><small>${DAYS[s.day].h}هـ</small></td><td>${s.label}<br><small>${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</small></td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td class="${st?stCls[l.status]:'idle'}">${st?st.t:'لم تُرصد'}</td><td>${esc(noteOf(s))}</td></tr>`}).join('')}</tbody></table>`).join('')||'<p>لا توجد ملاحظات ضمن الأيام المحددة.</p>';
   return `<section class="page">${printHeader('المعلمون الذين عليهم ملاحظات',(isMon()||effSup()>=0?scopeLabel()+' · ':'')+`${list.length} معلم · ${n} ملاحظة`)}${body}
   <div class="sign"><div>المتابِع</div><div>وكيل الشؤون التعليمية</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div>
-  <p class="foot">صدر من منصة متابعة الحصص عن بُعد · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
+  <p class="foot">صدر من منصة متابعة الحصص عن بُعد · إعداد وتنفيذ / بكر الدوخي · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
 function printNotes(kind){const list=notedTeachers();if(!list.length){toast('لا توجد ملاحظات ضمن الأيام المحددة');return}exportDoc(kind,'ملاحظات المعلمين',[notesPage(list)])}
 $('tNotesOnly').onclick=()=>{state.notesOnly=!state.notesOnly;$('tNotesOnly').setAttribute('aria-pressed',String(!!state.notesOnly));renderTeachers()};
 $('notesPrint').onclick=()=>printNotes('print');$('notesPdf').onclick=()=>printNotes('pdf');
@@ -926,7 +928,7 @@ function letterPage(t){const inc=incOf(t);
   <p>شاكرين لكم تعاونكم، وتقبلوا خالص التحية والتقدير،،،</p>
   <div class="ack"><b>إقرار المعلم:</b> اطلعت على ما ورد أعلاه وأتعهد بالالتزام. &nbsp; الاسم: ${esc(t.name)} &nbsp; التوقيع: ................ &nbsp; التاريخ: ......../......../........14هـ</div>
   <div class="sign"><div>المتابِع</div><div>وكيل الشؤون التعليمية</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div>
-  <p class="foot">صدر من منصة متابعة الحصص عن بُعد · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
+  <p class="foot">صدر من منصة متابعة الحصص عن بُعد · إعداد وتنفيذ / بكر الدوخي · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
 function printLetters(kind,list){list=list||repeatTeachers();if(!list.length){toast(`لا يوجد معلم تكررت عليه الحالات (${repMin()} فأكثر) في الأيام المحددة`);return}exportDoc(kind,list.length===1?'خطاب تنبيه '+list[0].name:'خطابات التنبيه',list.map(letterPage))}
 $('tRepeat').onclick=()=>{state.repeatOnly=!state.repeatOnly;$('tRepeat').setAttribute('aria-pressed',String(!!state.repeatOnly));renderTeachers()};
 $('tRepMin').onchange=renderTeachers;
@@ -1002,7 +1004,7 @@ function teacherPage(t){const c=tStats(t.ss);const sups=[...new Set(t.ss.map(s=>
   <table><thead><tr><th>اليوم</th><th>الحصة</th><th>الصف</th><th>المادة</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>تسجيل</th><th>التقييم</th><th>ملاحظات المتابعة</th></tr></thead><tbody>${rows}</tbody></table>
   <h2>توصيات ومرئيات</h2><div class="notes"></div>
   <div class="sign"><div>توقيع المعلم</div><div>المتابِع</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div>
-  <p class="foot">صدر من منصة متابعة الحصص عن بُعد · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
+  <p class="foot">صدر من منصة متابعة الحصص عن بُعد · إعداد وتنفيذ / بكر الدوخي · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
 function generalPage(){const R=S.filter(inRange);const c=tStats(R);
   const supRows=state.names.map((n,i)=>{const x=tStats(R.filter(s=>s.sup===i));return `<tr><td>${esc(n)}</td><td>${SUPCLS[i]}</td><td>${x.total}</td><td>${x.logged}</td><td class="ok">${x.done}</td><td class="late">${x.late}</td><td class="bad">${x.absent}</td><td class="tech">${x.tech}</td><td>${pct(x.logged,x.total)}%</td><td>${fmtAvg(x.avg)}</td></tr>`}).join('');
   const tRows=teachersIn(R).map(t=>{const x=tStats(t.ss);return `<tr><td>${esc(t.name)}</td><td>${esc(subjOf(t.ss))}</td><td>${x.total}</td><td class="ok">${x.done}</td><td class="late">${x.late}</td><td class="bad">${x.absent}</td><td class="tech">${x.tech}</td><td>${x.pending}</td><td>${x.logged?pct(x.held,x.logged)+'%':'—'}</td><td>${fmtAvg(x.avg)}</td></tr>`}).join('');
@@ -1127,7 +1129,7 @@ function staffPage(){const {rows,mons}=staffData();const tr=r=>`<tr><td><b>${esc
   <h2>المسؤولون المتابعون</h2><table><thead>${th}</thead><tbody>${rows.map(tr).join('')}</tbody></table>
   ${mons.length?`<h2>المشرفون على المعلمين</h2><table><thead>${th}</thead><tbody>${mons.map(tr).join('')}</tbody></table>`:''}
   <div class="sign"><div>وكيل الشؤون التعليمية</div><div>منسق المتابعة</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div>
-  <p class="foot">صدر من منصة متابعة الحصص عن بُعد · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
+  <p class="foot">صدر من منصة متابعة الحصص عن بُعد · إعداد وتنفيذ / بكر الدوخي · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
 $('stDay').onchange=()=>{state.stDay=+$('stDay').value;renderStaff()};
 $('stPrint').onclick=()=>exportDoc('print','متابعة المسؤولين والمشرفين',[staffPage()]);$('stPdf').onclick=()=>exportDoc('pdf','متابعة المسؤولين والمشرفين',[staffPage()]);
 function render(){renderDue();renderSups();if(state.view==='staff'){renderStaff();return}if(state.view==='schedule'){renderDays();renderTimeline();renderRail()}else if(state.view==='report')renderReport();else if(state.view==='teachers')renderTeachers();else renderBoard()}
