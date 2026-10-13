@@ -447,14 +447,14 @@ tr.clickable:hover td{background:var(--surface-2)}
   <section id="boardView" class="board" hidden>
     <div class="board-head">
       <div><h2>لوحة الأرقام العامة</h2><p class="note" id="bSub"></p></div>
-      <button class="btn ghost" id="fsBtn">ملء الشاشة</button>
+      <div class="filters"><label class="rng">العرض <select id="bDay" aria-label="يوم شاشة الأرقام"></select></label><button class="btn ghost" id="fsBtn">ملء الشاشة</button></div>
     </div>
     <div class="hero" id="bHero"></div>
     <div class="bstatus" id="bStatus"></div>
     <div id="bCharts"></div>
     <div class="bgrid">
       <div class="panel"><h2>الإنجاز حسب المسؤول</h2><div class="bars" id="bSups"></div></div>
-      <div class="panel"><h2>الإنجاز حسب اليوم</h2><div class="bars" id="bDays"></div></div>
+      <div class="panel"><h2 id="bDaysH">الإنجاز حسب اليوم</h2><div class="bars" id="bDays"></div></div>
       <div class="panel"><h2>معلمون يحتاجون متابعة</h2><div id="bTeachers"></div></div>
     </div>
   </section>
@@ -850,12 +850,12 @@ $('aPrint').onclick=()=>archDoc('print');$('aPdf').onclick=()=>archDoc('pdf');
 paintArchOpts();
 // per-day data helpers
 function perDay(list,f=state.from,t=state.to){const out=[];for(let i=f;i<=t;i++){const l=list.filter(s=>s.day===i);out.push({i,label:DAYS[i].n,sub:DAYS[i].h,list:l,c:tStats(l)})}return out}
-function chartsBlock(list,P,o={}){const days=perDay(list,o.from??state.from,o.to??state.to),c=tStats(list);const box=(t,body,cls='')=>`<div class="cbox ${cls}"><h3>${t}</h3>${body}</div>`;
-  const att=dayLineSVG(days.map(d=>({label:d.label,v:d.c.att,note:d.c.attN?`متوسط ${d.c.avgPresent} حاضر من ${d.c.avgClass} في الحصة · ${d.c.attN} حصة`:''})),P,{max:100,fmt:v=>v+'%',fmtAxis:v=>v+'%',label:'نسبة حضور الطلاب حسب اليوم',color:P.accent,w:360,h:o.lineH||210});
-  const rat=dayLineSVG(days.map(d=>({label:d.label,v:d.c.avg==null?null:+d.c.avg.toFixed(1),note:d.c.rating.length?d.c.rating.length+' تقييم':''})),P,{max:5,fmt:v=>v.toFixed(1),fmtAxis:v=>v.toFixed(1),label:'متوسط التقييم حسب اليوم',color:P.brass,w:/\bt4\b/.test(o.cls||'')?560:360,h:o.lineH||(/\bt4\b/.test(o.cls||'')?190:210)});
+function chartsBlock(list,P,o={}){const by=o.by||'اليوم';const days=o.rows||perDay(list,o.from??state.from,o.to??state.to),c=tStats(list);const box=(t,body,cls='')=>`<div class="cbox ${cls}"><h3>${t}</h3>${body}</div>`;
+  const att=dayLineSVG(days.map(d=>({label:d.label,v:d.c.att,note:d.c.attN?`متوسط ${d.c.avgPresent} حاضر من ${d.c.avgClass} في الحصة · ${d.c.attN} حصة`:''})),P,{max:100,fmt:v=>v+'%',fmtAxis:v=>v+'%',label:'نسبة حضور الطلاب حسب '+by+'',color:P.accent,w:360,h:o.lineH||210});
+  const rat=dayLineSVG(days.map(d=>({label:d.label,v:d.c.avg==null?null:+d.c.avg.toFixed(1),note:d.c.rating.length?d.c.rating.length+' تقييم':''})),P,{max:5,fmt:v=>v.toFixed(1),fmtAxis:v=>v.toFixed(1),label:'متوسط التقييم حسب '+by+'',color:P.brass,w:/\bt4\b/.test(o.cls||'')?560:360,h:o.lineH||(/\bt4\b/.test(o.cls||'')?190:210)});
   const B={donut:box('توزيع الحالات',`<div class="cdwrap">${donutSVG(c,P,{px:o.donutPx})}${legendHTML(c,P)}</div>`,'c-donut'),
-    days:box('الحصص حسب اليوم',dayColumnsSVG(days,P,{h:o.colH}),'c-days'),
-    att:box('نسبة حضور الطلاب حسب اليوم',att,'c-att'),rating:box('متوسط التقييم حسب اليوم <small>من 5</small>',rat,'c-rat'),
+    days:box('الحصص حسب '+by,dayColumnsSVG(days,P,{h:o.colH}),'c-days'),
+    att:box('نسبة حضور الطلاب حسب '+by+'',att,'c-att'),rating:box('متوسط التقييم حسب '+by+' <small>من 5</small>',rat,'c-rat'),
     sups:o.sups?box('الرصد حسب المسؤول',stackRowsHTML(o.sups,P),'c-sups'):'',
     reasons:box('أسباب الحصص المتعثرة <small>المتأخرة ولم تُعقد والتقنية</small>',reasonsHTML(list,P),'c-rsn')};
   return `<div class="cgrid ${o.cls||''}">${(o.only||['donut','days','att','rating','sups','reasons']).map(k=>B[k]||'').join('')}</div>`}
@@ -1036,17 +1036,22 @@ $('wkPrint').onclick=()=>{renderReport();exportDoc('print','التقرير ال�
 // ---------- board ----------
 function barRow(label,c){const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');
   return `<div class="barrow"><div class="row"><span>${esc(label)}</span><b>${c.logged} / ${c.total} · ${pct(c.logged,c.total)}%</b></div><div class="stack">${seg}</div></div>`}
-function renderBoard(){const list=scope();const c=tStats(list);
-  $('bSub').textContent=scopeLabel()+' · تتحدّث مباشرة مع كل رصد';
-  $('bCharts').innerHTML=chartsBlock(list,PAL_SCREEN,{from:0,to:4,cls:'t4',only:['donut','days','att','rating'],donutPx:200,colH:240});
+function renderBoard(){if(state.bDay===undefined){const ti=todayIdx();state.bDay=ti>=0?ti:-1}
+  $('bDay').innerHTML='<option value="-1">الأسبوع كامل</option>'+DAYS.map((d,i)=>`<option value="${i}">${d.n} ${d.h}${i===todayIdx()?' (اليوم)':''}</option>`).join('');$('bDay').value=String(state.bDay);
+  const bd=state.bDay;const list=scope().filter(s=>bd<0||s.day===bd);const c=tStats(list);
+  $('bSub').textContent=scopeLabel()+' · '+(bd<0?rangeText().replace(/^الأسبوع: /,'الأسبوع '):`يوم ${DAYS[bd].n} ${DAYS[bd].h}هـ`)+' · تتحدّث مباشرة مع كل رصد';
+  const slotRows=bd<0?null:SLOTS.map((sl,i)=>{const l=list.filter(s=>s.slot===i);return{i,label:sl[0],sub:sl[1],list:l,c:tStats(l)}}).filter(r=>r.list.length);
+  $('bCharts').innerHTML=chartsBlock(list,PAL_SCREEN,bd<0?{from:0,to:4,cls:'t4',only:['donut','days','att','rating'],donutPx:200,colH:240}:{rows:slotRows,by:'الحصة',cls:'t4',only:['donut','days','att','rating'],donutPx:200,colH:240});
   const held=c.logged?pct(c.held,c.logged):0;
   $('bHero').innerHTML=[['نسبة الرصد',pct(c.logged,c.total)+'%',`${c.logged} من ${c.total} حصة`,pct(c.logged,c.total)],['نسبة الانعقاد',c.logged?held+'%':'—','من الحصص المرصودة',held],['متوسط التقييم',fmtAvg(c.avg),'من 5 نجوم',c.avg?c.avg*20:0],['حضور الطلاب',c.att==null?'—':c.att+'%',c.attN?`متوسط ${c.avgPresent} حاضر من ${c.avgClass} طالب في الحصة · ${c.attN} حصة`:'لا توجد أعداد مرصودة',c.att||0]]
     .map(([a,b,s,m])=>`<div class="htile"><span>${a}</span><b class="num">${b}</b><small class="num">${s}</small><div class="meter"><i style="width:${Math.min(100,m)}%"></i></div></div>`).join('');
   $('bStatus').innerHTML=['done','late','absent','tech'].map(k=>`<div class="stile s-${k}"><span>${ST[k].t}</span><b class="num">${c[k]}</b></div>`).join('')+`<div class="stile"><span>لم تُرصد بعد</span><b class="num">${c.pending}</b></div>`;
-  $('bSups').innerHTML=state.names.map((n,i)=>effSup()>=0&&i!==effSup()?'':(isMon()&&!scope().some(s=>s.sup===i)?'':barRow(n,counts(scope().filter(s=>s.sup===i))))).join('');
-  $('bDays').innerHTML=DAYS.map((d,i)=>barRow(d.n+(i===todayIdx()?' (اليوم)':''),counts(list.filter(s=>s.day===i)))).join('');
+  $('bSups').innerHTML=state.names.map((n,i)=>effSup()>=0&&i!==effSup()?'':(isMon()&&!list.some(s=>s.sup===i)?'':barRow(n,counts(list.filter(s=>s.sup===i))))).join('');
+  $('bDaysH').textContent=bd<0?'الإنجاز حسب اليوم':'الإنجاز حسب الحصة';
+  $('bDays').innerHTML=bd<0?DAYS.map((d,i)=>barRow(d.n+(i===todayIdx()?' (اليوم)':''),counts(list.filter(s=>s.day===i)))).join(''):slotRows.map(r=>barRow(`${r.label} · ${SLOTS[r.i][1]}`,counts(r.list))).join('');
   const risk=teachersIn(list).map(t=>({t,c:counts(t.ss)})).filter(x=>x.c.absent+x.c.tech+x.c.late>0).sort((a,b)=>(b.c.absent*3+b.c.tech*2+b.c.late)-(a.c.absent*3+a.c.tech*2+a.c.late)).slice(0,8);
   $('bTeachers').innerHTML=risk.length?risk.map(({t,c})=>`<div class="trow"><span>${esc(t.name)}</span><span class="chips">${c.absent?`<span class="chip s-absent">لم تُعقد ${c.absent}</span>`:''}${c.tech?`<span class="chip s-tech">تقنية ${c.tech}</span>`:''}${c.late?`<span class="chip s-late">متأخرة ${c.late}</span>`:''}</span></div>`).join(''):'<p class="empty">لا يوجد معلم عليه ملاحظات حتى الآن.</p>';}
+$('bDay').onchange=()=>{state.bDay=+$('bDay').value;renderBoard()};
 $('fsBtn').onclick=async()=>{const el=$('boardView');try{if(document.fullscreenElement)await document.exitFullscreen();else await el.requestFullscreen()}catch(e){toast('ملء الشاشة غير متاح هنا')}};
 
 // ---------- overdue (ended + 10 min, not logged) ----------
@@ -1372,7 +1377,7 @@ function paintWeekNav(){const ws=allWeeks();$('wSel').innerHTML=ws.slice().rever
   $('weekSub').textContent=`ثانوية الصحافة الأهلية · الأسبوع من الأحد ${DAYS[0].h}هـ إلى الخميس ${DAYS[4].h}هـ (${DAYS[0].gs} – ${DAYS[4].gs} ${DAYS[4].g.slice(0,4)}م)`;
   let a=$('archNote');if(!a){a=document.createElement('div');a.id='archNote';a.className='archived';$('banner').after(a)}
   a.hidden=state.week===CUR_WEEK;a.textContent=state.week<CUR_WEEK?'تعرض الآن أسبوعًا سابقًا من الأرشيف. التعديلات تُحفظ على ذلك الأسبوع.':''}
-function setWeek(wk){if(wk===state.week)return;state.archive=null;state.week=wk;DAYS=weekDays(wk);state.logs={};state.from=0;state.to=4;const ti=todayIdx();state.day=ti>=0?ti:0;state.teacher=state.teacher||null;
+function setWeek(wk){if(wk===state.week)return;state.archive=null;state.bDay=undefined;state.week=wk;DAYS=weekDays(wk);state.logs={};state.from=0;state.to=4;const ti=todayIdx();state.day=ti>=0?ti:0;state.teacher=state.teacher||null;
   paintDayOpts();paintWeekNav();tickClock();subLogs();render()}
 $('wSel').onchange=()=>setWeek($('wSel').value);
 $('wPrev').onclick=()=>{const ws=allWeeks(),i=ws.indexOf(state.week);if(i>0)setWeek(ws[i-1])};
