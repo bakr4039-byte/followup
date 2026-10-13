@@ -168,6 +168,8 @@ tr.clickable:hover td{background:var(--surface-2)}
 .btn{border:0;border-radius:10px;padding:9px 16px;font-weight:600;background:var(--accent);color:var(--accent-ink)}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
 .btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+.tnote{margin-top:6px;font-size:12px;color:var(--ink);opacity:.8;white-space:pre-line;text-align:right;max-height:3.2em;overflow:hidden}
 
 /* drawer */
 .scrim{position:fixed;inset:0;background:rgba(5,20,17,.45);z-index:20}
@@ -367,6 +369,8 @@ tr.clickable:hover td{background:var(--surface-2)}
           <input id="tSearch" type="search" placeholder="ابحث باسم المعلم" aria-label="بحث باسم المعلم">
           <label class="rng">من <select id="tFrom" aria-label="من يوم"></select></label>
           <label class="rng">إلى <select id="tTo" aria-label="إلى يوم"></select></label>
+          <button class="btn ghost" id="tNotesOnly" aria-pressed="false" title="عرض المعلمين الذين لديهم ملاحظات مكتوبة في الأيام المحددة">عليهم ملاحظات</button>
+          <span class="btngroup dlx" hidden><span>الملاحظات:</span><button class="btn ghost" id="notesPrint">طباعة</button><button class="btn" id="notesPdf">PDF</button></span>
           <span class="btngroup dlx" hidden><span>كل المعلمين:</span><button class="btn ghost" id="allPrint">طباعة</button><button class="btn" id="allPdf">PDF</button></span>
           <button class="wabtn master-only2" id="waAllBtn" hidden>إرسال للجميع بالواتساب</button>
           <span class="btngroup dlx master-only" hidden><span>التقرير العام:</span><button class="btn ghost" id="genPrint">طباعة</button><button class="btn" id="genPdf">PDF</button></span>
@@ -628,10 +632,20 @@ function waText(t){const c=tStats(t.ss);const L=[];
   if(notes.length){L.push('');L.push('ملاحظات المتابعة:');notes.slice(0,15).forEach(n=>L.push(n))}
   L.push('');L.push('شاكرين جهودكم، وتقبلوا تحياتنا.');L.push('إدارة ثانوية الصحافة الأهلية');return L.join('\n')}
 function waLink(t){const ph=normPhone(state.phones[t.name]);return ph?`https://wa.me/${ph}?text=${encodeURIComponent(waText(t))}`:''}
-function renderTeachers(){const q=$('tSearch').value.trim();const all=teachersIn(scope().filter(inRange));const list=all.filter(t=>!q||t.name.includes(q));
-  $('tCount').textContent=`${all.length} معلم`;
+function noteOf(s){const l=state.logs[s.id];if(!l)return '';const n=(l.notes||'').trim();return n||joinNotes(splitNotes(l)).trim()}
+function notedTeachers(){const q=$('tSearch').value.trim();return teachersIn(scope().filter(s=>inRange(s)&&noteOf(s))).filter(t=>!q||t.name.includes(q))}
+function notesPage(list){const n=list.reduce((a,t)=>a+t.ss.length,0);
+  const body=list.map(t=>`<h2>${esc(t.name)} <small style="color:#667;font-weight:400">· ${esc(subjOf(t.ss))} · ${t.ss.length} ملاحظة</small></h2><table><thead><tr><th style="width:13%">اليوم</th><th style="width:11%">الحصة</th><th style="width:16%">الصف / المسار</th><th style="width:14%">المادة</th><th style="width:11%">الحالة</th><th>الملاحظات</th></tr></thead><tbody>${t.ss.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr><td>${DAYS[s.day].n}<br><small>${DAYS[s.day].h}هـ</small></td><td>${s.label}<br><small>${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</small></td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td class="${st?stCls[l.status]:'idle'}">${st?st.t:'لم تُرصد'}</td><td>${esc(noteOf(s))}</td></tr>`}).join('')}</tbody></table>`).join('')||'<p>لا توجد ملاحظات ضمن الأيام المحددة.</p>';
+  return `<section class="page">${printHeader('المعلمون الذين عليهم ملاحظات',(isMon()||effSup()>=0?scopeLabel()+' · ':'')+`${list.length} معلم · ${n} ملاحظة`)}${body}
+  <div class="sign"><div>المتابِع</div><div>وكيل الشؤون التعليمية</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div>
+  <p class="foot">صدر من منصة متابعة الحصص عن بُعد · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
+function printNotes(kind){const list=notedTeachers();if(!list.length){toast('لا توجد ملاحظات ضمن الأيام المحددة');return}exportDoc(kind,'ملاحظات المعلمين',[notesPage(list)])}
+$('tNotesOnly').onclick=()=>{state.notesOnly=!state.notesOnly;$('tNotesOnly').setAttribute('aria-pressed',String(!!state.notesOnly));renderTeachers()};
+$('notesPrint').onclick=()=>printNotes('print');$('notesPdf').onclick=()=>printNotes('pdf');
+function renderTeachers(){const q=$('tSearch').value.trim();const all=teachersIn(scope().filter(inRange));const noted=new Set(teachersIn(scope().filter(s=>inRange(s)&&noteOf(s))).map(t=>t.name));const list=all.filter(t=>(!q||t.name.includes(q))&&(!state.notesOnly||noted.has(t.name)));
+  $('tCount').textContent=`${all.length} معلم · ${noted.size} عليهم ملاحظات`;
   $('tGrid').innerHTML=list.map(t=>{const c=tStats(t.ss);const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');
-    return `<button class="tcard" data-teacher="${esc(t.name)}" aria-pressed="${state.teacher===t.name}"><div class="row"><b>${esc(t.name)}</b><span class="pct num">${c.logged?pct(c.held,c.logged)+'%':'—'}</span></div><div class="subjs">${esc(subjOf(t.ss))} · <span class="num">${c.total}</span> حصة${normPhone(state.phones[t.name])?' · <span class="tag wa-ok">واتساب</span>':''}</div><div class="stack">${seg}</div></button>`}).join('')||'<p class="empty">لا يوجد معلم بهذا الاسم.</p>';
+    return `<button class="tcard" data-teacher="${esc(t.name)}" aria-pressed="${state.teacher===t.name}"><div class="row"><b>${esc(t.name)}</b><span class="pct num">${c.logged?pct(c.held,c.logged)+'%':'—'}</span></div><div class="subjs">${esc(subjOf(t.ss))} · <span class="num">${c.total}</span> حصة${normPhone(state.phones[t.name])?' · <span class="tag wa-ok">واتساب</span>':''}</div><div class="stack">${seg}</div>${state.notesOnly?`<div class="tnote">${t.ss.filter(noteOf).map(s=>esc(DAYS[s.day].n+' · '+s.label+': '+noteOf(s).replace(/\n/g,' · '))).join('\n')}</div>`:''}</button>`}).join('')||`<p class="empty">${state.notesOnly?'لا يوجد معلم عليه ملاحظات في الأيام المحددة.':'لا يوجد معلم بهذا الاسم.'}</p>`;
   const sel=all.find(t=>t.name===state.teacher);const box=$('tDetail');
   if(!sel){box.hidden=true;return}box.hidden=false;const c=tStats(sel.ss);
   box.innerHTML=`<div class="tdetail-head"><div><h2>${esc(sel.name)}</h2><p>${esc(subjOf(sel.ss))} · ${esc(clsOf(sel.ss))}</p></div><div class="filters">${state.downloads?'<button class="btn ghost" id="tPrint">طباعة</button><button class="btn" id="tPdf">تحميل PDF</button>':''}<button class="btn ghost" id="tClose">إغلاق</button></div></div>
