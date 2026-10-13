@@ -158,7 +158,11 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 table{border-collapse:collapse;width:100%;min-width:860px;font-size:13.5px}
 th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
 th{font-weight:600;color:var(--muted);font-size:12.5px;background:var(--surface-2);position:sticky;top:0}
-td.wrap{white-space:normal;min-width:180px}
+td.wrap{white-space:pre-line;min-width:200px}
+.notes3{display:grid;gap:10px;border:1px solid var(--line);border-radius:12px;padding:10px}
+.notes3 .field textarea{min-height:60px}
+.notes3 .nh{font-weight:700;margin:0}
+.combined{white-space:pre-line;background:var(--surface-2);border:1px dashed var(--line);border-radius:10px;padding:8px 10px;font-size:13px;min-height:40px;color:var(--muted)}
 tr.clickable{cursor:pointer}
 tr.clickable:hover td{background:var(--surface-2)}
 .btn{border:0;border-radius:10px;padding:9px 16px;font-weight:600;background:var(--accent);color:var(--accent-ink)}
@@ -399,7 +403,12 @@ tr.clickable:hover td{background:var(--surface-2)}
     </div>
     <div class="field"><span class="lbl">هل سُجّلت الحصة؟</span><div class="toggle" id="dRec"><button data-v="yes" aria-pressed="false">نعم</button><button data-v="no" aria-pressed="false">لا</button></div></div>
     <div class="field"><span class="lbl">تقييم الحصة</span><div class="stars" id="dStars"></div></div>
-    <div class="field"><label for="dNotes">ملاحظات المتابع</label><textarea id="dNotes" placeholder="مثال: تأخر دخول المعلم 5 دقائق، تفاعل جيد من الطلاب"></textarea></div>
+    <div class="notes3"><p class="nh">ملاحظات المتابعة</p>
+      <div class="field"><label for="nVC">حسب فيوكلاس</label><textarea id="nVC" placeholder="مثال: دخل المعلم 06:51، حاضر 4 + متأخر 9"></textarea></div>
+      <div class="field"><label for="nSup">حسب المسؤول المتابع</label><textarea id="nSup" placeholder="مثال: تفاعل جيد من الطلاب، الصوت غير واضح"></textarea></div>
+      <div class="field"><label for="nAdm">حسب المشرف</label><textarea id="nAdm" placeholder="ملاحظات المشرف العام على الحصة"></textarea></div>
+      <div class="field"><span class="lbl">الملاحظات المجمّعة للمعلم في الحصة</span><div class="combined" id="nAll"></div></div>
+    </div>
     <p class="who" id="dWho"></p>
   </div>
   <div class="drawer-foot">
@@ -646,7 +655,7 @@ const PRINT_CSS=`@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-fam
 h2{font-size:16px;margin:14px 0 6px;color:#0E6B57}
 .info{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}.info div{border:1px solid #cfdcd8;border-radius:6px;padding:6px 8px}.info span{display:block;font-size:10.5px;color:#667}.info b{font-size:13px}
 .stats{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:8px 0 12px}.stats div{border:1px solid #cfdcd8;border-radius:6px;padding:6px;text-align:center}.stats span{display:block;font-size:10px;color:#667}.stats b{font-size:17px}
-table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #bccbc7;padding:5px 6px;text-align:right;vertical-align:top}th{background:#e7f1ee;font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #bccbc7;padding:5px 6px;text-align:right;vertical-align:top;white-space:pre-line}th{background:#e7f1ee;font-weight:700}
 .ok{color:#1C7A45;font-weight:700}.late{color:#9A6512;font-weight:700}.bad{color:#B0352F;font-weight:700}.tech{color:#5B40A6;font-weight:700}.idle{color:#888}
 .notes{min-height:60px;border:1px solid #bccbc7;border-radius:6px;padding:8px;margin-top:8px}
 .sign{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px;text-align:center;font-size:12px}.sign div{padding-top:30px;border-top:1px dashed #889}
@@ -662,7 +671,7 @@ function teacherPage(t){const c=tStats(t.ss);const sups=[...new Set(t.ss.map(s=>
   return `<section class="page">${printHeader('تقرير متابعة الحصص عن بُعد','ثانوية الصحافة الأهلية')}
   <div class="info"><div><span>اسم المعلم</span><b>${esc(t.name)}</b></div><div><span>المواد</span><b>${esc(subjOf(t.ss))}</b></div><div><span>الصفوف / المسارات</span><b>${esc(clsOf(t.ss))}</b></div><div><span>المتابِع</span><b>${esc(sups)}</b></div><div><span>نسبة الانعقاد من المرصود</span><b>${c.logged?pct(c.held,c.logged)+'%':'—'}</b></div><div><span>نسبة تسجيل الحصص</span><b>${c.rec==null?'—':c.rec+'%'}</b></div></div>
   <div class="stats"><div><span>الحصص</span><b>${c.total}</b></div><div><span>تمت في وقتها</span><b class="ok">${c.done}</b></div><div><span>متأخرة</span><b class="late">${c.late}</b></div><div><span>لم تُعقد</span><b class="bad">${c.absent}</b></div><div><span>مشكلة تقنية</span><b class="tech">${c.tech}</b></div><div><span>لم تُرصد</span><b>${c.pending}</b></div><div><span>متوسط التقييم</span><b>${fmtAvg(c.avg)}</b></div><div><span>حضور الطلاب</span><b>${c.att==null?'—':c.att+'%'}</b></div></div>
-  <table><thead><tr><th>اليوم</th><th>الحصة</th><th>الصف</th><th>المادة</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>تسجيل</th><th>التقييم</th><th>ملاحظات المتابع</th></tr></thead><tbody>${rows}</tbody></table>
+  <table><thead><tr><th>اليوم</th><th>الحصة</th><th>الصف</th><th>المادة</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>تسجيل</th><th>التقييم</th><th>ملاحظات المتابعة</th></tr></thead><tbody>${rows}</tbody></table>
   <h2>توصيات ومرئيات</h2><div class="notes"></div>
   <div class="sign"><div>توقيع المعلم</div><div>المتابِع</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div>
   <p class="foot">صدر من منصة متابعة الحصص عن بُعد · ${new Date().toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}</p></section>`}
@@ -754,14 +763,22 @@ function paintDraft(){const d=state.draft;
   $('dStatus').querySelectorAll('[data-st]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.st===d.status));
   $('dRec').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===d.recorded));
   $('dStars').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.r<=(d.rating||0)));}
+const NOTE_PARTS=[['notesVC','حسب فيوكلاس','nVC'],['notesSup','حسب المسؤول المتابع','nSup'],['notesAdm','حسب المشرف','nAdm']];
+function splitNotes(l){if(!l)return {notesVC:'',notesSup:'',notesAdm:''};
+  if(l.notesVC!=null||l.notesSup!=null||l.notesAdm!=null)return {notesVC:l.notesVC||'',notesSup:l.notesSup||'',notesAdm:l.notesAdm||''};
+  const n=(l.notes||'').trim();const m=n.match(/^حسب فيوكلاس:\s*/);
+  return m?{notesVC:n.slice(m[0].length),notesSup:'',notesAdm:''}:{notesVC:'',notesSup:n,notesAdm:''};}
+function joinNotes(p){return NOTE_PARTS.filter(([k])=>(p[k]||'').trim()).map(([k,t])=>t+': '+p[k].trim()).join('\n')}
+function paintCombined(){const t=joinNotes({notesVC:$('nVC').value,notesSup:$('nSup').value,notesAdm:$('nAdm').value});$('nAll').textContent=t||'—'}
+['nVC','nSup','nAdm'].forEach(x=>$(x).addEventListener('input',paintCombined));
 async function openDrawer(id){const s=byId[id];state.open=id;const l=state.logs[id]||{};state.draft={status:l.status||'',recorded:l.recorded||'',rating:l.rating||0};
   $('dTitle').textContent=s.subj;$('dSub').textContent=`${s.teacher} · ${CLS[s.cls]} · ${DAYS[s.day].n} ${DAYS[s.day].h}هـ · الحصة ${s.label} (${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}) · ${state.names[s.sup]}`;
-  $('dLink').value=state.links[id]||'';paintJoin();$('dEntry').value=l.entry||'';$('dPresent').value=l.present??'';$('dAbsent').value=l.absent??'';$('dNotes').value=l.notes||'';
+  $('dLink').value=state.links[id]||'';paintJoin();$('dEntry').value=l.entry||'';$('dPresent').value=l.present??'';$('dAbsent').value=l.absent??'';{const p=splitNotes(l);$('nVC').value=p.notesVC;$('nSup').value=p.notesSup;$('nAdm').value=p.notesAdm;paintCombined()}
   $('dWho').textContent='';if(l.updatedAt){let who='';if(l.updatedBy&&state.user){try{const ps=await state.user.profiles([l.updatedBy]);who=ps[l.updatedBy]?.name||''}catch(e){}}
     $('dWho').textContent=`آخر تحديث: ${new Date(l.updatedAt).toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',weekday:'long',hour:'numeric',minute:'2-digit'})}${who?' · بواسطة '+who:''}`}
   const notMine=state.role==null||(state.role>=0&&s.sup!==state.role);
   const ro=!state.db||!state.canWrite||notMine;
-  if(notMine&&state.role!=null)$('dWho').textContent=($('dWho').textContent?$('dWho').textContent+' · ':'')+'هذه الحصة من مسؤولية '+state.names[s.sup]+' (عرض فقط)';['dEntry','dPresent','dAbsent','dNotes','dLink'].forEach(x=>$(x).disabled=ro);$('dLinkSave').disabled=ro;$('dSave').disabled=ro;$('dClear').disabled=ro||!state.logs[id];
+  if(notMine&&state.role!=null)$('dWho').textContent=($('dWho').textContent?$('dWho').textContent+' · ':'')+'هذه الحصة من مسؤولية '+state.names[s.sup]+' (عرض فقط)';['dEntry','dPresent','dAbsent','nVC','nSup','dLink'].forEach(x=>$(x).disabled=ro);$('nAdm').disabled=!state.db||!state.canWrite||state.role!==-1;$('dLinkSave').disabled=ro;$('dSave').disabled=ro;$('dClear').disabled=ro||!state.logs[id];
   paintDraft();$('scrim').hidden=false;$('drawer').hidden=false;$('dClose').focus();}
 function closeDrawer(){$('scrim').hidden=true;$('drawer').hidden=true;state.open=null}
 $('dClose').onclick=closeDrawer;$('scrim').onclick=closeDrawer;
@@ -779,7 +796,7 @@ $('dLinkSave').onclick=async()=>{const id=state.open;if(!state.db||!id)return;co
   catch(e){toast('تعذّر حفظ الرابط')}};
 $('dSave').onclick=async()=>{const id=state.open;if(!state.db||!id)return;const d=state.draft;
   if(!d.status){toast('اختر حالة الحصة أولاً');return}
-  const s=byId[id];if(state.role==null||(state.role>=0&&s.sup!==state.role))return;const doc={by:state.role,status:d.status,entry:$('dEntry').value||'',present:numOrNull($('dPresent').value),absent:numOrNull($('dAbsent').value),recorded:d.recorded||'',rating:d.rating||0,notes:$('dNotes').value.trim().slice(0,1000),sup:s.sup,day:s.day,updatedAt:new Date().toISOString(),updatedBy:state.uid||''};
+  const s=byId[id];if(state.role==null||(state.role>=0&&s.sup!==state.role))return;const doc={by:state.role,status:d.status,entry:$('dEntry').value||'',present:numOrNull($('dPresent').value),absent:numOrNull($('dAbsent').value),recorded:d.recorded||'',rating:d.rating||0,...(()=>{const prev=splitNotes(state.logs[id]);const p={notesVC:$('nVC').value.trim().slice(0,600),notesSup:$('nSup').value.trim().slice(0,600),notesAdm:(state.role===-1?$('nAdm').value:prev.notesAdm).trim().slice(0,600)};return {...p,notes:joinNotes(p).slice(0,2000)}})(),sup:s.sup,day:s.day,updatedAt:new Date().toISOString(),updatedBy:state.uid||''};
   $('dSave').disabled=true;
   try{await state.db.doc('logs/'+id).set(doc);state.logs[id]=doc;toast('تم حفظ المتابعة');closeDrawer();render()}
   catch(e){if(e&&e.code==='invalid_argument'){state.canWrite=false;toast('ليست لديك صلاحية التعديل')}else toast('تعذّر الحفظ، حاول مرة أخرى')}
