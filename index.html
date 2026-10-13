@@ -1240,7 +1240,7 @@ $('loginForm').onsubmit=async e=>{e.preventDefault();$('loginErr').textContent='
   if(!state.auth){$('loginErr').textContent='بيانات الدخول غير جاهزة';return}
   const h=await hashFor(state.auth.salt,loginRole,$('pw').value);
   if(h!==storedHash(loginRole)){$('loginErr').textContent='كلمة المرور غير صحيحة';$('pw').select();return}
-  $('pw').value='';save(SKEY,{role:loginRole,h});enter(loginRole)};
+  const typed=$('pw').value;$('pw').value='';save(SKEY,{role:loginRole,h});enter(loginRole);migrateAccount(loginRole,typed)};
 $('setupForm').onsubmit=async e=>{e.preventDefault();$('setupErr').textContent='';
   const vals=[-1,0,1,2,3].map(r=>$('sup'+r).value);
   if(vals.some(v=>v.length<6)){$('setupErr').textContent='كل كلمة مرور لازم تكون 6 أحرف على الأقل';return}
@@ -1293,37 +1293,48 @@ function secureSection(){if(state.role!==-1)return '';
   if(state.secure){return `<div class="secbox on"><h3>الدخول الآمن مفعّل ✓</h3><p class="note" style="margin:0">كل شخص يدخل بحساب محمي في Firebase، وكل واحد يغيّر كلمة مروره من زر «تغيير كلمة المرور» أعلى الصفحة.</p>
     <details><summary>نسي أحدهم كلمة المرور؟</summary><ol><li>افتح Firebase Console ← Authentication ← Users واحذف حسابه (مثل <code>${roleEmail(0)}</code>).</li><li>ارجع هنا واختر الحساب واكتب كلمة مرور جديدة ثم «إنشاء الحساب».</li></ol>
     <div class="row2"><select id="scRole">${[-1,0,1,2,3,4,5,6,7].map(r=>`<option value="${r}">${esc(roleName(r))} · ${roleEmail(r).split('@')[0]}</option>`).join('')}</select><input id="scPw" type="password" placeholder="كلمة مرور جديدة (8 أحرف+)" autocomplete="new-password"><button type="button" class="btn ghost" id="scGo">إنشاء الحساب</button></div></details></div>`}
-  return `<div class="secbox"><h3>الدخول الآمن (موصى به)</h3>
-  <p class="note" style="margin:0">حاليًا أي شخص يعرف رابط المنصة يقدر يقرأ البيانات ويعدّلها من خارج الواجهة، لأن التحقق من كلمة المرور يتم في المتصفح فقط. الدخول الآمن ينشئ حسابًا محميًا لكل شخص في Firebase ويقفل قاعدة البيانات على أصحاب الحسابات.</p>
-  <ol><li>انشر قواعد الأمان الجديدة في Firebase (مرة واحدة). لا تؤثر على الدخول الحالي حتى تكمل الخطوة 2. <button type="button" class="btn ghost" id="scCopy" style="padding:4px 10px;font-size:12.5px">نسخ القواعد</button> <a href="${RULES_URL}" target="_blank" rel="noopener">فتح صفحة القواعد ↗</a> <span id="scRulesSt" class="note"></span></li>
-  <li>اكتب كلمة مرور جديدة لكل شخص (8 أحرف على الأقل) ثم اضغط «تفعيل الدخول الآمن». المشرفون اختياري.</li></ol>
+  const rd=(state.secureDoc&&state.secureDoc.ready)||{};const hasHash=r=>!!(state.auth&&storedHash(r));
+  const roles=[-1,0,1,2,3,4,5,6,7].filter(r=>r<4||hasHash(r));
+  const st=r=>{const v=rd[roleKey(r)];return v===true?'<b style="color:var(--ok)">✓ جاهز</b>':v==='other'?'<b style="color:var(--bad)">⚠ يوجد حساب بكلمة مرور مختلفة</b>':'<span class="note">⏳ ينتظر دخوله مرة واحدة بكلمة مروره الحالية</span>'};
+  return `<div class="secbox"><h3>الدخول الآمن بكلمات المرور الحالية</h3>
+  <p class="note" style="margin:0">كل شخص يدخل المنصة مرة واحدة بكلمة مروره الحالية، فيُنشأ له حساب محمي في Firebase بنفس كلمة المرور تلقائيًا. لما يجهز الجميع اضغط «تفعيل الدخول الآمن» فتنقفل قاعدة البيانات على أصحاب الحسابات، وكل واحد يدخل بنفس كلمة مروره.</p>
+  <div class="cstack" style="gap:6px">${roles.map(r=>`<div class="cshead" style="margin:0"><span>${esc(roleName(r))}</span>${st(r)}</div>`).join('')}</div>
+  <p class="note" style="margin:0">قواعد الأمان: <span id="scRulesSt">جارٍ التحقق…</span> <button type="button" class="btn ghost" id="scCopy" style="padding:4px 10px;font-size:12.5px">نسخ القواعد</button> <a href="${RULES_URL}" target="_blank" rel="noopener">صفحة القواعد ↗</a></p>
   <pre id="scRules" hidden></pre>
-  <div class="names">${[-1,0,1,2,3,4,5,6,7].map(r=>`<div class="field"><label for="sc${r}">${esc(roleName(r))}${r>=4?' (اختياري)':''}</label><input id="sc${r}" type="password" autocomplete="new-password" minlength="8"></div>`).join('')}</div>
+  <div class="field"><label for="scAdm">كلمة مرور المدير الحالية (للتأكيد)</label><input id="scAdm" type="password" autocomplete="current-password"></div>
   <p class="err" id="scErr"></p><button type="button" class="btn" id="scOn">تفعيل الدخول الآمن</button></div>`}
+// create the Firebase account for a role with the password just typed at legacy login
+async function migrateAccount(r,pw){if(state.secure||!state.authApi||!state.db)return null;const k=roleKey(r);const rd=(state.secureDoc&&state.secureDoc.ready)||{};if(rd[k]===true)return true;
+  try{const res=await state.authApi.createAccount(roleEmail(r),pw);const v=res==='exists-other'?'other':true;
+    try{await state.db.doc('config/secure').update({['ready.'+k]:v})}catch(e){await state.db.doc('config/secure').set({...(state.secureDoc||{}),enabled:false,ready:{...rd,[k]:v}})}
+    return v}catch(e){console.warn('migrate',e);return null}}
 async function rulesPublished(){try{await state.db.doc('meta/rules2').get();return true}catch(e){return false}}
 function randPw(){const a=new Uint8Array(18);crypto.getRandomValues(a);return Array.from(a).map(x=>x.toString(36)).join('').slice(0,24)+'Aa1!'}
 function wireSecure(){const cp=$('scCopy');if(cp){cp.onclick=async()=>{$('scRules').textContent=RULES_TEXT;$('scRules').hidden=false;try{await navigator.clipboard.writeText(RULES_TEXT);toast('تم نسخ القواعد، الصقها في صفحة القواعد ثم Publish')}catch(e){toast('انسخ القواعد من المربع')}};
-    rulesPublished().then(ok=>{const el=$('scRulesSt');if(el)el.textContent=ok?'✓ القواعد الجديدة منشورة':'القواعد الجديدة لم تُنشر بعد'})}
+    rulesPublished().then(ok=>{const el=$('scRulesSt');if(el)el.textContent=ok?'✓ منشورة':'غير منشورة بعد'})}
   const on=$('scOn');if(on)on.onclick=activateSecure;
   const go=$('scGo');if(go)go.onclick=async()=>{const r=+$('scRole').value,pw=$('scPw').value;if(pw.length<8){toast('كلمة المرور 8 أحرف على الأقل');return}go.disabled=true;
     try{const res=await state.authApi.createAccount(roleEmail(r),pw);toast(res==='created'?'تم إنشاء الحساب':res==='exists'?'الحساب موجود بنفس كلمة المرور':'الحساب موجود بكلمة مرور أخرى، احذفه من Firebase أولاً');
       if(r>=4&&res!=='exists-other'){const mons=[...secureMons()];mons[r-4]=true;await state.db.doc('config/secure').set({...state.secureDoc,mons});}}catch(e){toast('تعذّر إنشاء الحساب')}finally{go.disabled=false}}}
 async function activateSecure(){const err=t=>{$('scErr').textContent=t};err('');const api=state.authApi;if(!api){err('خدمة الحسابات غير متاحة');return}
-  const pw=r=>$('sc'+r).value;const req=[-1,0,1,2,3];
-  if(req.some(r=>pw(r).length<8)){err('اكتب كلمة مرور (8 أحرف على الأقل) للمدير والمسؤولين الأربعة');return}
-  if([4,5,6,7].some(r=>pw(r)&&pw(r).length<8)){err('كلمة مرور المشرف 8 أحرف على الأقل');return}
-  const given=[-1,0,1,2,3,4,5,6,7].map(pw).filter(Boolean);if(new Set(given).size<given.length){err('استخدم كلمة مرور مختلفة لكل شخص');return}
-  if(!await rulesPublished()){err('انشر قواعد الأمان الجديدة أولاً (الخطوة 1)، ثم أعد المحاولة');return}
-  const btn=$('scOn');btn.disabled=true;const res={};
-  try{for(const r of [-1,0,1,2,3,4,5,6,7]){btn.textContent='جارٍ إنشاء الحسابات… '+(Object.keys(res).length+1)+'/9';const p=pw(r)||randPw();res[r]=await api.createAccount(roleEmail(r),p);
-      if(res[r]==='exists-other'&&r<4){err(`حساب «${roleName(r)}» موجود مسبقًا بكلمة مرور مختلفة. احذفه من Firebase ← Authentication ثم أعد المحاولة.`);btn.disabled=false;btn.textContent='تفعيل الدخول الآمن';return}}
+  const apw=$('scAdm').value;if(!apw){err('اكتب كلمة مرور المدير الحالية');return}
+  if(!state.auth||await hashFor(state.auth.salt,-1,apw)!==state.auth.master){err('كلمة مرور المدير غير صحيحة');return}
+  if(!await rulesPublished()){err('قواعد الأمان الجديدة غير منشورة بعد في Firebase');return}
+  const btn=$('scOn');btn.disabled=true;btn.textContent='جارٍ التجهيز…';
+  try{const m=await migrateAccount(-1,apw);if(m!==true){err('تعذّر تجهيز حساب المدير'+(m==='other'?': يوجد حساب بكلمة مرور مختلفة، احذفه من Firebase ← Authentication':''));return}
+    const rd=(state.secureDoc&&state.secureDoc.ready)||{};
+    const missing=[0,1,2,3,4,5,6,7].filter(r=>(r<4||storedHash(r))&&rd[roleKey(r)]!==true);
+    if(missing.length&&!confirm(`لم يجهز بعد: ${missing.map(roleName).join('، ')}.\nلن يستطيعوا الدخول حتى تنشئ لهم حسابًا من الإعدادات بكلمة مرور جديدة.\nهل تريد التفعيل الآن؟`)){return}
+    // lock unused monitor emails with random passwords so nobody else can claim them
+    for(const r of [4,5,6,7])if(!storedHash(r)&&rd[roleKey(r)]!==true){try{await api.createAccount(roleEmail(r),randPw())}catch(e){}}
     btn.textContent='جارٍ التفعيل…';
-    await api.signIn(roleEmail(-1),pw(-1));
-    const mons=[4,5,6,7].map(r=>!!pw(r)&&res[r]!=='exists-other');
-    await state.db.doc('config/secure').set({enabled:true,at:new Date().toISOString(),mons});
+    await api.signIn(roleEmail(-1),apw);
+    const mons=[4,5,6,7].map(r=>!!storedHash(r)&&rd[roleKey(r)]===true);
+    await state.db.doc('config/secure').set({enabled:true,at:new Date().toISOString(),mons,ready:rd});
     try{await state.db.doc('config/auth').delete()}catch(e){}
     save(SKEY,null);toast('تم تفعيل الدخول الآمن');setTimeout(()=>location.reload(),900)}
-  catch(e){console.error(e);err('تعذّر التفعيل: '+(e&&e.code||e&&e.message||''));btn.disabled=false;btn.textContent='تفعيل الدخول الآمن'}}
+  catch(e){console.error(e);err('تعذّر التفعيل: '+(e&&e.code||e&&e.message||''))}
+  finally{btn.disabled=false;btn.textContent='تفعيل الدخول الآمن'}}
 let dataStarted=false;
 function startData(){if(dataStarted||!state.db)return;dataStarted=true;
   state.db.doc('config/phones').onSnapshot(d=>{const v=d.exists&&d.data();state.phones=v&&v.phones&&typeof v.phones==='object'?v.phones:{};if(state.view==='teachers')renderTeachers()},()=>{});
