@@ -1446,12 +1446,21 @@ function readRepViews(){const v=[...document.querySelectorAll('#nFields input[na
 let dataStarted=false;
 function startData(){if(dataStarted||!state.db)return;dataStarted=true;
   state.db.doc('config/phones').onSnapshot(d=>{const v=d.exists&&d.data();state.phones=v&&v.phones&&typeof v.phones==='object'?v.phones:{};if(state.view==='teachers')renderTeachers()},()=>{});
-  scopedCollection('links').onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{const v=d.exists&&d.data();if(v&&v.url&&byId[d.id])m[d.id]=String(v.url)});state.links=m;render()},()=>{});
+  subLinks();
   subLogs()}
-let unsubLogs=null;
-function scopedCollection(path){if(state.role===-1||state.role===8)return state.db.collection(path);const list=scope();return {get:async()=>({docs:(await Promise.all(list.map(s=>state.db.doc(path+'/'+s.id).get()))).filter(d=>d.exists)}),onSnapshot:(next,err)=>{const docs=new Map();const stops=list.map(s=>state.db.doc(path+'/'+s.id).onSnapshot(d=>{if(d.exists)docs.set(s.id,d);else docs.delete(s.id);next({docs:[...docs.values()]})},err));return()=>stops.forEach(f=>f())}}}
+let unsubLogs=null,unsubLinks=null;
+// Load every assigned lesson, independently of the selected day or report filter.
+function dataScope(){if(isSupRole(state.role))return S.filter(s=>s.sup===state.role);if(isMon()){const teachers=monTeachers(state.role);return S.filter(s=>teachers.has(s.teacher))}return S}
+function scopedCollection(path){if(state.role===-1||state.role===8)return state.db.collection(path);const list=dataScope();return {
+  get:async()=>({docs:(await Promise.all(list.map(s=>state.db.doc(path+'/'+s.id).get()))).filter(d=>d.exists)}),
+  onSnapshot:(next,err)=>{const docs=new Map(),ready=new Set();let active=true;const emit=()=>{if(active&&ready.size===list.length)next({docs:[...docs.values()]})};
+    const stops=list.map(s=>state.db.doc(path+'/'+s.id).onSnapshot(d=>{if(!active)return;ready.add(s.id);if(d.exists)docs.set(s.id,d);else docs.delete(s.id);emit()},e=>{if(active&&err)err(e)}));
+    if(!list.length)emit();return()=>{active=false;stops.forEach(f=>f())}}
+}}
+function subLinks(){if(unsubLinks)unsubLinks();unsubLinks=scopedCollection('links').onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{const v=d.exists&&d.data();if(v&&v.url&&byId[d.id])m[d.id]=String(v.url)});state.links=m;render()},()=>{})}
 function subLogs(){if(!state.db)return;if(unsubLogs){try{unsubLogs()}catch(e){}}const wk=state.week;
-  unsubLogs=scopedCollection(logsCol(wk)).onSnapshot(snap=>{if(wk!==state.week)return;const m={};snap.docs.forEach(d=>{if(d.exists&&byId[d.id])m[d.id]=d.data()});state.logs=m;render()},()=>{})}
+  const loading='جارٍ تحميل الرصد والحضور لجميع أيام الأسبوع…';showBanner(loading);
+  unsubLogs=scopedCollection(logsCol(wk)).onSnapshot(snap=>{if(wk!==state.week)return;const m={};snap.docs.forEach(d=>{if(d.exists&&byId[d.id])m[d.id]=d.data()});state.logs=m;if($('banner').textContent===loading||$('banner').dataset.logsError==='true'){$('banner').hidden=true;delete $('banner').dataset.logsError}render()},()=>{if(wk!==state.week)return;$('banner').dataset.logsError='true';showBanner('تعذّر تحميل الرصد والحضور. حدّث الصفحة وسجّل الدخول مجددًا؛ لا يعني ذلك أن الحصص لم تُرصد.')})}
 function paintWeekNav(){const ws=allWeeks();$('wSel').innerHTML=ws.slice().reverse().map(w=>`<option value="${w}">${w===CUR_WEEK?'هذا الأسبوع · ':''}${weekLabel(w)}</option>`).join('');$('wSel').value=state.week;
   const i=ws.indexOf(state.week);$('wPrev').disabled=i<=0;$('wNext').disabled=i>=ws.length-1;$('wNow').hidden=state.week===CUR_WEEK;
   $('weekSub').textContent=`ثانوية الصحافة الأهلية · الأسبوع من الأحد ${DAYS[0].h}هـ إلى الخميس ${DAYS[4].h}هـ (${DAYS[0].gs} – ${DAYS[4].gs} ${DAYS[4].g.slice(0,4)}م)`;
@@ -1485,8 +1494,9 @@ render();
     try{const w=await user.can('data.write');if(w===false){state.canWrite=false;showBanner('لديك صلاحية الاطلاع فقط. اطلب من مدير المنصة صلاحية «مساهم» للرصد.')}}catch(e){}
     try{state.isEditor=await user.canEdit()}catch(e){}}
   db.doc('config/main').onSnapshot(d=>{const v=d.exists&&d.data();if(v&&v.classSize&&typeof v.classSize==='object'){state.classSize=v.classSize;if(state.view==='board')renderBoard()}if(v&&Array.isArray(v.repViews)){state.repViews=v.repViews.map(String);if(state.role!=null)applyRepViews()}if(v&&Array.isArray(v.names)&&v.names.length===4){state.names=v.names.map((n,i)=>String(n||'').slice(0,40)||`المسؤول ${i+1}`);if(!$('loginForm').hidden)renderRoles();if(state.role!=null){$('rolePill').textContent='دخول: '+roleName(state.role)}render()}},()=>{});
-  db.doc('config/monitors').onSnapshot(d=>{const v=d.exists&&d.data();if(v){if(Array.isArray(v.names)&&v.names.length===4)state.mnames=v.names.map((n,i)=>String(n||'').slice(0,40)||`المشرف ${i+1}`);
+  db.doc('config/monitors').onSnapshot(d=>{const before=JSON.stringify(state.mteachers);const v=d.exists&&d.data();if(v){if(Array.isArray(v.names)&&v.names.length===4)state.mnames=v.names.map((n,i)=>String(n||'').slice(0,40)||`المشرف ${i+1}`);
     if(v.teachers&&typeof v.teachers==='object')state.mteachers=[0,1,2,3].map(m=>{const a=v.teachers['m'+m];return Array.isArray(a)?a.map(String):[]});}
+    if(dataStarted&&isMon()&&before!==JSON.stringify(state.mteachers)){state.archive=null;state.logs={};subLinks();subLogs()}
     if(!$('loginForm').hidden)renderRoles();if(state.role!=null){$('rolePill').textContent='دخول: '+roleName(state.role)}render()},()=>{});
   let legacyStarted=false;
   db.doc('config/secure').onSnapshot(d=>{const v=d.exists&&d.data();const on=true;state.secureDoc=v||{};
