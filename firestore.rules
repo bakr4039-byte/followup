@@ -9,10 +9,44 @@ service cloud.firestore {
   function ownStaff(id) { return staff() && (role() in [0,1,2,3] && id.matches(role() == 0 ? 'c1-.*' : role() == 1 ? 'c2-.*' : role() == 2 ? 'c3-.*' : '(ba|cs)-.*') || role() in [4,5,6,7] && get(/databases/$(database)/documents/lessonCatalog/$(id)).data.teacher in get(/databases/$(database)/documents/config/monitors).data.teachers.get('m' + string(role()-4), [])); }
   function teacher() { return request.auth != null && request.auth.token.get('teacher',false) == true && get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.active == true; }
   function ownTeacher(id) { return teacher() && get(/databases/$(database)/documents/teacherLessonAccess/$(request.auth.uid)).data.lessonIds.get(id,false) == true; }
-  function supervisorWrite(id) { return ownStaff(id) && role() in [0,1,2,3] && (resource == null ? request.resource.data.get('notesAdm','') == '' && request.resource.data.get('ratingMon',0) == 0 && !request.resource.data.keys().hasAny(['monBy','monAt']) : !request.resource.data.diff(resource.data).affectedKeys().hasAny(['notesAdm','ratingMon','monBy','monAt'])); }
-  function monitorWrite(id) { return ownStaff(id) && role() in [4,5,6,7] && (resource == null ? request.resource.data.keys().hasOnly(['sup','day','notesAdm','ratingMon','notes','teacher','week','monBy','monAt']) : request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notesAdm','ratingMon','notes','teacher','week','monBy','monAt'])); }
-  match /logs/{id} { allow get: if fullRead() || ownStaff(id) || ownTeacher(id); allow list: if fullRead(); allow create,update: if admin() || supervisorWrite(id) || monitorWrite(id); allow delete: if admin(); }
-  match /weeks/{week}/logs/{id} { allow get: if fullRead() || ownStaff(id) || ownTeacher(id); allow list: if fullRead(); allow create,update: if admin() || supervisorWrite(id) || monitorWrite(id); allow delete: if admin(); }
+  // Complete original records remain available as an immutable administrative archive.
+  match /logs/{id} { allow read: if fullRead(); allow write: if false; }
+  match /weeks/{week}/logs/{id} { allow read: if fullRead(); allow write: if false; }
+  function supervisor(id) { return ownStaff(id) && role() in [0,1,2,3]; }
+  function monitor(id) { return ownStaff(id) && role() in [4,5,6,7]; }
+  function cleanCore() { return request.resource.data.keys().hasOnly(['absent','by','day','entry','present','rating','ratingMon','reason','recorded','status','sup','teacher','updatedAt','updatedBy','week','monBy','monAt','src','cleared','clearedAt','clearedBy']); }
+  function supervisorCore(id) { return supervisor(id) && (resource == null ? request.resource.data.get('ratingMon',0) == 0 && !request.resource.data.keys().hasAny(['monBy','monAt','clearedAt','clearedBy']) : !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ratingMon','monBy','monAt','clearedAt','clearedBy'])); }
+  function monitorCore(id) { return monitor(id) && (resource == null ? request.resource.data.keys().hasOnly(['sup','day','teacher','week','ratingMon','monBy','monAt']) : request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingMon','monBy','monAt'])); }
+  function validNote() { return request.resource.data.keys().hasOnly(['text','updatedBy','updatedAt']) && request.resource.data.text is string && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is string; }
+  match /recordWeeks/{week}/logs/{id} {
+    allow get: if fullRead() || ownStaff(id) || ownTeacher(id);
+    allow list: if fullRead();
+    allow create,update: if cleanCore() && (admin() || supervisorCore(id) || monitorCore(id));
+    allow delete: if false;
+  }
+  match /recordWeeks/{week}/vcNotes/{id} {
+    allow get: if fullRead() || ownStaff(id) || ownTeacher(id);
+    allow list: if fullRead();
+    allow create,update: if validNote() && (admin() || supervisor(id));
+    allow delete: if false;
+  }
+  match /recordWeeks/{week}/supNotes/{id} {
+    allow get: if fullRead() || supervisor(id) || ownTeacher(id);
+    allow list: if fullRead();
+    allow create,update: if validNote() && (admin() || supervisor(id));
+    allow delete: if false;
+  }
+  match /recordWeeks/{week}/monitorNotes/{id} {
+    allow get: if fullRead() || monitor(id) || ownTeacher(id);
+    allow list: if fullRead();
+    allow create,update: if validNote() && (admin() || monitor(id));
+    allow delete: if false;
+  }
+  match /recordWeeks/{week}/legacyNotes/{id} {
+    allow get: if fullRead() || ownTeacher(id);
+    allow list: if fullRead();
+    allow write: if false;
+  }
   match /links/{id} { allow get: if fullRead() || ownStaff(id); allow list: if fullRead(); allow write: if admin() || ownStaff(id) && role() in [0,1,2,3]; }
   match /staffAccess/{uid} { allow get: if request.auth != null && request.auth.uid == uid || admin(); allow list,write: if admin(); }
   match /lessonCatalog/{id} { allow read: if staff(); allow write: if false; }

@@ -1,6 +1,6 @@
 // Read-only teacher dashboard. Existing lesson identifiers and Firebase records are retained.
 firebase.initializeApp(window.FIREBASE_CONFIG);
-const auth=firebase.auth(),db=firebase.firestore(),$=id=>document.getElementById(id);
+const auth=firebase.auth(),rawDb=firebase.firestore(),db=ProtectedRecords.wrapDb(rawDb,rawDb,auth),$=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const STATUS={done:['✓','تمت في وقتها'],late:['◷','بدأت متأخرة'],absent:['×','لم تُعقد'],tech:['!','مشكلة تقنية'],pending:['○','لم تُرصد']};
 let mine=[],logs={},stops=[],generation=0,profile=null,exporting=false;
