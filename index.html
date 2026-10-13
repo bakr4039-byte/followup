@@ -590,6 +590,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
 <div class="pdfhost" id="pdfhost" aria-hidden="true"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js"></script><script src="app-check.js?v=20261013"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="protected-records.js?v=notes-20261013"></script>
@@ -615,7 +616,7 @@ window.FIREBASE_CONFIG = {
       var cfg=window.FIREBASE_CONFIG||{};
       if(!window.firebase||!cfg.apiKey||!cfg.projectId)return null;
       try{
-        if(!firebase.apps.length)firebase.initializeApp(cfg);
+        if(!firebase.apps.length){var primary=firebase.initializeApp(cfg);FollowupAppCheck.activate(primary);}
         var a=firebase.auth();
         try{await a.setPersistence(firebase.auth.Auth.Persistence.SESSION)}catch(e){}
         var u=await new Promise(function(r){var off=a.onAuthStateChanged(function(x){off();r(x)})});
@@ -652,7 +653,7 @@ window.FIREBASE_CONFIG = {
       signIn:async function(email,pw){const c=await ctx.auth.signInWithEmailAndPassword(email,pw);const d=await ctx.fs.doc('staffAccess/'+c.user.uid).get();if(!d.exists||d.data().active!==true){await ctx.auth.signOut();throw Error('account-not-approved')}ctx.uid=c.user.uid},
       signOut:async function(){await ctx.auth.signOut()},
       createAccount:async function(email,pw,role){
-        var app2=firebase.apps.filter(function(x){return x.name==='acct'})[0]||firebase.initializeApp(ctx.cfg,'acct');var a2=app2.auth();
+        var app2=firebase.apps.filter(function(x){return x.name==='acct'})[0]||firebase.initializeApp(ctx.cfg,'acct');if(!app2.__followupCheck){FollowupAppCheck.activate(app2);app2.__followupCheck=true;}var a2=app2.auth();
         try{await a2.setPersistence(firebase.auth.Auth.Persistence.NONE)}catch(e){}
         try{const c=await a2.createUserWithEmailAndPassword(email,pw);await ctx.fs.doc('staffAccess/'+c.user.uid).set({role,active:true,email});await a2.signOut();return 'created'}
         catch(e){if(e&&e.code==='auth/email-already-in-use'){try{const c=await a2.signInWithEmailAndPassword(email,pw);await ctx.fs.doc('staffAccess/'+c.user.uid).set({role,active:true,email});await a2.signOut();return 'exists'}catch(e2){return 'exists-other'}}throw e}},
@@ -1521,3 +1522,4 @@ function showBanner(t){const b=$('banner');b.textContent=t;b.hidden=false}
 
 </body>
 </html>
+
