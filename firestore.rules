@@ -1,77 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
-  match /databases/{database}/documents {
-    // ---- secure staff login (Firebase Auth accounts created from the platform settings) ----
-    function secureOn() {
-      return exists(/databases/$(database)/documents/config/secure)
-        && get(/databases/$(database)/documents/config/secure).data.enabled == true;
-    }
-    function staffEmail() {
-      return request.auth != null
-        && request.auth.token.firebase.sign_in_provider == 'password'
-        && request.auth.token.email in [
-          'admin@staff.alsahafa-followup.invalid',
-          'sup1@staff.alsahafa-followup.invalid', 'sup2@staff.alsahafa-followup.invalid',
-          'sup3@staff.alsahafa-followup.invalid', 'sup4@staff.alsahafa-followup.invalid',
-          'mon1@staff.alsahafa-followup.invalid', 'mon2@staff.alsahafa-followup.invalid',
-          'mon3@staff.alsahafa-followup.invalid', 'mon4@staff.alsahafa-followup.invalid',
-          'rep@staff.alsahafa-followup.invalid'
-        ];
-    }
-    function adminEmail() {
-      return request.auth != null
-        && request.auth.token.firebase.sign_in_provider == 'password'
-        && request.auth.token.email == 'admin@staff.alsahafa-followup.invalid';
-    }
-    // old password-hash login: works only until secure login is switched on
-    function legacyStaff() {
-      return request.auth != null
-        && request.auth.token.firebase.sign_in_provider == 'anonymous'
-        && !secureOn();
-    }
-    function staff() { return staffEmail() || legacyStaff(); }
-    // the reports account can read but never write
-    function writer() { return (staffEmail() && request.auth.token.email != 'rep@staff.alsahafa-followup.invalid') || legacyStaff(); }
-    function admin() { return adminEmail() || legacyStaff(); }
-
-    // ---- teachers (unchanged) ----
-    function teacher() {
-      return request.auth != null
-        && request.auth.token.get('teacher', false) == true
-        && get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.active == true;
-    }
-    function ownLesson(id) {
-      return teacher()
-        && get(/databases/$(database)/documents/teacherLessonAccess/$(request.auth.uid)).data.lessonIds.get(id, false) == true;
-    }
-
-    // marker the platform reads to confirm these rules are published
-    match /meta/rules2 { allow get: if true; }
-
-    match /logs/{id} {
-      allow get: if staff() || ownLesson(id);
-      allow list: if staff();
-      allow write: if writer();
-    }
-    match /weeks/{week}/logs/{id} {
-      allow get: if staff() || ownLesson(id);
-      allow list: if staff();
-      allow write: if writer();
-    }
-    match /links/{id} { allow read: if staff(); allow write: if writer(); }
-
-    // names are needed on the login screen
-    match /config/main { allow read: if true; }
-    match /config/monitors { allow read: if true; }
-    match /config/secure { allow read: if true; }
-    match /config/{id} {
-      allow read: if staff();
-      allow write: if admin();
-    }
-
-    match /teacherProfiles/{uid} {
-      allow get: if request.auth != null && request.auth.uid == uid && teacher();
-    }
-    match /{document=**} { allow read, write: if false; }
-  }
+ match /databases/{database}/documents {
+  function signed() { return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password'; }
+  function staff() { return signed() && exists(/databases/$(database)/documents/staffAccess/$(request.auth.uid)) && get(/databases/$(database)/documents/staffAccess/$(request.auth.uid)).data.active == true; }
+  function role() { return get(/databases/$(database)/documents/staffAccess/$(request.auth.uid)).data.role; }
+  function admin() { return staff() && role() == -1; }
+  function fullRead() { return staff() && role() in [-1,8]; }
+  function ownStaff(id) { return staff() && (role() in [0,1,2,3] && id.matches(role() == 0 ? 'c1-.*' : role() == 1 ? 'c2-.*' : role() == 2 ? 'c3-.*' : '(ba|cs)-.*') || role() in [4,5,6,7] && get(/databases/$(database)/documents/lessonCatalog/$(id)).data.teacher in get(/databases/$(database)/documents/config/monitors).data.teachers.get('m' + string(role()-4), [])); }
+  function teacher() { return request.auth != null && request.auth.token.get('teacher',false) == true && get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.active == true; }
+  function ownTeacher(id) { return teacher() && get(/databases/$(database)/documents/teacherLessonAccess/$(request.auth.uid)).data.lessonIds.get(id,false) == true; }
+  function supervisorWrite(id) { return ownStaff(id) && role() in [0,1,2,3] && (resource == null ? request.resource.data.get('notesAdm','') == '' && request.resource.data.get('ratingMon',0) == 0 && !request.resource.data.keys().hasAny(['monBy','monAt']) : !request.resource.data.diff(resource.data).affectedKeys().hasAny(['notesAdm','ratingMon','monBy','monAt'])); }
+  function monitorWrite(id) { return ownStaff(id) && role() in [4,5,6,7] && (resource == null ? request.resource.data.keys().hasOnly(['sup','day','notesAdm','ratingMon','notes','teacher','week','monBy','monAt']) : request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notesAdm','ratingMon','notes','teacher','week','monBy','monAt'])); }
+  match /logs/{id} { allow get: if fullRead() || ownStaff(id) || ownTeacher(id); allow list: if fullRead(); allow create,update: if admin() || supervisorWrite(id) || monitorWrite(id); allow delete: if admin(); }
+  match /weeks/{week}/logs/{id} { allow get: if fullRead() || ownStaff(id) || ownTeacher(id); allow list: if fullRead(); allow create,update: if admin() || supervisorWrite(id) || monitorWrite(id); allow delete: if admin(); }
+  match /links/{id} { allow get: if fullRead() || ownStaff(id); allow list: if fullRead(); allow write: if admin() || ownStaff(id) && role() in [0,1,2,3]; }
+  match /staffAccess/{uid} { allow get: if request.auth != null && request.auth.uid == uid || admin(); allow list,write: if admin(); }
+  match /lessonCatalog/{id} { allow read: if staff(); allow write: if false; }
+  match /config/main { allow read: if true; allow write: if admin(); }
+  match /config/monitors { allow read: if true; allow write: if admin(); }
+  match /config/secure { allow read: if true; allow write: if admin() && request.resource.data.enabled == true; }
+  match /config/phones { allow read: if staff(); allow write: if admin(); }
+  match /config/{id} { allow read,write: if admin(); }
+  match /meta/rules2 { allow get: if true; allow write: if false; }
+  match /teacherProfiles/{uid} { allow get: if request.auth != null && request.auth.uid == uid && teacher(); }
+  match /{document=**} { allow read,write: if false; }
+ }
 }
