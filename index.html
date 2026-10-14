@@ -1001,11 +1001,7 @@ async function sendWaPdf(name,btn){const t=teachersIn(scope().filter(inRange)).f
   const ph=normPhone(state.phones[t.name]);if(!ph){toast('لم يُسجّل رقم جوال لهذا المعلم');return}
   let file;try{file=await waPdfFile(t)}catch(e){toast('تعذّر إنشاء ملف PDF، أعد تحميل الصفحة');return}
   const data={files:[file],title:file.name,text:waShortText(t)};
-  if(navigator.canShare&&navigator.canShare({files:[file]})){
-    try{await navigator.share(data);return}catch(e){
-      if(e&&e.name==='AbortError')return;
-      if(e&&e.name==='NotAllowedError'&&btn){btn.dataset.ready='1';const old=btn.textContent;btn.textContent='الملف جاهز – اضغط للإرسال';setTimeout(()=>{if(btn.isConnected){btn.textContent=old;delete btn.dataset.ready}},30000);return}}}
-  // desktop fallback: download the PDF then open the teacher chat
+  // download the PDF then open the teacher chat directly (wa.me) on all devices
   try{if(state.downloads)await state.downloads.save({filename:file.name,data:file});else{const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=file.name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)}}catch(e){if(e&&e.code==='cancelled')return}
   window.open(`https://wa.me/${ph}?text=${encodeURIComponent(waShortText(t))}`,'_blank','noopener');
   toast('تم تحميل ملف PDF – اسحبه إلى محادثة واتساب أو أرفقه بزر المشبك')}
