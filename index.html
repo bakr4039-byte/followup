@@ -529,7 +529,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
       <div class="field"><label for="nVC">حسب فيوكلاس</label><textarea id="nVC" placeholder="مثال: دخل المعلم 06:51، حاضر 4 + متأخر 9"></textarea></div>
       <div class="field"><label for="nSup">حسب المسؤول المتابع</label><textarea id="nSup" placeholder="مثال: تفاعل جيد من الطلاب، الصوت غير واضح"></textarea></div>
       <div class="field"><label for="nAdm">حسب المشرف</label><textarea id="nAdm" placeholder="ملاحظات المشرف العام على الحصة"></textarea></div>
-      <div class="field"><span class="lbl">الملاحظات المجمّعة للمعلم في الحصة</span><div class="combined" id="nAll"></div></div>
+      <div class="field"><span class="lbl">الملاحظات المجمّعة للمعلم في الحصة</span><div class="combined" id="nAll"></div><p class="hint" id="nAutoMsg" aria-live="polite"></p></div>
     </div>
     <p class="who" id="dWho"></p>
   </div>
@@ -1215,7 +1215,21 @@ function splitNotes(l){if(!l)return {notesVC:'',notesSup:'',notesAdm:''};
 function joinNotes(p){return NOTE_PARTS.filter(([k])=>(p[k]||'').trim()).map(([k,t])=>t+': '+p[k].trim()).join('\n')}
 function paintCombined(){const vis=notePartsFor();const t=joinNotes({notesVC:$('nVC').value,notesSup:vis.includes('notesSup')?$('nSup').value:'',notesAdm:vis.includes('notesAdm')?$('nAdm').value:''});$('nAll').textContent=t||'—'}
 ['nVC','nSup','nAdm'].forEach(x=>$(x).addEventListener('input',paintCombined));
-async function openDrawer(id){const s=byId[id];state.open=id;const l=state.logs[id]||{};state.draft={status:l.status||'',recorded:l.recorded||'',rating:l.rating||0,ratingMon:l.ratingMon||0,reason:reasonOf(l)};
+// Notes autosave while typing, so the administrator and the teacher see them live.
+const autoNote={t:null,id:null,busy:false,again:false};
+function noteMsg(t){const el=$('nAutoMsg');if(el)el.textContent=t}
+function noteFieldsFor(){const vis=notePartsFor();return NOTE_PARTS.filter(([k,,el])=>vis.includes(k)&&!$(el).disabled).map(([k,,el])=>[k,el])}
+async function autoSaveNotes(id){if(!state.db||!id||!byId[id])return;if(autoNote.busy){autoNote.again=true;return}
+  const s=byId[id];if(isMon()){if(!monTeachers(state.role).has(s.teacher))return}else if(state.role==null||(state.role>=0&&s.sup!==state.role))return;
+  const fields=noteFieldsFor();if(!fields.length)return;const prev=state.logs[id];
+  const data={teacher:s.teacher,week:state.week,sup:s.sup,day:s.day};fields.forEach(([k,el])=>data[k]=$(el).value.trim().slice(0,600));if(!isMon()&&!prev)data.status='';
+  autoNote.busy=true;noteMsg('جارٍ حفظ الملاحظات…');
+  try{await state.db.doc(logsCol(state.week)+'/'+id).set(data);const base=prev||{sup:s.sup,day:s.day,teacher:s.teacher,week:state.week,status:''};const p={...splitNotes(base)};fields.forEach(([k])=>p[k]=data[k]);state.logs[id]={...base,...p,notes:joinNotes(p).slice(0,2000)};if(state.open===id)noteMsg('✓ حُفظت الملاحظات تلقائياً وتظهر للمدير والمعلم')}
+  catch(e){console.error(e);if(state.open===id)noteMsg('تعذّر الحفظ التلقائي للملاحظات'+(e&&e.code?' ('+e.code+')':'')+'، اضغط «حفظ المتابعة»')}
+  finally{autoNote.busy=false;if(autoNote.again){autoNote.again=false;if(state.open===id)autoSaveNotes(id)}}}
+function flushNotes(){if(autoNote.t){clearTimeout(autoNote.t);autoNote.t=null;autoSaveNotes(autoNote.id)}}
+['nVC','nSup','nAdm'].forEach(x=>$(x).addEventListener('input',()=>{const id=state.open;if(!id)return;clearTimeout(autoNote.t);autoNote.id=id;noteMsg('سيتم الحفظ تلقائياً…');autoNote.t=setTimeout(()=>{autoNote.t=null;autoSaveNotes(id)},1200)}));
+async function openDrawer(id){flushNotes();noteMsg('');const s=byId[id];state.open=id;const l=state.logs[id]||{};state.draft={status:l.status||'',recorded:l.recorded||'',rating:l.rating||0,ratingMon:l.ratingMon||0,reason:reasonOf(l)};
   $('dTitle').textContent=s.subj;$('dSub').textContent=`${s.teacher} · ${CLS[s.cls]} · ${DAYS[s.day].n} ${DAYS[s.day].h}هـ · الحصة ${s.label} (${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}) · ${state.names[s.sup]}`;
   $('dLink').value=state.links[id]||'';paintJoin();$('dEntry').value=l.entry||'';$('dPresent').value=l.present??'';$('dAbsent').value=l.absent??'';{const p=splitNotes(l);$('nVC').value=p.notesVC;$('nSup').value=p.notesSup;$('nAdm').value=p.notesAdm;paintCombined()}
   $('dWho').textContent='';if(l.updatedAt){let who='';if(l.updatedBy&&state.user){try{const ps=await state.user.profiles([l.updatedBy]);who=ps[l.updatedBy]?.name||''}catch(e){}}
@@ -1225,7 +1239,7 @@ async function openDrawer(id){const s=byId[id];state.open=id;const l=state.logs[
   const monOk=isMon()&&monTeachers(state.role).has(s.teacher);
   if(notMine&&state.role!=null)$('dWho').textContent=($('dWho').textContent?$('dWho').textContent+' · ':'')+(isMon()?(monOk?'صلاحيتك: تقييم المشرف وملاحظاته فقط':'هذا المعلم ليس ضمن معلميك (عرض فقط)'):'هذه الحصة من مسؤولية '+state.names[s.sup]+' (عرض فقط)');['dEntry','dPresent','dAbsent','nVC','nSup','dLink'].forEach(x=>$(x).disabled=ro);const admOk=!!state.db&&state.canWrite&&(state.role===-1||monOk);$('nAdm').disabled=!admOk;$('drawer').classList.toggle('monmode',isMon());$('drawer').classList.toggle('supmode',isSupRole(state.role)||isRep());{const vis=notePartsFor();NOTE_PARTS.forEach(([k,,el])=>$(el).closest('.field').classList.toggle('hidef',!vis.includes(k)))}$('dLinkSave').disabled=ro;$('dSave').disabled=ro&&!monOk;$('dClear').disabled=state.role!==-1||!state.logs[id];
   paintDraft();$('scrim').hidden=false;$('drawer').hidden=false;$('dClose').focus();}
-function closeDrawer(){$('scrim').hidden=true;$('drawer').hidden=true;state.open=null}
+function closeDrawer(){flushNotes();$('scrim').hidden=true;$('drawer').hidden=true;state.open=null}
 $('dClose').onclick=closeDrawer;$('scrim').onclick=closeDrawer;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();closeNames();closeImport();if(typeof closeQueue==='function')closeQueue()}});
 $('dStatus').onclick=e=>{const b=e.target.closest('[data-st]');if(!b)return;state.draft.status=b.dataset.st;paintDraft()};
