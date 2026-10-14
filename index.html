@@ -1530,12 +1530,16 @@ function paintSubs(){const {wk,day,map}=subsCtx();const abs=$('sbAbs').value;
     return `<div class="sbrow"><div class="sbh"><span>${esc(s.subj)} · ${CLS[s.cls]}</span><small class="num">الحصة ${SLOTS[s.slot][0]} · ${SLOTS[s.slot][1]}–${SLOTS[s.slot][2]}</small></div>
       ${x&&x.t?`<div class="note">مسندة حالياً إلى <b>${esc(x.t)}</b></div>`:''}
       <div class="sbact"><select data-sbsel="${s.id}"><option value="">— اختر معلم الانتظار —</option>${free.length?`<optgroup label="بدون حصص في هذا اليوم">${free.map(opt).join('')}</optgroup>`:''}${part.length?`<optgroup label="متاح في وقت الحصة">${part.map(opt).join('')}</optgroup>`:''}</select>
-      <button class="btn" data-sbsave="${s.id}">إسناد</button>${x&&x.t?`<button class="btn ghost" data-sbdel="${s.id}">إلغاء</button>`:''}</div>
+      <button class="btn" data-sbsave="${s.id}">إسناد</button>${x&&x.t?`${subWa(s,x,wk)}<button class="btn ghost" data-sbdel="${s.id}">إلغاء</button>`:''}</div>
       ${c.length?'':'<p class="note">لا يوجد معلم متاح في وقت هذه الحصة.</p>'}</div>`}).join('');
   const absS=absentSet(day,map);const freeDay=ALL_TEACHERS.filter(t=>!absS.has(t)&&loadOf(t,day,map)===0);
   $('sbFree').innerHTML=freeDay.length?freeDay.map(t=>`<span>${esc(t)}</span>`).join(''):'<p class="note">كل المعلمين لديهم حصص في هذا اليوم.</p>';
   const list=S.filter(s=>s.day===day&&map[s.id]&&map[s.id].t).sort((a,b)=>a.slot-b.slot);
-  $('sbList').innerHTML=list.length?list.map(s=>`<div class="sbrow"><div class="sbh"><span>${esc(map[s.id].t)} <small>بدل ${esc(origOf(s))}</small></span><small class="num">الحصة ${SLOTS[s.slot][0]} · ${esc(s.subj)} · ${CLS[s.cls]}</small></div><div class="sbact"><button class="btn ghost" data-sbdel="${s.id}">إلغاء الإسناد</button></div></div>`).join(''):'<p class="note">لا توجد حصص انتظار في هذا اليوم.</p>'}
+  $('sbList').innerHTML=list.length?list.map(s=>`<div class="sbrow"><div class="sbh"><span>${esc(map[s.id].t)} <small>بدل ${esc(origOf(s))}</small></span><small class="num">الحصة ${SLOTS[s.slot][0]} · ${esc(s.subj)} · ${CLS[s.cls]}</small></div><div class="sbact">${subWa(s,map[s.id],wk)}<button class="btn ghost" data-sbdel="${s.id}">إلغاء الإسناد</button></div></div>`).join(''):'<p class="note">لا توجد حصص انتظار في هذا اليوم.</p>'}
+function subWa(s,x,wk){if(!x||!x.t)return '';const ph=normPhone(state.phones[x.t]);if(!ph)return `<span class="note">لا يوجد رقم جوال للمعلم ${esc(x.t)}</span>`;
+  const d=weekDays(wk)[s.day];const link=safeUrl(state.links[s.id]);
+  const msg=`السلام عليكم أ. ${x.t}\nتم إسناد حصة انتظار لك:\nاليوم: ${d.n} ${d.h}هـ (${d.g.replace(/-/g,'/')}م)\nالحصة: ${SLOTS[s.slot][0]} (${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]})\nالمادة: ${s.subj} · ${CLS[s.cls]}\nبدل المعلم: ${origOf(s)}${link?`\nرابط الحصة: ${link}`:''}\nشاكرين تعاونكم.`;
+  return `<a class="btn" style="width:auto;background:#1f9d55;color:#fff" href="https://wa.me/${ph}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener noreferrer">إشعار بالواتساب</a>`}
 async function saveSub(id,t){const {wk}=subsCtx();const s=byId[id];if(!s||!state.db)return;$('sbMsg').textContent='جارٍ الحفظ…';
   const map=Object.assign({},await loadSubsWeek(wk));if(t)map[id]={t,o:origOf(s),at:new Date().toISOString(),by:state.uid||''};else delete map[id];
   try{await state.db.doc(subsDoc(wk)).set({map,updatedAt:new Date().toISOString()});state.subsW[wk]=map;$('sbMsg').textContent='';toast(t?'تم حفظ حصة الانتظار':'تم حفظ إلغاء الإسناد');paintSubs();if(wk===state.week)render()}
