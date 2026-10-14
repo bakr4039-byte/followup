@@ -618,7 +618,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js"></script><script src="app-check.js?v=20261013"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="protected-records.js?v=validation-20261014"></script>
+<script src="protected-records.js?v=supfix-20261014"></script>
 <script>
 /* ===== إعدادات Firebase: الصق هنا بيانات مشروعك من Firebase Console ← Project settings ← Your apps ===== */
 window.FIREBASE_CONFIG = {
@@ -1248,7 +1248,7 @@ $('dSave').onclick=async()=>{const id=state.open;if(!state.db||!id)return;const 
   const s=byId[id];if(state.role==null||(state.role>=0&&s.sup!==state.role))return;const doc={by:state.role,status:d.status,entry:$('dEntry').value||'',present:numOrNull($('dPresent').value),absent:numOrNull($('dAbsent').value),recorded:d.recorded||'',rating:d.rating||0,ratingMon:(state.role===-1?d.ratingMon:(state.logs[id]||{}).ratingMon)||0,...(()=>{const prev=splitNotes(state.logs[id]);const p={notesVC:$('nVC').value.trim().slice(0,600),notesSup:$('nSup').value.trim().slice(0,600),notesAdm:(state.role===-1?$('nAdm').value:prev.notesAdm).trim().slice(0,600)};const o=state.logs[id]||{};return {...p,notes:joinNotes(p).slice(0,2000),...(o.monBy!=null?{monBy:o.monBy,monAt:o.monAt}:{})}})(),reason:(REASONS[d.reason]&&REASONS[d.reason].f.includes(d.status))?d.reason:'',teacher:s.teacher,week:state.week,sup:s.sup,day:s.day,updatedAt:new Date().toISOString(),updatedBy:state.uid||''};
   $('dSave').disabled=true;
   try{await state.db.doc(logsCol(state.week)+'/'+id).set(doc);state.logs[id]=doc;toast('تم حفظ المتابعة');closeDrawer();render()}
-  catch(e){if(e&&e.code==='invalid_argument'){state.canWrite=false;toast('ليست لديك صلاحية التعديل')}else toast('تعذّر الحفظ، حاول مرة أخرى')}
+  catch(e){console.error(e);if(e&&(e.code==='permission-denied'||e.code==='invalid_argument')){toast('تعذّر الحفظ: لا توجد صلاحية لهذه الحصة')}else toast('تعذّر الحفظ، حاول مرة أخرى')}
   finally{$('dSave').disabled=false}};
 $('dClear').onclick=async()=>{const id=state.open;if(!state.db||!id)return;
   if($('dClear').dataset.confirm!=='1'){$('dClear').dataset.confirm='1';$('dClear').textContent='اضغط مرة أخرى للتأكيد';setTimeout(()=>{$('dClear').dataset.confirm='';$('dClear').textContent='مسح الرصد'},3000);return}
