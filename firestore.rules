@@ -14,14 +14,22 @@ service cloud.firestore {
   match /weeks/{week}/logs/{id} { allow read: if fullRead(); allow write: if false; }
   function supervisor(id) { return ownStaff(id) && role() in [0,1,2,3]; }
   function monitor(id) { return ownStaff(id) && role() in [4,5,6,7]; }
-  function cleanCore() { return request.resource.data.keys().hasOnly(['absent','by','day','entry','present','rating','ratingMon','reason','recorded','status','sup','teacher','updatedAt','updatedBy','week','monBy','monAt','src','cleared','clearedAt','clearedBy']); }
-  function supervisorCore(id) { return supervisor(id) && (resource == null ? request.resource.data.get('ratingMon',0) == 0 && !request.resource.data.keys().hasAny(['monBy','monAt','clearedAt','clearedBy']) : !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ratingMon','monBy','monAt','clearedAt','clearedBy'])); }
-  function monitorCore(id) { return monitor(id) && (resource == null ? request.resource.data.keys().hasOnly(['sup','day','teacher','week','ratingMon','monBy','monAt']) : request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingMon','monBy','monAt'])); }
+  function cleanCore() { return request.resource.data.keys().hasOnly(['absent','by','day','entry','present','rating','ratingMon','reason','recorded','status','sup','teacher','updatedAt','updatedBy','week','monBy','monAt','monUid','src','cleared','clearedAt','clearedBy']) && (resource == null || request.resource.data.keys().hasAll(resource.data.keys())); }
+  function changed(key) { return resource == null ? key in request.resource.data : request.resource.data.diff(resource.data).affectedKeys().hasAny([key]); }
+  function countValue(key) { let value = request.resource.data.get(key,null); return !changed(key) || value == null || value is int && value >= 0; }
+  function ratingValue(key) { let value = request.resource.data.get(key,0); return !changed(key) || value is int && value >= 0 && value <= 5; }
+  function validValues() { return countValue('present') && countValue('absent') && ratingValue('rating') && ratingValue('ratingMon') && (!changed('status') || request.resource.data.status in ['', 'pending', 'done', 'late', 'absent', 'tech']); }
+  function validClearActor() { return !changed('clearedBy') && !changed('clearedAt') || admin() && request.resource.data.clearedBy == request.auth.uid && request.resource.data.clearedAt is string; }
+  function responsibleActor() { return request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is string && request.resource.data.by == role(); }
+  function validMonitorActor() { return request.resource.data.monUid == request.auth.uid && request.resource.data.monAt is string && request.resource.data.monBy == (admin() ? -1 : role()-4); }
+  function adminCore() { return admin() && responsibleActor() && validClearActor() && (!(changed('ratingMon') || changed('monUid') || changed('monBy') || changed('monAt')) || validMonitorActor()); }
+  function supervisorCore(id) { return supervisor(id) && responsibleActor() && (resource == null ? request.resource.data.get('ratingMon',0) == 0 && !request.resource.data.keys().hasAny(['monBy','monAt','monUid','clearedAt','clearedBy']) : !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ratingMon','monBy','monAt','monUid','clearedAt','clearedBy'])); }
+  function monitorCore(id) { return monitor(id) && validMonitorActor() && (resource == null ? request.resource.data.keys().hasOnly(['sup','day','teacher','week','ratingMon','monBy','monAt','monUid']) : request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingMon','monBy','monAt','monUid'])); }
   function validNote() { return request.resource.data.keys().hasOnly(['text','updatedBy','updatedAt']) && request.resource.data.text is string && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is string; }
   match /recordWeeks/{week}/logs/{id} {
     allow get: if fullRead() || ownStaff(id) || ownTeacher(id);
     allow list: if fullRead();
-    allow create,update: if cleanCore() && (admin() || supervisorCore(id) || monitorCore(id));
+    allow create,update: if cleanCore() && validValues() && (adminCore() || supervisorCore(id) || monitorCore(id));
     allow delete: if false;
   }
   match /recordWeeks/{week}/vcNotes/{id} {
@@ -58,6 +66,8 @@ service cloud.firestore {
   match /meta/rules2 { allow get: if true; allow write: if false; }
   match /teacherProfiles/{uid} { allow get: if request.auth != null && request.auth.uid == uid && teacher(); }
   match /securityAudit/{event} { allow read: if admin(); allow write: if false; }
+  match /securityLoginAttempts/{event} { allow read: if admin(); allow write: if false; }
+  match /securityAlerts/{event} { allow read: if admin(); allow write: if false; }
   match /{document=**} { allow read,write: if false; }
  }
 }
