@@ -8,6 +8,7 @@ service cloud.firestore {
   function fullRead() { return staff() && role() in [-1,8]; }
   function ownStaff(id) { return staff() && (role() in [0,1,2,3] && id.matches(role() == 0 ? 'c1-.*' : role() == 1 ? 'c2-.*' : role() == 2 ? 'c3-.*' : '(ba|cs)-.*') || role() in [4,5,6,7] && get(/databases/$(database)/documents/lessonCatalog/$(id)).data.teacher in get(/databases/$(database)/documents/config/monitors).data.teachers.get('m' + string(role()-4), [])); }
   function teacher() { return request.auth != null && request.auth.token.get('teacher',false) == true && get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.active == true; }
+  function subTeacher(week, id) { return teacher() && exists(/databases/$(database)/documents/config/$('subs-' + week)) && get(/databases/$(database)/documents/config/$('subs-' + week)).data.get('map', {}).get(id, {}).get('t', '') == get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.get('scheduleName', '-'); }
   function ownTeacher(id) { return teacher() && get(/databases/$(database)/documents/teacherLessonAccess/$(request.auth.uid)).data.lessonIds.get(id,false) == true; }
   // Complete original records remain available as an immutable administrative archive.
   match /logs/{id} { allow read: if fullRead(); allow write: if false; }
@@ -27,31 +28,31 @@ service cloud.firestore {
   function monitorCore(id) { return monitor(id) && validMonitorActor() && (resource == null ? request.resource.data.keys().hasOnly(['sup','day','teacher','week','ratingMon','monBy','monAt','monUid']) : request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingMon','monBy','monAt','monUid'])); }
   function validNote() { return request.resource.data.keys().hasOnly(['text','updatedBy','updatedAt']) && request.resource.data.text is string && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is string; }
   match /recordWeeks/{week}/logs/{id} {
-    allow get: if fullRead() || ownStaff(id) || ownTeacher(id);
+    allow get: if fullRead() || ownStaff(id) || ownTeacher(id) || subTeacher(week, id);
     allow list: if fullRead();
     allow create,update: if cleanCore() && validValues() && (adminCore() || supervisorCore(id) || monitorCore(id));
     allow delete: if false;
   }
   match /recordWeeks/{week}/vcNotes/{id} {
-    allow get: if fullRead() || ownStaff(id) || ownTeacher(id);
+    allow get: if fullRead() || ownStaff(id) || ownTeacher(id) || subTeacher(week, id);
     allow list: if fullRead();
     allow create,update: if validNote() && (admin() || supervisor(id));
     allow delete: if false;
   }
   match /recordWeeks/{week}/supNotes/{id} {
-    allow get: if fullRead() || supervisor(id) || ownTeacher(id);
+    allow get: if fullRead() || supervisor(id) || ownTeacher(id) || subTeacher(week, id);
     allow list: if fullRead();
     allow create,update: if validNote() && (admin() || supervisor(id));
     allow delete: if false;
   }
   match /recordWeeks/{week}/monitorNotes/{id} {
-    allow get: if fullRead() || monitor(id) || ownTeacher(id);
+    allow get: if fullRead() || monitor(id) || ownTeacher(id) || subTeacher(week, id);
     allow list: if fullRead();
     allow create,update: if validNote() && (admin() || monitor(id));
     allow delete: if false;
   }
   match /recordWeeks/{week}/legacyNotes/{id} {
-    allow get: if fullRead() || ownTeacher(id);
+    allow get: if fullRead() || ownTeacher(id) || subTeacher(week, id);
     allow list: if fullRead();
     allow write: if false;
   }
@@ -62,7 +63,7 @@ service cloud.firestore {
   match /config/monitors { allow read: if true; allow write: if admin(); }
   match /config/secure { allow read: if true; allow write: if admin() && request.resource.data.enabled == true; }
   match /config/phones { allow read: if staff(); allow write: if admin(); }
-  match /config/{id} { allow read,write: if admin(); }
+  match /config/{id} { allow read: if admin() || id.matches('subs-.*') && (staff() || teacher()); allow write: if admin(); }
   match /meta/rules2 { allow get: if true; allow write: if false; }
   match /teacherProfiles/{uid} { allow get: if request.auth != null && request.auth.uid == uid && teacher(); }
   match /securityAudit/{event} { allow read: if admin(); allow write: if false; }
