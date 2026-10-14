@@ -1,0 +1,23 @@
+<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>التحقق من حماية الرصد</title><body><h1>التحقق من حماية الرصد</h1><p>هذا الفحص خاص بالمدير ويستخدم سجلًا تجريبيًا منفصلًا عن أسابيع الدراسة.</p><button id="run" disabled>بدء التحقق</button><pre id="result">جارٍ التحقق من الحساب…</pre>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js"></script><script src="app-check.js?v=20261013"></script>
+<script>
+'use strict';
+const app=firebase.initializeApp({apiKey:'AIzaSyBkzpz7hLmQlnL5nODu3dpKZD_if71nOcY',authDomain:'alsahafa-followup.firebaseapp.com',projectId:'alsahafa-followup',appId:'1:652830562435:web:1c1b529b5d6b57c944a3b6'});FollowupAppCheck.activate(app);
+const auth=app.auth(),db=app.firestore(),out=document.getElementById('result'),button=document.getElementById('run');let user=null;
+auth.onAuthStateChanged(async actor=>{if(!actor){out.textContent='يلزم دخول المدير من صفحة المنصة في هذه النافذة أولًا.';return;}try{const access=await db.doc('staffAccess/'+actor.uid).get();if(!access.exists||!access.data().active||access.data().role!==-1){out.textContent='الفحص متاح للمدير فقط.';return;}user=actor;button.disabled=false;out.textContent='جاهز للفحص. لن يتغير أي سجل حصة فعلي.';}catch(error){out.textContent='تعذر التحقق من الصلاحية: '+error.code;}});
+button.onclick=async()=>{
+button.disabled=true;let passed=0;const week='security-values-check-'+Date.now(),ref=db.doc('recordWeeks/'+week+'/logs/c2-d0-p0'),now=new Date().toISOString();
+const seed={status:'done',present:17,absent:2,rating:4,ratingMon:3,teacher:'اختبار حماية',sup:1,day:0,week,by:-1,updatedBy:user.uid,updatedAt:now,monUid:user.uid,monBy:-1,monAt:now};
+async function reject(patch){try{await ref.update(patch);throw Error('unexpected-allowed-write');}catch(error){if(error.code!=='permission-denied')throw error;passed++;out.textContent='نجح '+passed+' فحصًا…';}}
+try{
+await ref.set(seed);passed++;
+for(const field of ['present','absent'])for(const value of [-1,1.5,'17'])await reject({[field]:value});
+for(const field of ['rating','ratingMon'])for(const value of [-1,6,1.5,'4',null])await reject({[field]:value});
+await reject({updatedBy:'forged-user'});await reject({by:99});await reject({monUid:'forged-user'});await reject({monBy:77});await reject({status:'forged-status'});
+for(const patch of [{present:0,absent:0,rating:0,ratingMon:0},{present:null,absent:null,rating:5,ratingMon:5},{present:17,absent:2,rating:4,ratingMon:3}]){await ref.update(patch);passed++;}
+const final=await ref.get();if(final.data().present!==17||final.data().absent!==2)throw Error('test-value-mismatch');
+const report={passed,allPassed:true,syntheticPath:ref.path,realLessonWrites:0,documentsDeleted:0,fieldsDeleted:0};out.textContent='اكتمل التحقق بنجاح: '+passed+' فحصًا. لم يتغير أي سجل حصة فعلي.';out.dataset.passed=String(passed);out.dataset.path=ref.path;
+}catch(error){out.textContent='توقف الفحص: '+(error.code||error.message);out.dataset.failure=error.code||error.message;}
+};
+</script></body></html>
+
