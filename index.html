@@ -1401,7 +1401,7 @@ function showGate(mode,msg){const g=$('gate');g.hidden=false;$('gateMsg').textCo
 function enter(role){state.role=role;$('gate').hidden=true;$('logoutBtn').hidden=false;
   $('rolePill').hidden=false;$('rolePill').textContent='دخول: '+roleName(role);$('pwBtn').hidden=!state.secure;
   $('namesBtn').hidden=!(role<0&&state.isEditor);$('exportBtn').hidden=!(role<0&&state.downloads);$('impBtn').hidden=!(role>=-1&&role<=3&&state.db);$('waAllBtn').hidden=role!==-1;$('vSubs').hidden=role!==-1;document.querySelectorAll('.dlx').forEach(x=>x.hidden=!state.downloads||(x.classList.contains('master-only')&&role>=0));
-  applyRepViews();startData();if(role===-1)setView('teachers');else render()}
+  applyRepViews();startData();if(role===-1)setView('schedule');else render()}
 $('loginForm').onsubmit=async e=>{e.preventDefault();$('loginErr').textContent='';
   if(loginRole==null){$('loginErr').textContent='اختر صفة الدخول أولاً';return}
   if(state.secure){const btn=$('loginForm').querySelector('[type=submit]');btn.disabled=true;
