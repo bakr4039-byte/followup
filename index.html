@@ -997,13 +997,25 @@ async function waPdfFile(t){const key=t.name+'|'+rangeText();if(waPdfCache.has(k
   $('busyTxt').textContent='جارٍ تجهيز ملف PDF للإرسال…';$('busy').hidden=false;
   try{const blob=await buildPdf([teacherPage(t)]);const f=new File([blob],('تقرير-المعلم-'+t.name).replace(/\s+/g,'-')+'.pdf',{type:'application/pdf'});waPdfCache.set(key,f);return f}
   finally{$('busy').hidden=true}}
+const isMobileUA=()=>/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+function canSharePdf(f){try{return isMobileUA()&&!!navigator.share&&!!navigator.canShare&&navigator.canShare({files:[f]})}catch(e){return false}}
+async function sharePdf(f){await navigator.share({files:[f]})} // file only: WhatsApp drops the attachment when text is added on some phones
+function waPdfDone(name){if(queue.items.length&&queue.items[queue.i]&&queue.items[queue.i].name===name){queue.sent.add(name);setTimeout(()=>{queue.i++;paintQueue()},700)}}
 async function sendWaPdf(name,btn){const t=teachersIn(scope().filter(inRange)).find(x=>x.name===name);if(!t)return;
   const ph=normPhone(state.phones[t.name]);if(!ph){toast('لم يُسجّل رقم جوال لهذا المعلم');return}
+  const key=t.name+'|'+rangeText();const cached=waPdfCache.get(key);
+  // mobile: attach the PDF itself through the share sheet (WhatsApp → teacher)
+  if(cached&&canSharePdf(cached)){try{await sharePdf(cached);if(btn&&btn.dataset.label){btn.textContent=btn.dataset.label;delete btn.dataset.label}waPdfDone(name)}catch(e){if(e&&e.name!=='AbortError')toast('تعذّرت المشاركة، جرّب مرة أخرى')}return}
   let file;try{file=await waPdfFile(t)}catch(e){toast('تعذّر إنشاء ملف PDF، أعد تحميل الصفحة');return}
-  const data={files:[file],title:file.name,text:waShortText(t)};
-  // download the PDF then open the teacher chat directly (wa.me) on all devices
+  if(canSharePdf(file)){try{await sharePdf(file);waPdfDone(name)}catch(e){
+      if(e&&e.name==='AbortError')return;
+      // PDF generation took too long and the browser blocked sharing: ask for one more tap
+      if(btn){btn.dataset.label=btn.dataset.label||btn.textContent;btn.textContent='الملف جاهز – اضغط للإرسال'}
+      toast('ملف PDF جاهز – اضغط الزر مرة أخرى ثم اختر واتساب والمعلم')}
+    return}
+  // computer: download the PDF and open the teacher chat to attach it
   try{if(state.downloads)await state.downloads.save({filename:file.name,data:file});else{const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=file.name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)}}catch(e){if(e&&e.code==='cancelled')return}
-  window.open(`https://wa.me/${ph}?text=${encodeURIComponent(waShortText(t))}`,'_blank','noopener');
+  window.open(`https://wa.me/${ph}?text=${encodeURIComponent(waShortText(t))}`,'_blank','noopener');waPdfDone(name);
   toast('تم تحميل ملف PDF – اسحبه إلى محادثة واتساب أو أرفقه بزر المشبك')}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-wapdf]');if(!b||b.disabled)return;e.preventDefault();e.stopPropagation();
   if(b.dataset.busy)return;b.dataset.busy='1';sendWaPdf(b.dataset.wapdf,b).finally(()=>{delete b.dataset.busy})},true);
@@ -1019,10 +1031,10 @@ function closeQueue(){$('qScrim').hidden=true;$('qDrawer').hidden=true}
 function paintQueue(){const it=queue.items,cur=it[queue.i];
   if(!it.length){$('qNow').innerHTML='<p class="empty">لا يوجد معلم لديه رقم جوال. أضف الأرقام من تقرير كل معلم.</p>';$('qList').innerHTML='';$('qProg').textContent='';$('qSkip').hidden=true;return}
   $('qSkip').hidden=!cur;
-  $('qNow').innerHTML=cur?`<span class="note">التالي (${queue.i+1} من ${it.length})</span><b>${esc(cur.name)}</b><a class="wabtn" id="qGo" href="${esc(waLink(cur))}" target="_blank" rel="noopener noreferrer">فتح المحادثة وإرسال التقرير</a><span class="note">بعد ما يفتح واتساب اضغط إرسال، ثم ارجع هنا وينتقل تلقائياً للمعلم التالي.</span>`:`<b>تم الانتهاء</b><span class="note">فُتحت ${queue.sent.size} محادثة من ${it.length}.</span>`;
+  $('qNow').innerHTML=cur?`<span class="note">التالي (${queue.i+1} من ${it.length})</span><b>${esc(cur.name)}</b><button type="button" class="wabtn" id="qGo" data-wapdf="${esc(cur.name)}">إرسال التقرير PDF</button><span class="note">في الجوال اختر واتساب ثم المعلم، وفي الكمبيوتر يُحمَّل الملف وتُفتح المحادثة. بعد الإرسال ارجع هنا وينتقل تلقائياً للمعلم التالي.</span>`:`<b>تم الانتهاء</b><span class="note">فُتحت ${queue.sent.size} محادثة من ${it.length}.</span>`;
   $('qList').innerHTML=it.map((t,k)=>`<div class="qrow ${k===queue.i?'cur':''} ${queue.sent.has(t.name)?'sent':''}"><span>${esc(t.name)}</span><span class="st">${queue.sent.has(t.name)?'تم الفتح':k===queue.i?'الحالي':'بانتظار'}</span></div>`).join('');
   $('qProg').textContent=`${queue.sent.size} / ${it.length}`;
-  const go=$('qGo');if(go)go.addEventListener('click',()=>{queue.sent.add(cur.name);setTimeout(()=>{queue.i++;paintQueue()},700)})}
+}
 $('waAllBtn').onclick=openQueue;$('qClose').onclick=closeQueue;$('qScrim').onclick=closeQueue;
 $('qSkip').onclick=()=>{queue.i++;paintQueue()};
 
