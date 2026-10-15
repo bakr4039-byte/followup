@@ -187,6 +187,10 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .alerts{display:grid;gap:8px;max-height:260px;overflow:auto}
 .alert{display:grid;gap:2px;padding:9px 11px;border-radius:10px;background:var(--st-soft);border:0;text-align:right;font-size:13px}
 .alert b{color:var(--st)}
+.afilter{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.afilter button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 11px;font-size:12.5px;cursor:pointer;color:inherit;font-family:inherit}
+.afilter button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.afilter .cnt{font-size:11px;opacity:.75;margin-inline-start:4px}
 .empty{color:var(--muted);font-size:13px;padding:6px 0}
 
 /* report */
@@ -412,7 +416,8 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
           <div class="legend" id="legend"></div>
         </div>
         <div class="panel">
-          <h2>تحتاج متابعة <small>هذا الأسبوع</small></h2>
+          <h2>تحتاج متابعة <small id="alTitle">هذا الأسبوع</small></h2>
+          <div class="afilter" id="alDays" role="group" aria-label="تحديد أيام المتابعة"></div>
           <div class="alerts" id="alerts"></div>
         </div>
       </aside>
@@ -808,8 +813,11 @@ function renderRail(){const list=scope().filter(s=>s.day===state.day),c=counts(l
   $('sumTitle').innerHTML=`ملخص ${DAYS[state.day].n} <small>${esc(scopeLabel())}</small>`;
   $('ring').innerHTML=ringSVG(c)+`<div><div class="big num">${pct(c.logged,c.total)}%</div><p class="num">رُصدت ${c.logged} من ${c.total} حصة</p><p class="num">انعقاد ${c.logged?pct(c.held,c.logged):0}% من المرصود</p></div>`;
   $('legend').innerHTML=[['done'],['late'],['absent'],['tech']].map(([k])=>`<div class="lg s-${k}"><span>${ST[k].t}</span><b class="num">${c[k]}</b></div>`).join('')+`<div class="lg" style="grid-column:1/-1"><span>لم تُرصد بعد</span><b class="num">${c.pending}</b></div>`;
-  const issues=scope().filter(s=>{const l=state.logs[s.id];return l&&(l.status==='absent'||l.status==='tech'||l.status==='late')});
-  $('alerts').innerHTML=issues.length?issues.map(s=>{const l=state.logs[s.id],st=ST[l.status];return `<button class="alert ${st.c}" data-open="${s.id}"><b>${st.t}</b><span>${esc(s.subj)} · ${esc(s.teacher)}</span><span class="note">${DAYS[s.day].n} · ${s.label} · ${CLS[s.cls]}${notesFor(l)?' — '+esc(notesFor(l)):''}</span></button>`}).join(''):'<p class="empty">لا توجد حصص متعثرة حتى الآن.</p>';}
+  const allIssues=scope().filter(s=>{const l=state.logs[s.id];return l&&(l.status==='absent'||l.status==='tech'||l.status==='late')});
+  const ad=state.alDays||(state.alDays=[]);const issues=ad.length?allIssues.filter(s=>ad.includes(s.day)):allIssues;
+  $('alDays').innerHTML=`<button type="button" data-aldays="all" aria-pressed="${!ad.length}">الكل<span class="cnt num">${allIssues.length}</span></button>`+DAYS.map((d,i)=>{const n=allIssues.filter(s=>s.day===i).length;return `<button type="button" data-aldays="${i}" aria-pressed="${ad.includes(i)}">${d.n}<span class="cnt num">${n}</span></button>`}).join('');
+  $('alTitle').textContent=ad.length?[...ad].sort((a,b)=>a-b).map(i=>DAYS[i].n).join(' · '):'هذا الأسبوع';
+  $('alerts').innerHTML=issues.length?issues.map(s=>{const l=state.logs[s.id],st=ST[l.status];return `<button class="alert ${st.c}" data-open="${s.id}"><b>${st.t}</b><span>${esc(s.subj)} · ${esc(s.teacher)}</span><span class="note">${DAYS[s.day].n} · ${s.label} · ${CLS[s.cls]}${notesFor(l)?' — '+esc(notesFor(l)):''}</span></button>`}).join(''):(ad.length?'<p class="empty">لا توجد حصص متعثرة في الأيام المحددة.</p>':'<p class="empty">لا توجد حصص متعثرة حتى الآن.</p>');}
 function renderReport(){
   $('kpis').innerHTML=state.names.map((n,i)=>{if(effSup()>=0&&i!==effSup())return'';const c=counts(scope().filter(s=>s.sup===i&&inRange(s)));if(isMon()&&!c.total)return'';const avg=c.rating.length?(c.rating.reduce((a,b)=>a+b,0)/c.rating.length).toFixed(1):'—';
     const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');
@@ -1211,7 +1219,8 @@ paintDayOpts();
 $('fStatus').innerHTML='<option value="">كل الحالات</option>'+Object.entries(ST).map(([k,v])=>`<option value="${k}">${v.t}</option>`).join('')+'<option value="pending">لم تُرصد</option>';
 ['fStatus','fText'].forEach(id=>$(id).addEventListener('input',renderReport));
 
-document.addEventListener('click',e=>{const t=e.target.closest('[data-sup],[data-day],[data-open]');if(!t)return;
+document.addEventListener('click',e=>{const a=e.target.closest('[data-aldays]');if(a){const v=a.dataset.aldays,ad=state.alDays||(state.alDays=[]);if(v==='all')ad.length=0;else{const i=+v,k=ad.indexOf(i);k<0?ad.push(i):ad.splice(k,1);if(ad.length===DAYS.length)ad.length=0}renderRail();return}
+  const t=e.target.closest('[data-sup],[data-day],[data-open]');if(!t)return;
   if(t.dataset.sup!=null){state.sup=+t.dataset.sup;render()}
   else if(t.dataset.day!=null){state.day=+t.dataset.day;render()}
   else if(t.dataset.open){openDrawer(t.dataset.open)}});
