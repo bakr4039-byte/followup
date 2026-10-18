@@ -1291,7 +1291,10 @@ function paintJoin(){const u=safeUrl($('dLink').value);const a=$('dJoin');if(u){
 $('dLink').addEventListener('input',paintJoin);
 $('dLinkSave').onclick=async()=>{const id=state.open;if(!state.db||!id)return;const s=byId[id];if(state.role==null||(state.role>=0&&s.sup!==state.role))return;const v=$('dLink').value.trim();
   if(v&&!safeUrl(v)){toast('الرابط يجب أن يبدأ بـ https://');return}
-  try{if(v){await state.db.doc('links/'+id).set({url:v.slice(0,500),updatedAt:new Date().toISOString()});state.links[id]=v}else{await state.db.doc('links/'+id).delete();delete state.links[id]}toast('تم حفظ الرابط');render()}
+  try{const wk=state.week,now=new Date().toISOString(),url=v.slice(0,500);await state.db.doc('links/'+linkDocId(id,wk)).set({url,week:wk,updatedAt:now});
+    // Keep links/<id> as the current week's link for roles that can only read the legacy document.
+    if(wk===CUR_WEEK){try{if(url)await state.db.doc('links/'+id).set({url,updatedAt:now});else await state.db.doc('links/'+id).delete()}catch(e){}}
+    if(url)state.links[id]=url;else delete state.links[id];toast('تم حفظ الرابط');render()}
   catch(e){toast('تعذّر حفظ الرابط')}};
 $('dSave').onclick=async()=>{const id=state.open;if(!state.db||!id)return;const d=state.draft;
   if(isMon()){const s=byId[id];if(!monTeachers(state.role).has(s.teacher))return;const prev=state.logs[id]||{sup:s.sup,day:s.day};const p={...splitNotes(prev),notesAdm:$('nAdm').value.trim().slice(0,600)};
@@ -1538,7 +1541,23 @@ function scopedCollection(path){if(state.role===-1||state.role===8)return state.
     const stops=list.map(s=>state.db.doc(path+'/'+s.id).onSnapshot(d=>{if(!active)return;ready.add(s.id);if(d.exists)docs.set(s.id,d);else docs.delete(s.id);emit()},e=>{if(active&&err)err(e)}));
     if(!list.length)emit();return()=>{active=false;stops.forEach(f=>f())}}
 }}
-function subLinks(){if(unsubLinks)unsubLinks();unsubLinks=scopedCollection('links').onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{const v=d.exists&&d.data();if(v&&v.url&&byId[d.id])m[d.id]=String(v.url)});state.links=m;render()},()=>{})}
+// Links are stored per week: links/<lessonId>@<week>. A legacy links/<lessonId> doc (the latest link) only counts
+// for the week its updatedAt falls in, so every new week starts with no links and past weeks keep their own.
+const linkDocId=(id,wk)=>id+'@'+wk;
+function stampWeek(iso){try{const d=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(iso));return weekOf(d)}catch(e){return ''}}
+function buildLinks(wk,legacy,weekly){const m={};for(const [id,v] of legacy)if(v&&v.url&&byId[id]&&stampWeek(v.updatedAt)===wk)m[id]=String(v.url);
+  for(const [id,v] of weekly){if(!byId[id]||!v)continue;if(v.url)m[id]=String(v.url);else delete m[id]}return m}
+function subLinks(){if(unsubLinks){try{unsubLinks()}catch(e){}unsubLinks=null}if(!state.db)return;const wk=state.week;
+  const legacy=new Map(),weekly=new Map();let active=true;
+  const emit=()=>{if(!active||wk!==state.week)return;state.links=buildLinks(wk,legacy,weekly);render()};
+  if(state.role===-1||state.role===8){
+    const stop=state.db.collection('links').onSnapshot(snap=>{legacy.clear();weekly.clear();snap.docs.forEach(d=>{if(!d.exists)return;const v=d.data(),i=d.id.indexOf('@');if(i<0)legacy.set(d.id,v);else if(d.id.slice(i+1)===wk)weekly.set(d.id.slice(0,i),v)});emit()},()=>{});
+    unsubLinks=()=>{active=false;stop()};return}
+  const list=dataScope(),stops=[];
+  list.forEach(s=>{
+    stops.push(state.db.doc('links/'+s.id).onSnapshot(d=>{if(d.exists)legacy.set(s.id,d.data());else legacy.delete(s.id);emit()},()=>{}));
+    stops.push(state.db.doc('links/'+linkDocId(s.id,wk)).onSnapshot(d=>{if(d.exists)weekly.set(s.id,d.data());else weekly.delete(s.id);emit()},()=>{}))});
+  if(!list.length)emit();unsubLinks=()=>{active=false;stops.forEach(f=>f())}}
 function subLogs(){if(!state.db)return;if(unsubLogs){try{unsubLogs()}catch(e){}}const wk=state.week;
   const loading='جارٍ تحميل الرصد والحضور لجميع أيام الأسبوع…';showBanner(loading);
   unsubLogs=scopedCollection(logsCol(wk)).onSnapshot(snap=>{if(wk!==state.week)return;const m={};snap.docs.forEach(d=>{if(d.exists&&byId[d.id])m[d.id]=d.data()});state.logs=m;if($('banner').textContent===loading||$('banner').dataset.logsError==='true'){$('banner').hidden=true;delete $('banner').dataset.logsError}render()},()=>{if(wk!==state.week)return;$('banner').dataset.logsError='true';showBanner('تعذّر تحميل الرصد والحضور. حدّث الصفحة وسجّل الدخول مجددًا؛ لا يعني ذلك أن الحصص لم تُرصد.')})}
@@ -1548,7 +1567,7 @@ function paintWeekNav(){const ws=allWeeks();$('wSel').innerHTML=ws.slice().rever
   let a=$('archNote');if(!a){a=document.createElement('div');a.id='archNote';a.className='archived';$('banner').after(a)}
   a.hidden=state.week===CUR_WEEK;a.textContent=state.week<CUR_WEEK?'تعرض الآن أسبوعًا سابقًا من الأرشيف. التعديلات تُحفظ على ذلك الأسبوع.':''}
 function setWeek(wk){if(wk===state.week)return;state.archive=null;state.bDay=undefined;state.stDay=undefined;state.week=wk;DAYS=weekDays(wk);state.logs={};state.from=0;state.to=4;const ti=todayIdx();state.day=ti>=0?ti:0;state.teacher=state.teacher||null;
-  paintDayOpts();paintWeekNav();tickClock();subSubs();subLogs();render()}
+  state.links={};paintDayOpts();paintWeekNav();tickClock();subSubs();subLinks();subLogs();render()}
 $('wSel').onchange=()=>setWeek($('wSel').value);
 $('wPrev').onclick=()=>{const ws=allWeeks(),i=ws.indexOf(state.week);if(i>0)setWeek(ws[i-1])};
 $('wNext').onclick=()=>{const ws=allWeeks(),i=ws.indexOf(state.week);if(i<ws.length-1)setWeek(ws[i+1])};
