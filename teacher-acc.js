@@ -40,6 +40,6 @@
     else if(b.hasAttribute('data-pdf')){b.disabled=true;try{A.download(await A.pdfFile({...a,teacherFull:fullName(a)}))}catch(err){toast('تعذّر إنشاء PDF.')}finally{b.disabled=false}}
     else if(b.hasAttribute('data-wa')){A.sharePdfWa({...a,teacherFull:fullName(a)},A.ADMIN_PHONE,waText(a),b,toast)}});
   function waitProfile(user,tries=0){if(auth.currentUser!==user)return;if(typeof profile!=='undefined'&&profile&&profile.scheduleName){listen(profile.scheduleName);return}if(tries<60)setTimeout(()=>waitProfile(user,tries+1),250)}
-  function listen(name){if(stop)stop();stop=rawDb.collection(A.COL).where('teacher','==',name).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+String((d.data().decidedAt&&d.data().decidedAt.seconds)||'')})).sort((x,y)=>((y.createdAt&&y.createdAt.seconds)||9e9)-((x.createdAt&&x.createdAt.seconds)||9e9));render()},()=>{list=[];render()})}
+  function listen(name){if(stop)stop();stop=rawDb.collection(A.COL).where('teacher','==',name).onSnapshot(snap=>{list=snap.docs.filter(d=>d.data().status!=='deleted').map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+String((d.data().decidedAt&&d.data().decidedAt.seconds)||'')})).sort((x,y)=>((y.createdAt&&y.createdAt.seconds)||9e9)-((x.createdAt&&x.createdAt.seconds)||9e9));render()},()=>{list=[];render()})}
   auth.onAuthStateChanged(user=>{if(stop){stop();stop=null}list=[];render();uid=user?user.uid:null;if(user)waitProfile(user)});
 })();
