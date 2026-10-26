@@ -28,7 +28,7 @@
   .acc-card .muted{color:var(--muted);font-size:13px}.acc-reply{background:var(--surface-2);border-radius:10px;padding:8px 12px;white-space:pre-wrap;font-size:14px}
   .acc-acts{display:flex;flex-wrap:wrap;gap:6px}.acc-acts .btn{padding:7px 12px;font-size:13px}
   .acc-dec{display:grid;gap:8px;border-top:1px dashed var(--line);padding-top:8px}.acc-radios{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px}.acc-radios label{display:flex;gap:5px;align-items:center}
-  .acc-prev{overflow:auto;border:1px solid var(--line);border-radius:12px;background:#fff;max-height:70vh}.acc-prev .accp{transform:scale(.62);transform-origin:top right;margin-bottom:-420px}`;
+  .acc-prev{overflow:auto;border:1px solid var(--line);border-radius:12px;background:#fff;height:72vh;min-height:440px;flex:none}.acc-prev .accp{transform:scale(.62);transform-origin:top right;margin-bottom:-420px}`;
   document.head.appendChild(css);
   const btn=document.createElement('button');btn.id='vAcc';btn.setAttribute('aria-pressed','false');btn.hidden=true;btn.textContent='المساءلات';
   const anchor=document.getElementById('vSubs');if(anchor)anchor.after(btn);
@@ -69,7 +69,7 @@
   $a('acT').onchange=()=>{$a('acFull').value=$a('acT').value?fullOf($a('acT').value):''};
   $a('acDate').oninput=paintHijri;
   $a('acCats').addEventListener('change',()=>A.CATS.forEach((c,ci)=>{const n=$a('acCats').querySelectorAll(`input[data-acc^="${ci}-"]:checked`).length;const el=$a('acCats').querySelector(`[data-cnt="${ci}"]`);if(el)el.textContent=n?`(${n})`:''}));
-  $a('acPreview').onclick=()=>{const p=$a('acPrev');if(!p.hidden){p.hidden=true;return}p.innerHTML=`<style>${A.CSS}</style>`+A.formHTML(draft());p.hidden=false};
+  $a('acPreview').onclick=()=>{const p=$a('acPrev');if(!p.hidden){p.hidden=true;$a('acPreview').textContent='معاينة النموذج';return}p.innerHTML=`<style>${A.CSS}</style>`+A.formHTML(draft());p.hidden=false;$a('acPreview').textContent='إخفاء المعاينة';setTimeout(()=>p.scrollIntoView({behavior:'smooth',block:'start'}),50)};
   function teacherMsg(a,id){const ph=state.phones&&state.phones[a.teacher];return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم مساءلة إدارية بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة السبب وإرساله:',portal(id)].join('\n')}}
   $a('acSave').onclick=async()=>{const d=draft();const msg=$a('acMsg');
     if(!d.teacher){msg.textContent='اختر المعلم أولاً.';return}if(!d.items.length&&!d.other){msg.textContent='اختر مخالفة واحدة على الأقل أو اكتب مخالفة أخرى.';return}if(!d.date){msg.textContent='حدد تاريخ المخالفة.';return}
@@ -81,7 +81,7 @@
       const m=teacherMsg(d,ref.id);if(win){win.location.href=A.waUrl(m.phone,m.text)}
       msg.textContent=ph?'تم حفظ المساءلة وفتح الواتساب للمعلم.':'تم حفظ المساءلة. لا يوجد رقم جوال لهذا المعلم — أضفه من «تقارير المعلمين» ثم أرسل من السجل.';
       toast('تم حفظ المساءلة');$a('acCats').querySelectorAll('input:checked').forEach(x=>x.checked=false);$a('acCats').dispatchEvent(new Event('change'));$a('acOther').value='';$a('acDetails').value='';$a('acPrev').hidden=true;setTab('log')}
-    catch(e){if(win)win.close();console.error(e);msg.textContent=e&&e.code==='permission-denied'?'لا توجد صلاحية — انشر قواعد الأمان المحدّثة في Firebase (الإعدادات ← القواعد).':'تعذّر الحفظ، حاول مرة أخرى.'}
+    catch(e){if(win)win.close();console.error(e);const em=e&&e.code==='permission-denied'?'لم تُحفظ المساءلة: قواعد الأمان الجديدة غير منشورة في Firebase بعد.\nمن الإعدادات ← القواعد انسخ القواعد، ثم الصقها في Firebase Console ← Firestore ← Rules واضغط Publish.':'تعذّر الحفظ، حاول مرة أخرى.';msg.textContent=em;alert(em)}
     finally{$a('acSave').disabled=false}};
 
   // ---------- log ----------
@@ -101,7 +101,7 @@
     const waiting=list.filter(a=>a.status==='replied').length;$a('acCount').textContent=waiting?`(${waiting} بانتظار القرار)`:list.length?`(${list.length})`:'';
     $a('acList').innerHTML=rows.map(card).join('')||'<p class="muted">لا توجد مساءلات.</p>'}
   $a('acSearch').oninput=paintList;$a('acFilter').onchange=paintList;
-  function listen(){if(stop)return;stop=fs().collection(A.COL).orderBy('createdAt','desc').limit(300).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+(d.data().decidedAt&&d.data().decidedAt.seconds||'')}));paintList()},e=>{$a('acMsg').textContent=e&&e.code==='permission-denied'?'لا توجد صلاحية لقراءة المساءلات — انشر قواعد الأمان المحدّثة في Firebase.':'تعذّر تحميل المساءلات.'})}
+  function listen(){if(stop)return;stop=fs().collection(A.COL).orderBy('createdAt','desc').limit(300).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+(d.data().decidedAt&&d.data().decidedAt.seconds||'')}));paintList()},e=>{stop=null;$a('acMsg').textContent=e&&e.code==='permission-denied'?'لا توجد صلاحية لقراءة المساءلات — انشر قواعد الأمان المحدّثة في Firebase.':'تعذّر تحميل المساءلات.'})}
   $a('acList').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const el=b.closest('[data-id]');const a=list.find(x=>x.id===el.dataset.id);if(!a)return;
     if(b.hasAttribute('data-acc-wa')){const m=teacherMsg(a,a.id);window.open(A.waUrl(m.phone,m.text),'_blank','noopener')}
     else if(b.hasAttribute('data-acc-pdf')){b.disabled=true;try{A.download(await A.pdfFile(a))}catch(err){toast('تعذّر إنشاء PDF')}finally{b.disabled=false}}
