@@ -36,37 +36,37 @@
   let measureCtx=null;
   function wrap(text,width,px){if(!measureCtx)measureCtx=document.createElement('canvas').getContext('2d');measureCtx.font=`600 ${px}px ${FONT}`;const out=[];
     String(text||'').split(/\n/).forEach(par=>{const words=par.trim().split(/\s+/).filter(Boolean);if(!words.length)return;let line='';words.forEach(w=>{const t=line?line+' '+w:w;if(measureCtx.measureText(t).width>width&&line){out.push(line);line=w}else line=t});if(line)out.push(line)});return out}
-  function lines(paragraphs,min,max){const ls=[];(Array.isArray(paragraphs)?paragraphs:[paragraphs]).forEach(p=>ls.push(...wrap(p,W-120,15)));while(ls.length<min)ls.push('');const shown=ls.slice(0,max);if(ls.length>max)shown[max-1]+=' …';return shown.map(t=>`<div class="ln">${esc(t)||'&nbsp;'}</div>`).join('')}
-  const CSS=`.accp{width:${W}px;height:${H}px;background:#fff;color:#000;font-family:${FONT};direction:rtl;padding:26px 30px;box-sizing:border-box;position:relative}
-  .accp *{box-sizing:border-box}.accp .frame{border:2px solid #000;height:100%;padding:8px 14px;display:flex;flex-direction:column}
-  .accp .head img{width:100%;display:block}.accp .ttl{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;border-top:2px solid #000;padding-top:4px;margin-top:2px}
-  .accp .ttl h1{font-size:26px;margin:0;font-weight:700;text-decoration:underline}.accp .code{font-size:12px;font-weight:600;text-align:left}
-  .accp .to{display:flex;justify-content:space-between;font-size:16px;font-weight:700;margin:6px 0 2px}
-  .accp .h{font-size:15px;font-weight:700;text-decoration:underline;margin:4px 0 0}.accp .ln{border-bottom:1.5px dotted #333;height:29px;line-height:32px;font-size:15px;font-weight:600;padding:0 6px;white-space:nowrap;overflow:hidden;color:#0b2a6b}
-  .accp .sig{display:flex;justify-content:space-between;font-size:15px;font-weight:600;margin:8px 0 6px;gap:10px;padding:0 4px 0 10px}.accp .sig b{color:#0b2a6b}
-  .accp .sec{border-top:1.5px solid #000;padding-top:4px;margin-top:4px}
-  .accp .acts{display:grid;grid-template-columns:repeat(3,1fr);font-size:14px;font-weight:600;gap:4px 10px;margin:6px 0}
-  .accp .acts span{display:flex;align-items:center;gap:6px}.accp .bx{display:inline-block;width:14px;height:14px;border:1.5px solid #000;text-align:center;line-height:11px;font-size:13px;color:#0b2a6b;font-weight:700}
-  .accp .copy{margin-top:auto;font-size:13px;font-weight:600;border-top:1.5px solid #000;padding-top:4px}.accp .copy div{display:flex;justify-content:space-around;margin-top:6px}`;
+  function lines(paragraphs,min,max){const ls=[];(Array.isArray(paragraphs)?paragraphs:[paragraphs]).forEach(p=>ls.push(...wrap(p,W-120,15)));while(ls.length<min)ls.push('');const shown=ls.slice(0,max);if(ls.length>max)shown[max-1]+=' …';return shown.map(t=>`<div class="ac-ln">${esc(t)||'&nbsp;'}</div>`).join('')}
+  const CSS=`.accp{line-height:1.45;text-align:right;letter-spacing:0;width:${W}px;height:${H}px;background:#fff;color:#000;font-family:${FONT};direction:rtl;padding:26px 30px;box-sizing:border-box;position:relative}
+  .accp *{box-sizing:border-box}.accp .ac-frame>*,.accp .ac-sec>*{flex-shrink:0}.accp .ac-sec{display:block;gap:0}.accp .ac-frame{border:2px solid #000;height:100%;padding:8px 14px;display:flex;flex-direction:column}
+  .accp .ac-head img{width:100%;display:block}.accp .ac-ttl{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;border-top:2px solid #000;padding-top:4px;margin-top:2px}
+  .accp .ac-ttl h1{font-size:26px;margin:0;font-weight:700;text-decoration:underline}.accp .ac-code{font-size:12px;font-weight:600;text-align:left}
+  .accp .ac-to{display:flex;justify-content:space-between;font-size:16px;font-weight:700;margin:6px 0 2px}
+  .accp .ac-h{font-size:15px;font-weight:700;text-decoration:underline;margin:4px 0 0}.accp .ac-ln{border-bottom:1.5px dotted #333;height:29px;line-height:32px;font-size:15px;font-weight:600;padding:0 6px;white-space:nowrap;overflow:hidden;color:#0b2a6b}
+  .accp .ac-sig{display:flex;justify-content:space-between;font-size:15px;font-weight:600;margin:8px 0 6px;gap:10px;padding:0 4px 0 10px}.accp .ac-sig b{color:#0b2a6b}
+  .accp .ac-sec{border-top:1.5px solid #000;padding-top:4px;margin-top:4px}
+  .accp .ac-acts{display:grid;grid-template-columns:repeat(3,1fr);font-size:14px;font-weight:600;gap:4px 10px;margin:6px 0}
+  .accp .ac-acts span{display:flex;align-items:center;gap:6px}.accp .ac-bx{display:inline-block;width:14px;height:14px;border:1.5px solid #000;text-align:center;line-height:11px;font-size:13px;color:#0b2a6b;font-weight:700}
+  .accp .ac-copy{margin-top:auto;font-size:13px;font-weight:600;border-top:1.5px solid #000;padding-top:4px}.accp .ac-copy div{display:flex;justify-content:space-around;margin-top:6px}`;
   function formHTML(a,opt={}){const header=opt.headerSrc||new URL('acc-header.jpg',document.baseURI).href;
     const h=d=>d?`<span dir="rtl">${hijri(d)} هـ</span>`:'&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;/ 1448 هـ';
-    const act=+a.action||0;const box=i=>`<span class="bx">${act===i?'✓':''}</span>`;
+    const act=+a.action||0;const box=i=>`<span class="ac-bx">${act===i?'✓':''}</span>`;
     const amount=act===4?`( ${esc(a.amount||'……')} ) ريال مع عقوبة ${esc(a.penalty||'………')}`:'(………) ريال مع عقوبة ………';
-    return `<div class="accp"><div class="frame">
-      <div class="head"><img src="${esc(header)}" alt="" crossorigin="anonymous"></div>
-      <div class="ttl"><span></span><h1>مساءلة</h1><span class="code">رمز النموذج : ( و.م.ع.ن – 02 – 08 )</span></div>
-      <div class="to"><span>المكرم / المعلم : <b style="color:#0b2a6b">${esc(a.teacherFull||a.teacher)}</b></span><span>سلمه الله</span></div>
-      <div class="h">أرجو بيان سبب ما يلي : -</div>${lines(subjectText(a),5,6)}
-      <div class="sig"><span>مدير المدرسة / ${PRINCIPAL}</span><span>التوقيع /</span><span>بتاريخ : <b>${h(isoOf(a.createdAt)||a.date)}</b></span></div>
-      <div class="sec"><div class="h">* إجابة المعلم : -</div>${lines(a.reply||'',4,6)}
-      <div class="sig"><span>اسم المعلم : <b>${esc(a.teacherFull||a.teacher)}</b></span><span>التوقيع / ${a.reply?'<b>تم الرد إلكترونيًا</b>':''}</span><span>بتاريخ : <b>${a.reply?h(isoOf(a.replyAt)):h('')}</b></span></div></div>
-      <div class="sec"><div class="h">قرار المسؤول المباشر : -</div>${lines(a.decision||'',4,5)}
-      <div class="sig"><span>مدير المدرسة / ${PRINCIPAL}</span><span>التوقيع /</span><span>بتاريخ : <b>${a.decision?h(isoOf(a.decidedAt)):h('')}</b></span></div></div>
-      <div class="sec"><div class="h">الإجراءات الإدارية المتخذة بحق المعلم .</div>
-      <div class="acts"><span>${box(1)} 1- التنبيه</span><span>${box(2)} 2- لفت نظر</span><span>${box(3)} 3- إنـــــذار</span><span style="grid-column:span 2">${box(4)} 4- الحسم من الراتب مبلغ ${amount}</span><span>${box(5)} 5- الحفظ</span><span>${box(6)} 6- إنذار بالفصل</span></div></div>
-      <div class="sec"><div style="font-size:15px;font-weight:600">قرار المشرف العام للمدارس بشأنه :</div><div class="ln">&nbsp;</div>
-      <div class="sig" style="justify-content:space-around"><span>المشرف العام : ${GENERAL}</span><span>التوقيع</span></div></div>
-      <div class="copy">نسخة :<div><span>- لمكتب سعادة المشرف العام</span><span>- لسعادة مدير القسم</span><span>الختم الرسمي</span></div></div>
+    return `<div class="accp"><div class="ac-frame">
+      <div class="ac-head"><img src="${esc(header)}" alt="" crossorigin="anonymous"></div>
+      <div class="ac-ttl"><span></span><h1>مساءلة</h1><span class="ac-code">رمز النموذج : ( و.م.ع.ن – 02 – 08 )</span></div>
+      <div class="ac-to"><span>المكرم / المعلم : <b style="color:#0b2a6b">${esc(a.teacherFull||a.teacher)}</b></span><span>سلمه الله</span></div>
+      <div class="ac-h">أرجو بيان سبب ما يلي : -</div>${lines(subjectText(a),5,6)}
+      <div class="ac-sig"><span>مدير المدرسة / ${PRINCIPAL}</span><span>التوقيع /</span><span>بتاريخ : <b>${h(isoOf(a.createdAt)||a.date)}</b></span></div>
+      <div class="ac-sec"><div class="ac-h">* إجابة المعلم : -</div>${lines(a.reply||'',4,6)}
+      <div class="ac-sig"><span>اسم المعلم : <b>${esc(a.teacherFull||a.teacher)}</b></span><span>التوقيع / ${a.reply?'<b>تم الرد إلكترونيًا</b>':''}</span><span>بتاريخ : <b>${a.reply?h(isoOf(a.replyAt)):h('')}</b></span></div></div>
+      <div class="ac-sec"><div class="ac-h">قرار المسؤول المباشر : -</div>${lines(a.decision||'',4,5)}
+      <div class="ac-sig"><span>مدير المدرسة / ${PRINCIPAL}</span><span>التوقيع /</span><span>بتاريخ : <b>${a.decision?h(isoOf(a.decidedAt)):h('')}</b></span></div></div>
+      <div class="ac-sec"><div class="ac-h">الإجراءات الإدارية المتخذة بحق المعلم .</div>
+      <div class="ac-acts"><span>${box(1)} 1- التنبيه</span><span>${box(2)} 2- لفت نظر</span><span>${box(3)} 3- إنـــــذار</span><span style="grid-column:span 2">${box(4)} 4- الحسم من الراتب مبلغ ${amount}</span><span>${box(5)} 5- الحفظ</span><span>${box(6)} 6- إنذار بالفصل</span></div></div>
+      <div class="ac-sec"><div style="font-size:15px;font-weight:600">قرار المشرف العام للمدارس بشأنه :</div><div class="ac-ln">&nbsp;</div>
+      <div class="ac-sig" style="justify-content:space-around"><span>المشرف العام : ${GENERAL}</span><span>التوقيع</span></div></div>
+      <div class="ac-copy">نسخة :<div><span>- لمكتب سعادة المشرف العام</span><span>- لسعادة مدير القسم</span><span>الختم الرسمي</span></div></div>
     </div></div>`}
 
   function host(){let el=document.getElementById('accPdfHost');if(!el){el=document.createElement('div');el.id='accPdfHost';el.setAttribute('aria-hidden','true');el.style.cssText='position:fixed;top:0;left:-10000px;width:'+W+'px;pointer-events:none;z-index:-1';document.body.appendChild(el)}return el}
