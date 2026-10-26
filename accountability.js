@@ -26,9 +26,9 @@
   function normPhone(v){let d=String(v||'').replace(/[^\d]/g,'');if(d.startsWith('00'))d=d.slice(2);if(d.startsWith('05')&&d.length===10)d='966'+d.slice(1);else if(d.startsWith('5')&&d.length===9)d='966'+d;return d.length>=10&&d.length<=15?d:''}
 
   // نص «أرجو بيان سبب ما يلي»
-  function subjectText(a){const when=[a.date?`يوم ${dayName(a.date)} ${hijri(a.date)}هـ`:'',a.time&&a.time!=='أخرى'?`(${a.time})`:''].filter(Boolean).join(' ');
+  function subjectText(a){
     const items=(a.items||[]).concat(a.other?[a.other]:[]);
-    const L=items.map((x,i)=>(items.length>1?(i+1)+'- ':'')+x+(i===0&&when?' '+when:''));
+    const L=items.map((x,i)=>(items.length>1?(i+1)+'- ':'')+x);
     if(a.details)L.push(a.details);return L}
 
   // ---------- رسم النموذج ----------

@@ -47,9 +47,9 @@
      <div class="field"><label for="acMon">قام برصد المخالفة</label><select id="acMon"></select></div>
      <div class="field"><label for="acPhone">واتساب الإدارة لاستقبال رد المعلم</label><input id="acPhone" inputmode="tel" readonly title="رقم ثابت لجميع المساءلات" style="opacity:.85"></div>
     </div>
-    <div class="field"><label>المخالفات <small style="color:var(--muted)">(اختر واحدة أو أكثر)</small></label><div id="acCats" style="display:grid;gap:8px"></div></div>
+    <div class="field"><label>المخالفات <small style="color:var(--muted)">(اختياري — اختر واحدة أو أكثر)</small></label><div id="acCats" style="display:grid;gap:8px"></div></div>
     <div class="field"><label for="acOther">مخالفة أخرى (اختياري)</label><input id="acOther" class="acc-in" maxlength="200"></div>
-    <div class="field"><label for="acDetails">تفاصيل إضافية تظهر في النموذج (اختياري)</label><textarea id="acDetails" maxlength="600"></textarea></div>
+    <div class="field"><label for="acDetails">تفاصيل / نص المساءلة يظهر في النموذج</label><textarea id="acDetails" maxlength="600"></textarea></div>
     <div class="acc-acts"><button class="btn" id="acSave">حفظ وإرسال واتساب للمعلم</button><button class="btn ghost" id="acPreview">معاينة النموذج</button></div>
     <div class="acc-prev" id="acPrev" hidden></div>
    </div>
@@ -75,7 +75,7 @@
   const tPhone=a=>A.normPhone(a.teacherPhone||phoneOf(a.teacher));
   function teacherMsg(a,id){const ph=tPhone(a);return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم مساءلة إدارية بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة السبب وإرساله:',portal(id)].join('\n')}}
   $a('acSave').onclick=async()=>{const d=draft();const msg=$a('acMsg');
-    if(!d.teacher){msg.textContent='اختر المعلم أولاً.';return}if(!d.items.length&&!d.other){msg.textContent='اختر مخالفة واحدة على الأقل أو اكتب مخالفة أخرى.';return}if(!d.date){msg.textContent='حدد تاريخ المخالفة.';return}
+    if(!d.teacher){msg.textContent='اختر المعلم أولاً.';return}if(!d.items.length&&!d.other&&!d.details){msg.textContent='اكتب سبب المساءلة: اختر مخالفة أو اكتب مخالفة أخرى أو التفاصيل.';return}if(!d.date){msg.textContent='حدد تاريخ المخالفة.';return}
     // نفتح نافذة الواتساب فورًا (قبل انتظار الحفظ) حتى لا يحجبها المتصفح
     const ph=d.teacherPhone;const win=ph?window.open('about:blank','_blank'):null;
     $a('acSave').disabled=true;msg.textContent='جارٍ الحفظ…';
