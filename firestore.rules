@@ -66,6 +66,13 @@ service cloud.firestore {
   match /config/{id} { allow read: if admin() || id.matches('subs-.*') && (staff() || teacher()); allow write: if admin(); }
   match /meta/rules2 { allow get: if true; allow write: if false; }
   match /teacherProfiles/{uid} { allow get: if request.auth != null && request.auth.uid == uid && teacher(); }
+  function teacherName() { return get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.get('scheduleName', '-'); }
+  match /accountability/{id} {
+    allow read: if admin() || teacher() && resource.data.teacher == teacherName();
+    allow create, update: if admin();
+    allow update: if teacher() && resource.data.teacher == teacherName() && resource.data.status == 'sent' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply','replyAt','replyUid','status']) && request.resource.data.status == 'replied' && request.resource.data.replyUid == request.auth.uid && request.resource.data.replyAt == request.time && request.resource.data.reply is string && request.resource.data.reply.size() > 0 && request.resource.data.reply.size() <= 1500;
+    allow delete: if false;
+  }
   match /securityAudit/{event} { allow read: if admin(); allow write: if false; }
   match /securityLoginAttempts/{event} { allow read: if admin(); allow write: if false; }
   match /securityAlerts/{event} { allow read: if admin(); allow write: if false; }
