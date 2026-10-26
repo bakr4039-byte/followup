@@ -26,7 +26,7 @@
      ${st==='sent'?`<label><b>السبب / إجابتك</b><textarea data-reply maxlength="1500" placeholder="اكتب سبب المخالفة هنا…"></textarea></label><div class="actions"><button class="btn primary" data-send>إرسال الرد</button></div>`
        :`<div><b>إجابتك:</b><div class="acc-box">${esc(a.reply||'')}</div></div>`}
      ${st==='decided'?`<div><b>قرار الإدارة:</b><div class="acc-box">${esc(a.decision||'—')}${act?`\nالإجراء: ${esc(A.ACTIONS[act-1])}`:''}</div></div>`:''}
-     ${st!=='sent'?`<div class="actions">${a.replyPhone?'<button class="btn primary" data-wa>إرسال المساءلة PDF واتساب للإدارة</button>':''}<button class="btn" data-pdf>تحميل المساءلة PDF</button></div>`:''}</article>`}
+     ${st!=='sent'?`<div class="actions"><button class="btn primary" data-wa>إرسال المساءلة PDF واتساب للإدارة</button><button class="btn" data-pdf>تحميل المساءلة PDF</button></div>`:''}</article>`}
   function render(){sec.hidden=!list.length;if(!list.length){sec.innerHTML='';return}const need=list.filter(a=>(a.status||'sent')==='sent').length;
     sec.innerHTML=`<h3>المساءلات${need?` <span class="acc-st">${need} بانتظار ردك</span>`:''}</h3>`+list.map(item).join('');
     if(target){const el=document.getElementById('acc-'+target);if(el&&!render.done){render.done=true;setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'center'}),300)}}}
@@ -38,7 +38,7 @@
       try{await rawDb.collection(A.COL).doc(a.id).update({reply:t,replyAt:firebase.firestore.FieldValue.serverTimestamp(),replyUid:uid,status:'replied'})}
       catch(err){console.error(err);b.disabled=false;b.textContent='إرسال الرد';toast('تعذّر إرسال الرد، حاول مرة أخرى.')}}
     else if(b.hasAttribute('data-pdf')){b.disabled=true;try{A.download(await A.pdfFile({...a,teacherFull:fullName(a)}))}catch(err){toast('تعذّر إنشاء PDF.')}finally{b.disabled=false}}
-    else if(b.hasAttribute('data-wa')){A.sharePdfWa({...a,teacherFull:fullName(a)},a.replyPhone,waText(a),b,toast)}});
+    else if(b.hasAttribute('data-wa')){A.sharePdfWa({...a,teacherFull:fullName(a)},A.ADMIN_PHONE,waText(a),b,toast)}});
   function waitProfile(user,tries=0){if(auth.currentUser!==user)return;if(typeof profile!=='undefined'&&profile&&profile.scheduleName){listen(profile.scheduleName);return}if(tries<60)setTimeout(()=>waitProfile(user,tries+1),250)}
   function listen(name){if(stop)stop();stop=rawDb.collection(A.COL).where('teacher','==',name).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+String((d.data().decidedAt&&d.data().decidedAt.seconds)||'')})).sort((x,y)=>((y.createdAt&&y.createdAt.seconds)||9e9)-((x.createdAt&&x.createdAt.seconds)||9e9));render()},()=>{list=[];render()})}
   auth.onAuthStateChanged(user=>{if(stop){stop();stop=null}list=[];render();uid=user?user.uid:null;if(user)waitProfile(user)});

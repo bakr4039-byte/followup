@@ -45,7 +45,7 @@
      <div class="field"><label for="acDate">تاريخ المخالفة <small id="acHijri" style="color:var(--muted)"></small></label><input id="acDate" type="date"></div>
      <div class="field"><label for="acTime">الوقت</label><select id="acTime"></select></div>
      <div class="field"><label for="acMon">قام برصد المخالفة</label><select id="acMon"></select></div>
-     <div class="field"><label for="acPhone">واتساب الإدارة لاستقبال رد المعلم</label><input id="acPhone" inputmode="tel" placeholder="05xxxxxxxx"></div>
+     <div class="field"><label for="acPhone">واتساب الإدارة لاستقبال رد المعلم</label><input id="acPhone" inputmode="tel" readonly title="رقم ثابت لجميع المساءلات" style="opacity:.85"></div>
     </div>
     <div class="field"><label>المخالفات <small style="color:var(--muted)">(اختر واحدة أو أكثر)</small></label><div id="acCats" style="display:grid;gap:8px"></div></div>
     <div class="field"><label for="acOther">مخالفة أخرى (اختياري)</label><input id="acOther" class="acc-in" maxlength="200"></div>
@@ -63,10 +63,10 @@
   function paintForm(){const sel=$a('acT');const cur=sel.value;sel.innerHTML='<option value="">— اختر المعلم —</option>'+teachers().map(t=>`<option>${esc(t)}</option>`).join('');sel.value=cur;
     if(!$a('acTime').options.length){$a('acTime').innerHTML=A.TIMES.map(t=>`<option>${esc(t)}</option>`).join('');$a('acMon').innerHTML=A.MONITORS.map(t=>`<option>${esc(t)}</option>`).join('');
       $a('acCats').innerHTML=A.CATS.map((c,ci)=>`<details class="acc-cat" ${ci===0?'open':''}><summary>${esc(c.t)}<small data-cnt="${ci}"></small></summary><div class="acc-items">${c.items.map((x,i)=>`<label><input type="checkbox" data-acc="${ci}-${i}">${esc(x)}</label>`).join('')}</div></details>`).join('')}
-    if(!$a('acDate').value)$a('acDate').value=A.riyadhISO();$a('acPhone').value=$a('acPhone').value||lsGet(LS);paintHijri()}
+    if(!$a('acDate').value)$a('acDate').value=A.riyadhISO();$a('acPhone').value='0562518196';paintHijri()}
   function paintHijri(){const d=$a('acDate').value;$a('acHijri').textContent=d?`· ${A.dayName(d)} ${A.hijri(d)}هـ`:''}
   function picked(){return [...$a('acCats').querySelectorAll('input[data-acc]:checked')].map(x=>{const[ci,i]=x.dataset.acc.split('-').map(Number);return A.CATS[ci].items[i]})}
-  function draft(){return {teacher:$a('acT').value,teacherFull:$a('acFull').value.trim()||$a('acT').value,date:$a('acDate').value,time:$a('acTime').value,monitor:$a('acMon').value,items:picked(),other:$a('acOther').value.trim(),details:$a('acDetails').value.trim(),teacherPhone:A.normPhone($a('acTPhone').value),replyPhone:A.normPhone($a('acPhone').value)}}
+  function draft(){return {teacher:$a('acT').value,teacherFull:$a('acFull').value.trim()||$a('acT').value,date:$a('acDate').value,time:$a('acTime').value,monitor:$a('acMon').value,items:picked(),other:$a('acOther').value.trim(),details:$a('acDetails').value.trim(),teacherPhone:A.normPhone($a('acTPhone').value),replyPhone:A.ADMIN_PHONE}}
   const phoneOf=t=>(state.phones&&state.phones[t])||'';
   $a('acT').onchange=()=>{const t=$a('acT').value;$a('acFull').value=t?fullOf(t):'';$a('acTPhone').value=t?phoneOf(t):''};
   $a('acDate').oninput=paintHijri;
@@ -76,7 +76,6 @@
   function teacherMsg(a,id){const ph=tPhone(a);return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم مساءلة إدارية بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة السبب وإرساله:',portal(id)].join('\n')}}
   $a('acSave').onclick=async()=>{const d=draft();const msg=$a('acMsg');
     if(!d.teacher){msg.textContent='اختر المعلم أولاً.';return}if(!d.items.length&&!d.other){msg.textContent='اختر مخالفة واحدة على الأقل أو اكتب مخالفة أخرى.';return}if(!d.date){msg.textContent='حدد تاريخ المخالفة.';return}
-    if(d.replyPhone)lsSet(LS,d.replyPhone);
     // نفتح نافذة الواتساب فورًا (قبل انتظار الحفظ) حتى لا يحجبها المتصفح
     const ph=d.teacherPhone;const win=ph?window.open('about:blank','_blank'):null;
     $a('acSave').disabled=true;msg.textContent='جارٍ الحفظ…';

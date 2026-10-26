@@ -94,5 +94,6 @@
     else if(canShare(f)){try{await navigator.share({files:[f]})}catch(e){}return}
     download(f);root.open(waUrl(phone,text),'_blank','noopener');notify&&notify('تم تحميل PDF — أرفقه في محادثة الواتساب التي فُتحت')}
 
-  root.ACC={COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
+  const ADMIN_PHONE='966562518196'; // واتساب الإدارة الثابت لاستقبال ردود المعلمين
+  root.ACC={ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
 })(window);
