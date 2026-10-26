@@ -41,6 +41,7 @@
     <div class="acc-grid">
      <div class="field"><label for="acT">المعلم</label><select id="acT"></select></div>
      <div class="field"><label for="acFull">الاسم في النموذج</label><input id="acFull" class="acc-in"></div>
+     <div class="field"><label for="acTPhone">جوال المعلم (من المنصة)</label><input id="acTPhone" inputmode="tel" placeholder="لا يوجد رقم مسجّل — اكتبه هنا"></div>
      <div class="field"><label for="acDate">تاريخ المخالفة <small id="acHijri" style="color:var(--muted)"></small></label><input id="acDate" type="date"></div>
      <div class="field"><label for="acTime">الوقت</label><select id="acTime"></select></div>
      <div class="field"><label for="acMon">قام برصد المخالفة</label><select id="acMon"></select></div>
@@ -65,30 +66,32 @@
     if(!$a('acDate').value)$a('acDate').value=A.riyadhISO();$a('acPhone').value=$a('acPhone').value||lsGet(LS);paintHijri()}
   function paintHijri(){const d=$a('acDate').value;$a('acHijri').textContent=d?`· ${A.dayName(d)} ${A.hijri(d)}هـ`:''}
   function picked(){return [...$a('acCats').querySelectorAll('input[data-acc]:checked')].map(x=>{const[ci,i]=x.dataset.acc.split('-').map(Number);return A.CATS[ci].items[i]})}
-  function draft(){return {teacher:$a('acT').value,teacherFull:$a('acFull').value.trim()||$a('acT').value,date:$a('acDate').value,time:$a('acTime').value,monitor:$a('acMon').value,items:picked(),other:$a('acOther').value.trim(),details:$a('acDetails').value.trim(),replyPhone:A.normPhone($a('acPhone').value)}}
-  $a('acT').onchange=()=>{$a('acFull').value=$a('acT').value?fullOf($a('acT').value):''};
+  function draft(){return {teacher:$a('acT').value,teacherFull:$a('acFull').value.trim()||$a('acT').value,date:$a('acDate').value,time:$a('acTime').value,monitor:$a('acMon').value,items:picked(),other:$a('acOther').value.trim(),details:$a('acDetails').value.trim(),teacherPhone:A.normPhone($a('acTPhone').value),replyPhone:A.normPhone($a('acPhone').value)}}
+  const phoneOf=t=>(state.phones&&state.phones[t])||'';
+  $a('acT').onchange=()=>{const t=$a('acT').value;$a('acFull').value=t?fullOf(t):'';$a('acTPhone').value=t?phoneOf(t):''};
   $a('acDate').oninput=paintHijri;
   $a('acCats').addEventListener('change',()=>A.CATS.forEach((c,ci)=>{const n=$a('acCats').querySelectorAll(`input[data-acc^="${ci}-"]:checked`).length;const el=$a('acCats').querySelector(`[data-cnt="${ci}"]`);if(el)el.textContent=n?`(${n})`:''}));
   $a('acPreview').onclick=()=>{const p=$a('acPrev');if(!p.hidden){p.hidden=true;$a('acPreview').textContent='معاينة النموذج';return}p.innerHTML=`<style>${A.CSS}</style>`+A.formHTML(draft());p.hidden=false;$a('acPreview').textContent='إخفاء المعاينة';setTimeout(()=>p.scrollIntoView({behavior:'smooth',block:'start'}),50)};
-  function teacherMsg(a,id){const ph=state.phones&&state.phones[a.teacher];return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم مساءلة إدارية بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة السبب وإرساله:',portal(id)].join('\n')}}
+  const tPhone=a=>A.normPhone(a.teacherPhone||phoneOf(a.teacher));
+  function teacherMsg(a,id){const ph=tPhone(a);return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم مساءلة إدارية بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة السبب وإرساله:',portal(id)].join('\n')}}
   $a('acSave').onclick=async()=>{const d=draft();const msg=$a('acMsg');
     if(!d.teacher){msg.textContent='اختر المعلم أولاً.';return}if(!d.items.length&&!d.other){msg.textContent='اختر مخالفة واحدة على الأقل أو اكتب مخالفة أخرى.';return}if(!d.date){msg.textContent='حدد تاريخ المخالفة.';return}
     if(d.replyPhone)lsSet(LS,d.replyPhone);
     // نفتح نافذة الواتساب فورًا (قبل انتظار الحفظ) حتى لا يحجبها المتصفح
-    const ph=A.normPhone(state.phones&&state.phones[d.teacher]);const win=ph?window.open('about:blank','_blank'):null;
+    const ph=d.teacherPhone;const win=ph?window.open('about:blank','_blank'):null;
     $a('acSave').disabled=true;msg.textContent='جارٍ الحفظ…';
     try{const ref=fs().collection(A.COL).doc();await ref.set({...d,status:'sent',createdAt:firebase.firestore.FieldValue.serverTimestamp(),createdBy:state.uid||(firebase.auth().currentUser||{}).uid||''});
       const m=teacherMsg(d,ref.id);if(win){win.location.href=A.waUrl(m.phone,m.text)}
-      msg.textContent=ph?'تم حفظ المساءلة وفتح الواتساب للمعلم.':'تم حفظ المساءلة. لا يوجد رقم جوال لهذا المعلم — أضفه من «تقارير المعلمين» ثم أرسل من السجل.';
+      msg.textContent=ph?'تم حفظ المساءلة وفتح الواتساب للمعلم.':'تم حفظ المساءلة. لا يوجد رقم جوال لهذا المعلم — اكتبه في خانة «جوال المعلم» في المرة القادمة أو أضفه من «تقارير المعلمين».';
       toast('تم حفظ المساءلة');$a('acCats').querySelectorAll('input:checked').forEach(x=>x.checked=false);$a('acCats').dispatchEvent(new Event('change'));$a('acOther').value='';$a('acDetails').value='';$a('acPrev').hidden=true;setTab('log')}
     catch(e){if(win)win.close();console.error(e);const em=e&&e.code==='permission-denied'?'لم تُحفظ المساءلة: قواعد الأمان الجديدة غير منشورة في Firebase بعد.\nمن الإعدادات ← القواعد انسخ القواعد، ثم الصقها في Firebase Console ← Firestore ← Rules واضغط Publish.':'تعذّر الحفظ، حاول مرة أخرى.';msg.textContent=em;alert(em)}
     finally{$a('acSave').disabled=false}};
 
   // ---------- log ----------
   const when=a=>a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():0;
-  function card(a){const st=a.status||'sent';const ph=A.normPhone(state.phones&&state.phones[a.teacher]);const act=+a.action||0;
+  function card(a){const st=a.status||'sent';const ph=tPhone(a);const act=+a.action||0;
     return `<article class="acc-card" data-id="${esc(a.id)}"><div class="top"><h4>${esc(a.teacher)}</h4><span class="acc-st ${esc(st)}">${esc(A.STATUS[st]||st)}</span></div>
-     <div class="muted">${esc(A.dayName(a.date))} ${esc(A.hijri(a.date))}هـ · ${esc(a.time||'')} · رصدها: ${esc(a.monitor||'—')}</div>
+     <div class="muted">${esc(A.dayName(a.date))} ${esc(A.hijri(a.date))}هـ · ${esc(a.time||'')} · رصدها: ${esc(a.monitor||'—')} · جوال المعلم: <span dir="ltr">${ph?'+'+esc(ph):'غير مسجّل'}</span></div>
      <div>${A.subjectText(a).map(x=>esc(x)).join('<br>')}</div>
      ${a.reply?`<div><b style="font-size:13px">رد المعلم (${esc(A.hijri(A.isoOf(a.replyAt)))}هـ):</b><div class="acc-reply">${esc(a.reply)}</div></div>`:''}
      ${st!=='sent'?`<div class="acc-dec"><label class="field"><span style="font-size:13px;font-weight:600">قرار المسؤول المباشر</span><textarea class="acc-in" data-dec maxlength="600">${esc(a.decision||'')}</textarea></label>
@@ -105,7 +108,7 @@
   $a('acList').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const el=b.closest('[data-id]');const a=list.find(x=>x.id===el.dataset.id);if(!a)return;
     if(b.hasAttribute('data-acc-wa')){const m=teacherMsg(a,a.id);window.open(A.waUrl(m.phone,m.text),'_blank','noopener')}
     else if(b.hasAttribute('data-acc-pdf')){b.disabled=true;try{A.download(await A.pdfFile(a))}catch(err){toast('تعذّر إنشاء PDF')}finally{b.disabled=false}}
-    else if(b.hasAttribute('data-acc-pdfwa')){const text=`السلام عليكم ورحمة الله، أ. ${a.teacher}\nمرفق نموذج المساءلة${a.status==='decided'?' متضمنًا القرار والإجراء المتخذ':''}.`;A.sharePdfWa(a,state.phones&&state.phones[a.teacher],text,b,toast)}
+    else if(b.hasAttribute('data-acc-pdfwa')){const text=`السلام عليكم ورحمة الله، أ. ${a.teacher}\nمرفق نموذج المساءلة${a.status==='decided'?' متضمنًا القرار والإجراء المتخذ':''}.`;A.sharePdfWa(a,tPhone(a),text,b,toast)}
     else if(b.hasAttribute('data-acc-view')){const p=el.querySelector('[data-prev]');if(!p.hidden){p.hidden=true;return}p.innerHTML=`<style>${A.CSS}</style>`+A.formHTML(a);p.hidden=false}
     else if(b.hasAttribute('data-acc-dec')){const dec=el.querySelector('[data-dec]').value.trim();const r=el.querySelector('input[type=radio]:checked');if(!dec&&!r){toast('اكتب القرار أو اختر الإجراء');return}
       b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({decision:dec,action:r?+r.value:0,amount:el.querySelector('[data-amount]').value.trim(),penalty:el.querySelector('[data-penalty]').value.trim(),status:'decided',decidedAt:firebase.firestore.FieldValue.serverTimestamp(),decidedBy:(firebase.auth().currentUser||{}).uid||''});toast('تم حفظ القرار')}catch(err){toast('تعذّر حفظ القرار')}finally{b.disabled=false}}});
