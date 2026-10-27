@@ -87,6 +87,14 @@
      في الكمبيوتر: يُحمَّل الملف ويُفتح واتساب برسالة للمستلم لإرفاق الملف. */
   const cache=new Map();
   async function sharePdfWa(a,phone,text,btn,notify){const key=a.id+'|'+(a.updatedKey||'');let f=cache.get(key);
+    // عند وجود رقم: نفتح محادثة واتساب مع صاحب الرقم مباشرة (النافذة تُفتح فورًا حتى لا يحجبها المتصفح) ونحمّل الملف لإرفاقه
+    const ph=normPhone(phone);
+    if(ph){const win=root.open('about:blank','_blank');
+      if(!f){const label=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.textContent='جارٍ تجهيز PDF…'}
+        try{f=await pdfFile(a);cache.set(key,f)}catch(e){if(win)win.close();if(btn){btn.disabled=false;btn.textContent=label}notify&&notify('تعذّر إنشاء ملف PDF، أعد تحميل الصفحة');return}
+        if(btn){btn.disabled=false;btn.textContent=label}}
+      download(f);const url=waUrl(ph,text);if(win)win.location.href=url;else root.location.href=url;
+      notify&&notify('تم تحميل PDF — أرفقه في محادثة الواتساب التي فُتحت');return}
     if(!f){const label=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.textContent='جارٍ تجهيز PDF…'}
       try{f=await pdfFile(a);cache.set(key,f)}catch(e){if(btn){btn.disabled=false;btn.textContent=label}notify&&notify('تعذّر إنشاء ملف PDF، أعد تحميل الصفحة');return}
       if(btn){btn.disabled=false;btn.textContent=label}
