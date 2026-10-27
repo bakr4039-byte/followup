@@ -13,6 +13,7 @@
   const LS='acc-reply-phone';
   const lsGet=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}},lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
   const portal=id=>new URL('teacher.html#acc-'+id,location.href).href;
+  const pdfLink=id=>new URL('teacher.html#acc-'+id+'-pdf',location.href).href;
   let list=[],stop=null,tab='new';
 
   // ---------- markup ----------
@@ -117,7 +118,10 @@
   $a('acList').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const el=b.closest('[data-id]');const a=list.find(x=>x.id===el.dataset.id);if(!a)return;
     if(b.hasAttribute('data-acc-wa')){const m=teacherMsg(a,a.id);window.open(A.waUrl(m.phone,m.text),'_blank','noopener')}
     else if(b.hasAttribute('data-acc-pdf')){b.disabled=true;try{A.download(await A.pdfFile(a))}catch(err){toast('تعذّر إنشاء PDF')}finally{b.disabled=false}}
-    else if(b.hasAttribute('data-acc-pdfwa')){const text=`السلام عليكم ورحمة الله، أ. ${a.teacher}\nمرفق نموذج المساءلة${a.status==='decided'?' متضمنًا القرار والإجراء المتخذ':''}.`;A.sharePdfWa(a,tPhone(a),text,b,toast)}
+    else if(b.hasAttribute('data-acc-pdfwa')){const ph=tPhone(a);
+      // يُرسل للمعلم على رقمه رابطًا يفتح حسابه ويحمّل نموذج المساءلة PDF مباشرة (واتساب لا يسمح للمواقع بإرفاق ملف تلقائيًا)
+      if(ph){const text=[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,`نموذج المساءلة بتاريخ ${A.hijri(a.date)}هـ${a.status==='decided'?' متضمنًا القرار والإجراء المتخذ':''}.`,'لتحميل النموذج PDF افتح الرابط وسجّل الدخول:',pdfLink(a.id)].join('\n');window.open(A.waUrl(ph,text),'_blank','noopener')}
+      else{toast('لا يوجد رقم جوال لهذا المعلم — أضفه من «تعديل» أو «تقارير المعلمين».')}}
     else if(b.hasAttribute('data-acc-edit')){startEdit(a)}
     else if(b.hasAttribute('data-acc-del')){if(!confirm(`حذف مساءلة ${a.teacher} بتاريخ ${A.hijri(a.date)}هـ؟\nستختفي من السجل ومن حساب المعلم، ويمكن استرجاعها من «المحذوفة».`))return;b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({prevStatus:a.status||'sent',status:'deleted',deletedAt:firebase.firestore.FieldValue.serverTimestamp(),deletedBy:(firebase.auth().currentUser||{}).uid||''});if(editId===a.id){endEdit();resetForm()}toast('تم حذف المساءلة')}catch(err){b.disabled=false;toast('تعذّر الحذف')}}
     else if(b.hasAttribute('data-acc-restore')){b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({status:a.prevStatus||'sent'});toast('تم استرجاع المساءلة')}catch(err){b.disabled=false;toast('تعذّر الاسترجاع')}}
