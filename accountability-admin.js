@@ -106,7 +106,7 @@
      ${st!=='sent'&&st!=='deleted'?`<div class="acc-dec"><label class="field"><span style="font-size:13px;font-weight:600">قرار المسؤول المباشر</span><textarea class="acc-in" data-dec maxlength="600">${esc(a.decision||'')}</textarea></label>
        <div class="acc-radios">${A.ACTIONS.map((t,i)=>`<label><input type="radio" name="act-${esc(a.id)}" value="${i+1}" ${act===i+1?'checked':''}>${i+1}- ${esc(t)}</label>`).join('')}</div>
        <div class="acc-grid"><input class="acc-in" data-amount placeholder="مبلغ الحسم (للبند 4)" value="${esc(a.amount||'')}"><input class="acc-in" data-penalty placeholder="مع عقوبة (للبند 4)" value="${esc(a.penalty||'')}"></div>
-       <div class="acc-acts"><button class="btn" data-acc-dec>حفظ القرار</button></div></div>`:''}
+       <div class="acc-acts"><button class="btn" data-acc-dec>إرسال</button></div></div>`:''}
      <div class="acc-acts">${ph?`<button class="btn ghost" data-acc-wa>واتساب للمعلم (رابط الرد)</button>`:'<span class="muted">لا يوجد رقم جوال للمعلم</span>'}<button class="btn ghost" data-acc-pdfwa>إرسال النموذج PDF واتساب</button><button class="btn ghost" data-acc-pdf>تحميل PDF</button><button class="btn ghost" data-acc-view>معاينة</button>${st==='deleted'?'<button class="btn ghost" data-acc-restore>استرجاع</button>':'<button class="btn ghost" data-acc-edit>تعديل</button><button class="btn ghost" data-acc-del style="color:var(--bad)">حذف</button>'}</div>
      <div class="acc-prev" data-prev hidden></div></article>`}
   function paintList(){const q=$a('acSearch').value.trim(),f=$a('acFilter').value;const live=list.filter(a=>a.status!=='deleted');const rows=(f==='deleted'?list.filter(a=>a.status==='deleted'):live.filter(a=>!f||(a.status||'sent')===f)).filter(a=>!q||String(a.teacher).includes(q));
@@ -123,7 +123,7 @@
     else if(b.hasAttribute('data-acc-restore')){b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({status:a.prevStatus||'sent'});toast('تم استرجاع المساءلة')}catch(err){b.disabled=false;toast('تعذّر الاسترجاع')}}
     else if(b.hasAttribute('data-acc-view')){const p=el.querySelector('[data-prev]');if(!p.hidden){p.hidden=true;return}p.innerHTML=`<style>${A.CSS}</style>`+A.formHTML(a);p.hidden=false}
     else if(b.hasAttribute('data-acc-dec')){const dec=el.querySelector('[data-dec]').value.trim();const r=el.querySelector('input[type=radio]:checked');if(!dec&&!r){toast('اكتب القرار أو اختر الإجراء');return}
-      b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({decision:dec,action:r?+r.value:0,amount:el.querySelector('[data-amount]').value.trim(),penalty:el.querySelector('[data-penalty]').value.trim(),status:'decided',decidedAt:firebase.firestore.FieldValue.serverTimestamp(),decidedBy:(firebase.auth().currentUser||{}).uid||''});toast('تم حفظ القرار')}catch(err){toast('تعذّر حفظ القرار')}finally{b.disabled=false}}});
+      b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({decision:dec,action:r?+r.value:0,amount:el.querySelector('[data-amount]').value.trim(),penalty:el.querySelector('[data-penalty]').value.trim(),status:'decided',decidedAt:firebase.firestore.FieldValue.serverTimestamp(),decidedBy:(firebase.auth().currentUser||{}).uid||''});toast('تم إرسال القرار')}catch(err){toast('تعذّر إرسال القرار')}finally{b.disabled=false}}});
 
   // ---------- drawer ----------
   function setTab(t){tab=t;document.querySelectorAll('[data-acctab]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.acctab===t)));$a('acNew').hidden=t!=='new';$a('acLog').hidden=t!=='log';if(t==='log')paintList()}
