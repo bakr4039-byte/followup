@@ -3,7 +3,7 @@
   'use strict';
   if(!window.ACC||typeof auth==='undefined'||typeof rawDb==='undefined')return;
   const A=window.ACC,esc=A.esc;
-  const target=(location.hash.match(/^#acc-([A-Za-z0-9]+)$/)||[])[1]||'';
+  const hm=location.hash.match(/^#acc-([A-Za-z0-9]+)(-pdf)?$/)||[];const target=hm[1]||'';const wantPdf=!!hm[2];
   let list=[],stop=null,uid=null;
   const css=document.createElement('style');css.textContent=`
   .acc-sec{margin:18px 0 22px;display:grid;gap:12px}.acc-sec>h3{margin:0;font-size:18px}
@@ -17,7 +17,7 @@
   document.head.appendChild(css);
   const sec=document.createElement('section');sec.className='acc-sec';sec.id='accSec';sec.hidden=true;sec.setAttribute('aria-label','المساءلات');
   const welcome=document.querySelector('#account .welcome');if(welcome)welcome.after(sec);
-  if(target){const f=document.getElementById('form');if(f){const n=document.createElement('p');n.className='acc-login';n.textContent='لديك مساءلة إدارية — سجّل الدخول لقراءتها وكتابة السبب.';f.before(n)}}
+  if(target){const f=document.getElementById('form');if(f){const n=document.createElement('p');n.className='acc-login';n.textContent=wantPdf?'سجّل الدخول لتحميل نموذج المساءلة PDF.':'لديك مساءلة إدارية — سجّل الدخول لقراءتها وكتابة السبب.';f.before(n)}}
   const toast=t=>{const e=document.getElementById('dataError');if(e){e.textContent=t;setTimeout(()=>{if(e.textContent===t)e.textContent=''},5000)}};
   const fullName=a=>a.teacherFull||(typeof profile!=='undefined'&&profile&&profile.name)||a.teacher;
   function item(a){const st=a.status||'sent';const act=+a.action||0;
@@ -26,10 +26,12 @@
      ${st==='sent'?`<label><b>السبب / إجابتك</b><textarea data-reply maxlength="1500" placeholder="اكتب سبب المخالفة هنا…"></textarea></label><div class="actions"><button class="btn primary" data-send>إرسال الرد</button></div>`
        :`<div><b>إجابتك:</b><div class="acc-box">${esc(a.reply||'')}</div></div>`}
      ${st==='decided'?`<div><b>قرار الإدارة:</b><div class="acc-box">${esc(a.decision||'—')}${act?`\nالإجراء: ${esc(A.ACTIONS[act-1])}`:''}</div></div>`:''}
-     ${st!=='sent'?`<div class="actions"><button class="btn primary" data-wa>إرسال المساءلة PDF واتساب للإدارة</button><button class="btn" data-pdf>تحميل المساءلة PDF</button></div>`:''}</article>`}
+     <div class="actions">${st!=='sent'?'<button class="btn primary" data-wa>إرسال المساءلة PDF واتساب للإدارة</button>':''}<button class="btn" data-pdf>تحميل نموذج المساءلة PDF</button></div></article>`}
   function render(){sec.hidden=!list.length;if(!list.length){sec.innerHTML='';return}const need=list.filter(a=>(a.status||'sent')==='sent').length;
     sec.innerHTML=`<h3>المساءلات${need?` <span class="acc-st">${need} بانتظار ردك</span>`:''}</h3>`+list.map(item).join('');
-    if(target){const el=document.getElementById('acc-'+target);if(el&&!render.done){render.done=true;setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'center'}),300)}}}
+    if(target){const el=document.getElementById('acc-'+target);if(el&&!render.done){render.done=true;setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'center'}),300);
+      // رابط «-pdf» من واتساب الإدارة: نحمّل نموذج المساءلة تلقائيًا مرة واحدة
+      if(wantPdf){const a=list.find(x=>x.id===target);if(a)A.pdfFile({...a,teacherFull:fullName(a)}).then(f=>{A.download(f);toast('تم تحميل نموذج المساءلة PDF — إن لم يظهر اضغط «تحميل نموذج المساءلة PDF».')}).catch(()=>{})}}}}
   function waText(a){return [`السلام عليكم ورحمة الله`,`ردّ المعلم ${fullName(a)} على المساءلة بتاريخ ${A.hijri(a.date)}هـ:`,'',a.reply||''].join('\n')}
   sec.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const el=b.closest('.acc-item');const a=list.find(x=>'acc-'+x.id===el.id);if(!a)return;
     if(b.hasAttribute('data-send')){const t=el.querySelector('[data-reply]').value.trim();if(t.length<3){toast('اكتب السبب أولاً.');return}
