@@ -69,7 +69,14 @@ service cloud.firestore {
   function teacherName() { return get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.get('scheduleName', '-'); }
   match /accountability/{id} {
     allow read: if admin() || teacher() && resource.data.teacher == teacherName();
-    allow create, update: if admin();
+    allow create: if admin() && !request.resource.data.keys().hasAny(['archivedAt','archivePdf']);
+    allow update: if admin() && !resource.data.keys().hasAny(['archivedAt']) &&
+      (!request.resource.data.keys().hasAny(['archivedAt']) ||
+       resource.data.status == 'decided' && request.resource.data.status == 'decided' &&
+       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['archivePdf','archiveFileName','archiveVersion','archiveClosedDate','archiveActor','archivedAt','archivedBy']) &&
+       request.resource.data.archivedAt == request.time && request.resource.data.archivedBy == request.auth.uid &&
+       request.resource.data.archiveActor == request.auth.uid && request.resource.data.archiveVersion == 1 &&
+       request.resource.data.archivePdf is string && request.resource.data.archivePdf.size() > 0 && request.resource.data.archivePdf.size() < 910000);
     allow update: if teacher() && resource.data.teacher == teacherName() && resource.data.status == 'sent' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply','replyAt','replyUid','status']) && request.resource.data.status == 'replied' && request.resource.data.replyUid == request.auth.uid && request.resource.data.replyAt == request.time && request.resource.data.reply is string && request.resource.data.reply.size() > 0 && request.resource.data.reply.size() <= 1500;
     allow delete: if false;
   }

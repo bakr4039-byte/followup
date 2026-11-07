@@ -4,7 +4,7 @@
   if(!window.ACC||typeof auth==='undefined'||typeof rawDb==='undefined')return;
   const A=window.ACC,esc=A.esc;
   const hm=location.hash.match(/^#acc-([A-Za-z0-9]+)(-pdf)?$/)||[];const target=hm[1]||'';const wantPdf=!!hm[2];
-  let list=[],stop=null,uid=null;
+  let list=[],stop=null,uid=null,query='',month='',statusFilter='';
   const css=document.createElement('style');css.textContent=`
   .acc-sec{margin:18px 0 22px;display:grid;gap:12px}.acc-sec>h3{margin:0;font-size:18px}
   .acc-item{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px 18px;display:grid;gap:10px}
@@ -21,20 +21,24 @@
   const toast=t=>{const e=document.getElementById('dataError');if(e){e.textContent=t;setTimeout(()=>{if(e.textContent===t)e.textContent=''},5000)}};
   const fullName=a=>a.teacherFull||(typeof profile!=='undefined'&&profile&&profile.name)||a.teacher;
   function item(a){const st=a.status||'sent';const act=+a.action||0;
-    return `<article class="acc-item ${st==='sent'?'need':''} ${a.id===target?'hl':''}" id="acc-${esc(a.id)}"><div class="top"><h4>مساءلة · ${esc(A.dayName(a.date))} ${esc(A.hijri(a.date))}هـ</h4><span class="acc-st ${esc(st)}">${st==='sent'?'مطلوب ردك':st==='replied'?'تم إرسال ردك · قيد المراجعة':'تم اتخاذ القرار'}</span></div>
-     <div><b>أرجو بيان سبب ما يلي:</b><ul>${A.subjectText(a).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+    return `<article class="acc-item ${st==='sent'?'need':''} ${a.id===target?'hl':''}" id="acc-${esc(a.id)}"><div class="top"><h4>مساءلة · ${esc(A.dayName(a.date))} ${esc(A.hijri(a.date))}هـ</h4><span class="acc-st ${esc(st)}">${a.archivedAt?'مغلقة ومؤرشفة':st==='sent'?'مطلوب ردك':st==='replied'?'تم إرسال ردك · قيد المراجعة':'تم اتخاذ القرار'}</span></div>
+     <div class="acc-box">رقم المساءلة: ${esc(a.id)} · تاريخ الواقعة: ${esc(a.date||'—')} · تاريخ الإغلاق: ${esc(A.isoOf(a.archivedAt)||'لم تغلق بعد')}</div><div><b>أرجو بيان سبب ما يلي:</b><ul>${A.subjectText(a).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
      ${st==='sent'?`<label><b>السبب / إجابتك</b><textarea data-reply maxlength="1500" placeholder="اكتب سبب المخالفة هنا…"></textarea></label><div class="actions"><button class="btn primary" data-send>إرسال الرد</button></div>`
        :`<div><b>إجابتك:</b><div class="acc-box">${esc(a.reply||'')}</div></div>`}
      ${st==='decided'?`<div><b>قرار الإدارة:</b><div class="acc-box">${esc(a.decision||'—')}${act?`\nالإجراء: ${esc(A.ACTIONS[act-1])}`:''}</div></div>`:''}
-     <div class="actions">${st!=='sent'?'<button class="btn primary" data-wa>إرسال المساءلة PDF واتساب للإدارة</button>':''}<button class="btn" data-pdf>تحميل نموذج المساءلة PDF</button></div></article>`}
-  function render(){sec.hidden=!list.length;if(!list.length){sec.innerHTML='';return}const need=list.filter(a=>(a.status||'sent')==='sent').length;
-    sec.innerHTML=`<h3>المساءلات${need?` <span class="acc-st">${need} بانتظار ردك</span>`:''}</h3>`+list.map(item).join('');
+     <div class="actions">${a.archivedAt?'<button class="btn" data-view>عرض PDF النهائي</button>':''}${st!=='sent'?'<button class="btn primary" data-wa>إرسال المساءلة PDF واتساب للإدارة</button>':''}<button class="btn" data-pdf>تحميل نموذج المساءلة PDF</button></div></article>`}
+  function render(){sec.hidden=!uid;if(!uid){sec.innerHTML='';return}const need=list.filter(a=>(a.status||'sent')==='sent').length;
+    const rows=list.filter(a=>(!query||[a.id,...A.subjectText(a)].join(' ').includes(query))&&(!month||(a.date||'').startsWith(month))&&(!statusFilter||(statusFilter==='archived'?!!a.archivedAt:!a.archivedAt)));
+    sec.innerHTML=`<h3>سجل المساءلات</h3><div class="acc-box">المفتوحة: ${list.filter(a=>!a.archivedAt).length} · المغلقة والمؤرشفة: ${list.filter(a=>a.archivedAt).length} · بانتظار ردك: ${need}</div><div class="actions"><input id="accQuery" aria-label="بحث بالرقم أو الموضوع" placeholder="بحث بالرقم أو الموضوع" value="${esc(query)}"><input id="accMonth" type="month" aria-label="السنة والشهر" value="${esc(month)}"><select id="accStatus" aria-label="حالة المساءلة"><option value="">كل المساءلات</option><option value="active">المفتوحة</option><option value="archived">المغلقة والمؤرشفة</option></select></div>`+(rows.map(item).join('')||'<p>لا توجد مساءلات مطابقة.</p>');
+    document.getElementById('accStatus').value=statusFilter;
+    document.getElementById('accQuery').onchange=e=>{query=e.target.value.trim();render()};document.getElementById('accMonth').onchange=e=>{month=e.target.value;render()};document.getElementById('accStatus').onchange=e=>{statusFilter=e.target.value;render()};
     if(target){const el=document.getElementById('acc-'+target);if(el&&!render.done){render.done=true;setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'center'}),300);
       // رابط «-pdf» من واتساب الإدارة: نحمّل نموذج المساءلة تلقائيًا مرة واحدة
       if(wantPdf){const a=list.find(x=>x.id===target);if(a)A.pdfFile({...a,teacherFull:fullName(a)}).then(f=>{A.download(f);toast('تم تحميل نموذج المساءلة PDF — إن لم يظهر اضغط «تحميل نموذج المساءلة PDF».')}).catch(()=>{})}}}}
   function waText(a){return [`السلام عليكم ورحمة الله`,`ردّ المعلم ${fullName(a)} على المساءلة بتاريخ ${A.hijri(a.date)}هـ:`,'',a.reply||''].join('\n')}
   sec.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const el=b.closest('.acc-item');const a=list.find(x=>'acc-'+x.id===el.id);if(!a)return;
-    if(b.hasAttribute('data-send')){const t=el.querySelector('[data-reply]').value.trim();if(t.length<3){toast('اكتب السبب أولاً.');return}
+    if(b.hasAttribute('data-view')){try{await A.viewPdf(a)}catch(err){toast('تعذر عرض PDF')}}
+    else if(b.hasAttribute('data-send')){if(a.archivedAt)return;const t=el.querySelector('[data-reply]').value.trim();if(t.length<3){toast('اكتب السبب أولاً.');return}
       if(!confirm('سيتم إرسال ردك للإدارة ولا يمكن تعديله بعد الإرسال. متابعة؟'))return;
       b.disabled=true;b.textContent='جارٍ الإرسال…';
       try{await rawDb.collection(A.COL).doc(a.id).update({reply:t,replyAt:firebase.firestore.FieldValue.serverTimestamp(),replyUid:uid,status:'replied'})}
@@ -42,6 +46,6 @@
     else if(b.hasAttribute('data-pdf')){b.disabled=true;try{A.download(await A.pdfFile({...a,teacherFull:fullName(a)}))}catch(err){toast('تعذّر إنشاء PDF.')}finally{b.disabled=false}}
     else if(b.hasAttribute('data-wa')){A.sharePdfWa({...a,teacherFull:fullName(a)},A.ADMIN_PHONE,waText(a),b,toast)}});
   function waitProfile(user,tries=0){if(auth.currentUser!==user)return;if(typeof profile!=='undefined'&&profile&&profile.scheduleName){listen(profile.scheduleName);return}if(tries<60)setTimeout(()=>waitProfile(user,tries+1),250)}
-  function listen(name){if(stop)stop();stop=rawDb.collection(A.COL).where('teacher','==',name).onSnapshot(snap=>{list=snap.docs.filter(d=>d.data().status!=='deleted').map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+String((d.data().decidedAt&&d.data().decidedAt.seconds)||'')})).sort((x,y)=>((y.createdAt&&y.createdAt.seconds)||9e9)-((x.createdAt&&x.createdAt.seconds)||9e9));render()},()=>{list=[];render()})}
-  auth.onAuthStateChanged(user=>{if(stop){stop();stop=null}list=[];render();uid=user?user.uid:null;if(user)waitProfile(user)});
+  function listen(name){if(stop)stop();stop=rawDb.collection(A.COL).where('teacher','==',name).onSnapshot(snap=>{list=snap.docs.filter(d=>d.data().status!=='deleted').map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+String((d.data().decidedAt&&d.data().decidedAt.seconds)||'')})).sort((x,y)=>(y.date||'').localeCompare(x.date||'')||((y.createdAt&&y.createdAt.seconds)||9e9)-((x.createdAt&&x.createdAt.seconds)||9e9));render()},()=>{toast('تعذر تحميل سجل المساءلات؛ أعد المحاولة.');list=[];render()})}
+  auth.onAuthStateChanged(user=>{if(stop){stop();stop=null}list=[];render();uid=user?user.uid:null;query='';month='';statusFilter='';render();if(user)waitProfile(user)});
 })();

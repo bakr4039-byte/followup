@@ -14,10 +14,11 @@
   const lsGet=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}},lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
   const portal=id=>new URL('teacher.html#acc-'+id,location.href).href;
   const pdfLink=id=>new URL('teacher.html#acc-'+id+'-pdf',location.href).href;
-  let list=[],stop=null,tab='new';
+  let list=[],stop=null,tab='log',scope='active';
 
   // ---------- markup ----------
   const css=document.createElement('style');css.textContent=`
+  #acLog table th,#acLog table td{padding:10px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top} .acc-timeline{line-height:1.9;padding-inline-start:22px}
   .acc-tabs{display:flex;gap:6px}.acc-tabs button{flex:1;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:8px;font-weight:600}.acc-tabs button[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft)}
   .acc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}@media(max-width:620px){.acc-grid{grid-template-columns:1fr}}
   .acc-grid select,.acc-grid input,.acc-in{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:9px 10px;color:var(--ink)}
@@ -35,7 +36,7 @@
   const anchor=document.getElementById('vSubs');if(anchor)anchor.after(btn);
   const wrap=document.createElement('div');wrap.innerHTML=`<div class="scrim" id="acScrim" hidden></div>
   <aside class="drawer wide" id="acDrawer" hidden role="dialog" aria-modal="true" aria-labelledby="acTitle">
-   <div class="drawer-head"><div class="row"><h2 id="acTitle">المساءلات</h2><button class="iconbtn" id="acClose">إغلاق</button></div>
+   <div class="drawer-head"><div class="row"><h2 id="acTitle">إدارة المساءلات</h2><button class="iconbtn" id="acClose">إغلاق</button></div>
     <p>اختر المعلم والمخالفة ثم احفظ — تُرسل للمعلم رسالة واتساب برابط حسابه ليكتب السبب، ويصلك رده هنا لتكمل القرار والإجراء.</p>
     <div class="acc-tabs"><button data-acctab="new" aria-pressed="true">مساءلة جديدة</button><button data-acctab="log" aria-pressed="false">السجل <span id="acCount"></span></button></div></div>
    <div class="drawer-body" id="acNew">
@@ -45,7 +46,7 @@
      <div class="field"><label for="acFull">الاسم في النموذج</label><input id="acFull" class="acc-in"></div>
      <div class="field"><label for="acTPhone">جوال المعلم (من المنصة)</label><input id="acTPhone" inputmode="tel" placeholder="لا يوجد رقم مسجّل — اكتبه هنا"></div>
      <div class="field"><label for="acDate">تاريخ المخالفة <small id="acHijri" style="color:var(--muted)"></small></label><input id="acDate" type="date"></div>
-     <div class="field"><label for="acTime">الوقت</label><select id="acTime"></select></div>
+     <div class="field"><label for="acDue">آخر موعد للرد (اختياري)</label><input id="acDue" type="date"></div><div class="field"><label for="acTime">الوقت</label><select id="acTime"></select></div>
      <div class="field"><label for="acMon">قام برصد المخالفة</label><select id="acMon"></select></div>
      <div class="field"><label for="acPhone">واتساب الإدارة لاستقبال رد المعلم</label><input id="acPhone" inputmode="tel" readonly title="رقم ثابت لجميع المساءلات" style="opacity:.85"></div>
     </div>
@@ -55,7 +56,7 @@
     <div class="acc-acts"><button class="btn" id="acSave">حفظ وإرسال واتساب للمعلم</button><button class="btn ghost" id="acPreview">معاينة النموذج</button><button class="btn ghost" id="acCancelEdit" hidden>إلغاء التعديل</button></div>
     <div class="acc-prev" id="acPrev" hidden></div>
    </div>
-   <div class="drawer-body" id="acLog" hidden><div class="acc-grid"><input id="acSearch" placeholder="بحث باسم المعلم"><select id="acFilter"><option value="">كل الحالات</option><option value="sent">بانتظار رد المعلم</option><option value="replied">بانتظار القرار</option><option value="decided">مكتملة</option><option value="deleted">المحذوفة</option></select></div><div id="acList" style="display:grid;gap:10px"></div></div>
+   <div class="drawer-body" id="acLog" hidden><div id="acStats" class="acc-grid"></div><div class="acc-tabs"><button id="acActive">تحتاج إجراء</button><button id="acArchive">الأرشيف</button></div><div class="acc-grid"><input id="acFrom" type="date" aria-label="من تاريخ"><input id="acTo" type="date" aria-label="إلى تاريخ"><select id="acType" aria-label="نوع المخالفة"><option value="">كل المخالفات</option></select><input id="acSearch" placeholder="بحث بالمعلم أو الرقم أو الموضوع" aria-label="بحث المساءلات"><select id="acFilter"><option value="">كل الحالات</option><option value="sent">بانتظار رد المعلم</option><option value="replied">بانتظار القرار</option><option value="decided">مكتملة</option><option value="archived">مغلقة ومؤرشفة</option><option value="deleted">المحذوفة</option></select></div><div id="acList" style="display:grid;gap:10px"></div></div>
    <div class="drawer-foot"><span class="note" id="acMsg"></span></div>
   </aside>`;
   document.body.append(...wrap.children);
@@ -68,7 +69,7 @@
     if(!$a('acDate').value)$a('acDate').value=A.riyadhISO();$a('acPhone').value='0562518196';paintHijri()}
   function paintHijri(){const d=$a('acDate').value;$a('acHijri').textContent=d?`· ${A.dayName(d)} ${A.hijri(d)}هـ`:''}
   function picked(){return [...$a('acCats').querySelectorAll('input[data-acc]:checked')].map(x=>{const[ci,i]=x.dataset.acc.split('-').map(Number);return A.CATS[ci].items[i]})}
-  function draft(){return {teacher:$a('acT').value,teacherFull:$a('acFull').value.trim()||$a('acT').value,date:$a('acDate').value,time:$a('acTime').value,monitor:$a('acMon').value,items:picked(),other:$a('acOther').value.trim(),details:$a('acDetails').value.trim(),teacherPhone:A.normPhone($a('acTPhone').value),replyPhone:A.ADMIN_PHONE}}
+  function draft(){return {teacher:$a('acT').value,teacherFull:$a('acFull').value.trim()||$a('acT').value,date:$a('acDate').value,replyDue:$a('acDue').value,time:$a('acTime').value,monitor:$a('acMon').value,items:picked(),other:$a('acOther').value.trim(),details:$a('acDetails').value.trim(),teacherPhone:A.normPhone($a('acTPhone').value),replyPhone:A.ADMIN_PHONE}}
   const phoneOf=t=>(state.phones&&state.phones[t])||'';
   $a('acT').onchange=()=>{const t=$a('acT').value;$a('acFull').value=t?fullOf(t):'';$a('acTPhone').value=t?phoneOf(t):''};
   $a('acDate').oninput=paintHijri;
@@ -77,15 +78,16 @@
   const tPhone=a=>A.normPhone(a.teacherPhone||phoneOf(a.teacher));
   function teacherMsg(a,id){const ph=tPhone(a);return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم مساءلة إدارية بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة السبب وإرساله:',portal(id)].join('\n')}}
   let editId=null;
-  function resetForm(){$a('acCats').querySelectorAll('input:checked').forEach(x=>x.checked=false);$a('acCats').dispatchEvent(new Event('change'));$a('acOther').value='';$a('acDetails').value='';$a('acPrev').hidden=true;$a('acPreview').textContent='معاينة النموذج'}
+  function resetForm(){$a('acCats').querySelectorAll('input:checked').forEach(x=>x.checked=false);$a('acCats').dispatchEvent(new Event('change'));$a('acOther').value='';$a('acDetails').value='';$a('acDue').value='';$a('acPrev').hidden=true;$a('acPreview').textContent='معاينة النموذج'}
   function endEdit(){editId=null;$a('acEditBar').hidden=true;$a('acCancelEdit').hidden=true;$a('acSave').textContent='حفظ وإرسال واتساب للمعلم'}
-  function startEdit(a){paintForm();resetForm();editId=a.id;const sel=$a('acT');if(![...sel.options].some(o=>o.value===a.teacher))sel.add(new Option(a.teacher,a.teacher));sel.value=a.teacher;$a('acFull').value=a.teacherFull||a.teacher;$a('acTPhone').value=a.teacherPhone||phoneOf(a.teacher);$a('acDate').value=a.date||'';$a('acTime').value=a.time||A.TIMES[0];if(a.monitor)$a('acMon').value=a.monitor;
+  function startEdit(a){paintForm();resetForm();editId=a.id;const sel=$a('acT');if(![...sel.options].some(o=>o.value===a.teacher))sel.add(new Option(a.teacher,a.teacher));sel.value=a.teacher;$a('acFull').value=a.teacherFull||a.teacher;$a('acTPhone').value=a.teacherPhone||phoneOf(a.teacher);$a('acDate').value=a.date||'';$a('acDue').value=a.replyDue||'';$a('acTime').value=a.time||A.TIMES[0];if(a.monitor)$a('acMon').value=a.monitor;
     const extra=[];(a.items||[]).forEach(x=>{let hit=null;A.CATS.forEach((c,ci)=>c.items.forEach((y,i)=>{if(!hit&&y===x)hit=ci+'-'+i}));if(hit){const cb=$a('acCats').querySelector(`input[data-acc="${hit}"]`);cb.checked=true;cb.closest('details').open=true}else extra.push(x)});$a('acCats').dispatchEvent(new Event('change'));
     $a('acOther').value=[...extra,a.other||''].filter(Boolean).join(' – ');$a('acDetails').value=a.details||'';paintHijri();
     $a('acEditBar').textContent=`تعديل مساءلة ${a.teacher} — ${A.hijri(a.date)}هـ`+(a.status&&a.status!=='sent'?' (تنبيه: المعلم ردّ عليها، والتعديل لا يغيّر رده)':'');$a('acEditBar').hidden=false;$a('acCancelEdit').hidden=false;$a('acSave').textContent='حفظ التعديل';$a('acMsg').textContent='';setTab('new');$a('acNew').scrollTop=0}
   $a('acCancelEdit').onclick=()=>{endEdit();resetForm();$a('acMsg').textContent=''};
   $a('acSave').onclick=async()=>{const d=draft();const msg=$a('acMsg');
     if(!d.teacher){msg.textContent='اختر المعلم أولاً.';return}if(!d.items.length&&!d.other&&!d.details){msg.textContent='اكتب سبب المساءلة: اختر مخالفة أو اكتب مخالفة أخرى أو التفاصيل.';return}if(!d.date){msg.textContent='حدد تاريخ المخالفة.';return}
+    if(editId&&list.find(a=>a.id===editId)?.archivedAt){msg.textContent='المساءلة مؤرشفة ولا يمكن تعديلها.';return}
     if(editId){$a('acSave').disabled=true;msg.textContent='جارٍ حفظ التعديل…';try{const {replyPhone,...upd}=d;await fs().collection(A.COL).doc(editId).update({...upd,editedAt:firebase.firestore.FieldValue.serverTimestamp(),editedBy:(firebase.auth().currentUser||{}).uid||''});endEdit();resetForm();msg.textContent='تم حفظ التعديل.';toast('تم حفظ التعديل');setTab('log')}catch(e){console.error(e);msg.textContent='تعذّر حفظ التعديل، حاول مرة أخرى.'}finally{$a('acSave').disabled=false}return}
     // نفتح نافذة الواتساب فورًا (قبل انتظار الحفظ) حتى لا يحجبها المتصفح
     const ph=d.teacherPhone;const win=ph?window.open('about:blank','_blank'):null;
@@ -98,25 +100,48 @@
     finally{$a('acSave').disabled=false}};
 
   // ---------- log ----------
+  const overdue=a=>(a.status||'sent')==='sent'&&a.replyDue&&a.replyDue<A.riyadhISO();
   const when=a=>a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():0;
   function card(a){const st=a.status||'sent';const ph=tPhone(a);const act=+a.action||0;
-    return `<article class="acc-card" data-id="${esc(a.id)}"><div class="top"><h4>${esc(a.teacher)}</h4><span class="acc-st ${esc(st)}">${esc(A.STATUS[st]||st)}</span></div>
+    return `<article class="acc-card" data-id="${esc(a.id)}"><div class="top"><h4>${esc(a.teacher)} · ${esc(a.id)}</h4><span class="acc-st ${esc(st)}">${a.archivedAt?'مغلقة ومؤرشفة':esc(A.STATUS[st]||st)}</span></div>
      <div class="muted">${esc(A.dayName(a.date))} ${esc(A.hijri(a.date))}هـ · ${esc(a.time||'')} · رصدها: ${esc(a.monitor||'—')} · جوال المعلم: <span dir="ltr">${ph?'+'+esc(ph):'غير مسجّل'}</span></div>
+     <ol class="acc-timeline"><li>إنشاء المساءلة: ${esc(A.isoOf(a.createdAt)||a.date||'—')} · ${esc(a.createdBy||a.monitor||'—')}</li><li>رد المعلم: ${esc(A.isoOf(a.replyAt)||(a.reply?'رد محفوظ · التاريخ غير مسجل':'بانتظار الرد'))} · ${esc(a.replyUid||a.teacher)}</li><li>قرار الإدارة: ${esc(A.isoOf(a.decidedAt)||(a.status==='decided'?'قرار محفوظ · التاريخ غير مسجل':'بانتظار القرار'))} · ${esc(a.decidedBy||'—')}</li><li>الإغلاق: ${esc(A.isoOf(a.archivedAt)||'لم تغلق بعد')} · ${esc(a.archivedBy||'—')}</li></ol>
+     ${a.replyDue?`<div>آخر موعد للرد: ${esc(a.replyDue)} ${overdue(a)?'· متأخرة':''}</div>`:''}
+     ${a.archivedAt?`<div class="acc-reply"><b>القرار النهائي:</b> ${esc(a.decision||'—')}<br>${esc(A.ACTIONS[(+a.action||0)-1]||'')} ${esc(a.amount||'')} ${esc(a.penalty||'')}</div>`:''}
      <div>${A.subjectText(a).map(x=>esc(x)).join('<br>')}</div>
      ${a.reply?`<div><b style="font-size:13px">رد المعلم (${esc(A.hijri(A.isoOf(a.replyAt)))}هـ):</b><div class="acc-reply">${esc(a.reply)}</div></div>`:''}
-     ${st!=='sent'&&st!=='deleted'?`<div class="acc-dec"><label class="field"><span style="font-size:13px;font-weight:600">قرار المسؤول المباشر</span><textarea class="acc-in" data-dec maxlength="600">${esc(a.decision||'')}</textarea></label>
+     ${st!=='sent'&&st!=='deleted'&&!a.archivedAt?`<div class="acc-dec"><label class="field"><span style="font-size:13px;font-weight:600">قرار المسؤول المباشر</span><textarea class="acc-in" data-dec maxlength="600">${esc(a.decision||'')}</textarea></label>
        <div class="acc-radios">${A.ACTIONS.map((t,i)=>`<label><input type="radio" name="act-${esc(a.id)}" value="${i+1}" ${act===i+1?'checked':''}>${i+1}- ${esc(t)}</label>`).join('')}</div>
        <div class="acc-grid"><input class="acc-in" data-amount placeholder="مبلغ الحسم (للبند 4)" value="${esc(a.amount||'')}"><input class="acc-in" data-penalty placeholder="مع عقوبة (للبند 4)" value="${esc(a.penalty||'')}"></div>
-       <div class="acc-acts"><button class="btn" data-acc-dec>إرسال</button></div></div>`:''}
-     <div class="acc-acts">${ph?`<button class="btn ghost" data-acc-wa>واتساب للمعلم (رابط الرد)</button>`:'<span class="muted">لا يوجد رقم جوال للمعلم</span>'}<button class="btn ghost" data-acc-pdfwa>إرسال النموذج PDF واتساب</button><button class="btn ghost" data-acc-pdf>تحميل PDF</button><button class="btn ghost" data-acc-view>معاينة</button>${st==='deleted'?'<button class="btn ghost" data-acc-restore>استرجاع</button>':'<button class="btn ghost" data-acc-edit>تعديل</button><button class="btn ghost" data-acc-del style="color:var(--bad)">حذف</button>'}</div>
+       <label class="field">قرار المشرف العام (إن وجد)<textarea class="acc-in" data-general maxlength="600">${esc(a.generalDecision||'')}</textarea></label><div class="acc-acts"><button class="btn" data-acc-dec>إرسال</button></div></div>`:''}
+     <div class="acc-acts">${st==='decided'&&!a.archivedAt?'<button class="btn" data-acc-archive>إغلاق المساءلة وأرشفتها</button>':''}${a.archivedAt?`<span>أغلقت: ${esc(A.isoOf(a.archivedAt))} · بواسطة ${esc(a.archivedBy||'—')}</span><button class="btn" data-acc-pdfview>عرض PDF النهائي</button>`:''}${ph?`<button class="btn ghost" data-acc-wa>واتساب للمعلم (رابط الرد)</button>`:'<span class="muted">لا يوجد رقم جوال للمعلم</span>'}<button class="btn ghost" data-acc-pdfwa>إرسال النموذج PDF واتساب</button><button class="btn ghost" data-acc-pdf>تحميل PDF</button><button class="btn ghost" data-acc-view>معاينة</button>${st==='deleted'?'<button class="btn ghost" data-acc-restore>استرجاع</button>':a.archivedAt?'':'<button class="btn ghost" data-acc-edit>تعديل</button><button class="btn ghost" data-acc-del style="color:var(--bad)">حذف</button>'}</div>
      <div class="acc-prev" data-prev hidden></div></article>`}
-  function paintList(){const q=$a('acSearch').value.trim(),f=$a('acFilter').value;const live=list.filter(a=>a.status!=='deleted');const rows=(f==='deleted'?list.filter(a=>a.status==='deleted'):live.filter(a=>!f||(a.status||'sent')===f)).filter(a=>!q||String(a.teacher).includes(q));
-    const waiting=live.filter(a=>a.status==='replied').length;$a('acCount').textContent=waiting?`(${waiting} بانتظار القرار)`:live.length?`(${live.length})`:'';
-    $a('acList').innerHTML=rows.map(card).join('')||'<p class="muted">لا توجد مساءلات.</p>'}
-  $a('acSearch').oninput=paintList;$a('acFilter').onchange=paintList;
-  function listen(){if(stop)return;stop=fs().collection(A.COL).orderBy('createdAt','desc').limit(300).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+(d.data().decidedAt&&d.data().decidedAt.seconds||'')}));paintList()},e=>{stop=null;$a('acMsg').textContent=e&&e.code==='permission-denied'?'لا توجد صلاحية لقراءة المساءلات — انشر قواعد الأمان المحدّثة في Firebase.':'تعذّر تحميل المساءلات.'})}
-  $a('acList').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const el=b.closest('[data-id]');const a=list.find(x=>x.id===el.dataset.id);if(!a)return;
-    if(b.hasAttribute('data-acc-wa')){const m=teacherMsg(a,a.id);window.open(A.waUrl(m.phone,m.text),'_blank','noopener')}
+  function paintList(){
+    const q=$a('acSearch').value.trim().toLocaleLowerCase('ar'),f=$a('acFilter').value,from=$a('acFrom').value,to=$a('acTo').value,type=$a('acType').value;
+    const live=list.filter(a=>a.status!=='deleted');
+    $a('acStats').innerHTML=[['إجمالي المساءلات',live.length],['بانتظار رد المعلم',live.filter(a=>(a.status||'sent')==='sent').length],['بانتظار القرار',live.filter(a=>a.status==='replied').length],['مغلقة ومؤرشفة',live.filter(a=>a.archivedAt).length]].map(([t,n])=>`<div class="acc-card"><b>${esc(t)}</b><strong>${n}</strong></div>`).join('');
+    $a('acActive').setAttribute('aria-pressed',String(scope==='active'));$a('acArchive').setAttribute('aria-pressed',String(scope==='archive'));
+    const types=[...new Set(live.flatMap(a=>a.items||[]))];$a('acType').innerHTML='<option value="">كل المخالفات</option>'+types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');$a('acType').value=type;
+    const rows=list.filter(a=>f==='deleted'?a.status==='deleted':a.status!=='deleted'&&(f==='archived'?!!a.archivedAt:(scope==='archive'?!!a.archivedAt:!a.archivedAt))&&(!f||f==='archived'||(a.status||'sent')===f)).filter(a=>(!q||[a.teacher,a.teacherFull,a.id,...A.subjectText(a)].join(' ').toLocaleLowerCase('ar').includes(q))&&(!from||a.date>=from)&&(!to||a.date<=to)&&(!type||(a.items||[]).includes(type))).sort((a,b)=>Number(!!overdue(b))-Number(!!overdue(a))||(b.date||'').localeCompare(a.date||'')||when(b)-when(a));
+    $a('acCount').textContent=`(${live.length})`;
+    $a('acList').innerHTML=`<p class="muted">${rows.length} مساءلة · المتأخرة أولًا ثم الأحدث</p><div style="overflow:auto"><table style="width:100%;border-collapse:collapse;text-align:right"><thead><tr><th>الرقم</th><th>المعلم</th><th>الموضوع</th><th>تاريخ الواقعة</th><th>تاريخ الإغلاق</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>${rows.map(a=>`<tr><td>${esc(a.id)}</td><td>${esc(a.teacher)}</td><td>${esc(A.subjectText(a).join('، '))}</td><td>${esc(a.date||'—')}</td><td>${esc(A.isoOf(a.archivedAt)||'—')}</td><td><span class="acc-st ${esc(a.status||'sent')}">${a.archivedAt?'مغلقة ومؤرشفة':esc(A.STATUS[a.status||'sent'])}${overdue(a)?' · متأخرة':''}</span></td><td><button class="btn ghost" data-open-record="${esc(a.id)}">فتح التفاصيل</button></td></tr>`).join('')}</tbody></table></div>${rows.length?'':'<p>لا توجد مساءلات مطابقة.</p>'}<div id="acSelected"></div>`;
+
+  }
+  ['acSearch','acFrom','acTo'].forEach(id=>$a(id).oninput=paintList);['acFilter','acType'].forEach(id=>$a(id).onchange=paintList);
+  $a('acActive').onclick=()=>{scope='active';$a('acFilter').value='';paintList()};$a('acArchive').onclick=()=>{scope='archive';$a('acFilter').value='';paintList()};
+  function listen(){if(stop)return;stop=fs().collection(A.COL).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+(d.data().decidedAt&&d.data().decidedAt.seconds||'')}));paintList()},e=>{stop=null;$a('acMsg').textContent=e&&e.code==='permission-denied'?'لا توجد صلاحية لقراءة المساءلات — انشر قواعد الأمان المحدّثة في Firebase.':'تعذّر تحميل المساءلات.'})}
+  $a('acList').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.openRecord){const record=list.find(a=>a.id===b.dataset.openRecord);if(record){$a('acSelected').innerHTML=card(record);$a('acSelected').scrollIntoView({behavior:'smooth',block:'start'})}return}const el=b.closest('[data-id]');const a=list.find(x=>x.id===el.dataset.id);if(!a)return;
+    if(b.hasAttribute('data-acc-archive')){
+      if(!confirm('إغلاق المساءلة وحفظ نسخة PDF نهائية؟ لن يمكن تعديل النسخة المغلقة.'))return;
+      b.disabled=true;
+      try{const ref=fs().collection(A.COL).doc(a.id),fresh=await ref.get(),current={id:a.id,...fresh.data()};if(current.archivedAt||current.status!=='decided')throw Error('state-changed');
+        const archive=await A.archiveData({...current,archiveActor:(firebase.auth().currentUser||{}).uid||''});
+        await fs().runTransaction(async tx=>{const snap=await tx.get(ref);const latest=snap.data();if(latest.archivedAt||JSON.stringify(latest)!==JSON.stringify(fresh.data()))throw Error('state-changed');tx.update(ref,{...archive,archivedAt:firebase.firestore.FieldValue.serverTimestamp(),archivedBy:(firebase.auth().currentUser||{}).uid||''})});toast('تم إغلاق المساءلة وحفظ PDF النهائي');
+      }catch(err){console.error(err);toast(err.message==='archive-too-large'?'ملف PDF كبير؛ لم تغلق المساءلة.':'تعذرت الأرشفة؛ حدّث السجل وحاول مجددًا.')}finally{b.disabled=false}
+    }
+    else if(b.hasAttribute('data-acc-pdfview')){try{await A.viewPdf(a)}catch(err){toast('تعذر عرض PDF')}}
+    else if(a.archivedAt&&(b.hasAttribute('data-acc-edit')||b.hasAttribute('data-acc-dec')||b.hasAttribute('data-acc-del'))){toast('المساءلة مغلقة ومحفوظة');return}
+    else if(b.hasAttribute('data-acc-wa')){const m=teacherMsg(a,a.id);window.open(A.waUrl(m.phone,m.text),'_blank','noopener')}
     else if(b.hasAttribute('data-acc-pdf')){b.disabled=true;try{A.download(await A.pdfFile(a))}catch(err){toast('تعذّر إنشاء PDF')}finally{b.disabled=false}}
     else if(b.hasAttribute('data-acc-pdfwa')){const ph=tPhone(a);
       // يُرسل للمعلم على رقمه رابطًا يفتح حسابه ويحمّل نموذج المساءلة PDF مباشرة (واتساب لا يسمح للمواقع بإرفاق ملف تلقائيًا)
@@ -127,12 +152,12 @@
     else if(b.hasAttribute('data-acc-restore')){b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({status:a.prevStatus||'sent'});toast('تم استرجاع المساءلة')}catch(err){b.disabled=false;toast('تعذّر الاسترجاع')}}
     else if(b.hasAttribute('data-acc-view')){const p=el.querySelector('[data-prev]');if(!p.hidden){p.hidden=true;return}p.innerHTML=`<style>${A.CSS}</style>`+A.formHTML(a);p.hidden=false}
     else if(b.hasAttribute('data-acc-dec')){const dec=el.querySelector('[data-dec]').value.trim();const r=el.querySelector('input[type=radio]:checked');if(!dec&&!r){toast('اكتب القرار أو اختر الإجراء');return}
-      b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({decision:dec,action:r?+r.value:0,amount:el.querySelector('[data-amount]').value.trim(),penalty:el.querySelector('[data-penalty]').value.trim(),status:'decided',decidedAt:firebase.firestore.FieldValue.serverTimestamp(),decidedBy:(firebase.auth().currentUser||{}).uid||''});toast('تم إرسال القرار')}catch(err){toast('تعذّر إرسال القرار')}finally{b.disabled=false}}});
+      b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({decision:dec,generalDecision:el.querySelector('[data-general]').value.trim(),action:r?+r.value:0,amount:el.querySelector('[data-amount]').value.trim(),penalty:el.querySelector('[data-penalty]').value.trim(),status:'decided',decidedAt:firebase.firestore.FieldValue.serverTimestamp(),decidedBy:(firebase.auth().currentUser||{}).uid||''});toast('تم إرسال القرار')}catch(err){toast('تعذّر إرسال القرار')}finally{b.disabled=false}}});
 
   // ---------- drawer ----------
   function setTab(t){tab=t;document.querySelectorAll('[data-acctab]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.acctab===t)));$a('acNew').hidden=t!=='new';$a('acLog').hidden=t!=='log';if(t==='log')paintList()}
   document.querySelectorAll('[data-acctab]').forEach(x=>x.onclick=()=>setTab(x.dataset.acctab));
-  function openAcc(){if(state.role!==-1)return;paintForm();listen();$a('acMsg').textContent='';$a('acScrim').hidden=false;$a('acDrawer').hidden=false;$a('acClose').focus({preventScroll:true})}
+  function openAcc(){if(state.role!==-1)return;paintForm();setTab('log');listen();$a('acMsg').textContent='';$a('acScrim').hidden=false;$a('acDrawer').hidden=false;$a('acClose').focus({preventScroll:true})}
   function closeAcc(){$a('acScrim').hidden=true;$a('acDrawer').hidden=true}
   btn.onclick=openAcc;$a('acClose').onclick=closeAcc;$a('acScrim').onclick=closeAcc;
   document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAcc()});

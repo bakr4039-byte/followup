@@ -65,7 +65,7 @@
       <div class="ac-sig"><span>مدير المدرسة / ${PRINCIPAL}</span><span>التوقيع /</span><span>بتاريخ : <b>${a.decision?h(isoOf(a.decidedAt)):h('')}</b></span></div></div>
       <div class="ac-sec"><div class="ac-h">الإجراءات الإدارية المتخذة بحق المعلم .</div>
       <div class="ac-acts"><span>${box(1)} 1- التنبيه</span><span>${box(2)} 2- لفت نظر</span><span>${box(3)} 3- إنـــــذار</span><span style="grid-column:span 2">${box(4)} 4- الحسم من الراتب مبلغ ${amount}</span><span>${box(5)} 5- الحفظ</span><span>${box(6)} 6- إنذار بالفصل</span></div></div>
-      <div class="ac-sec"><div style="font-size:15px;font-weight:600">قرار المشرف العام للمدارس بشأنه :</div><div class="ac-ln">&nbsp;</div>
+      <div class="ac-sec"><div style="font-size:15px;font-weight:600">قرار المشرف العام للمدارس بشأنه :</div>${lines(a.generalDecision||'',1,2)}
       <div class="ac-sig" style="justify-content:space-around"><span>المشرف العام : ${GENERAL}</span><span>التوقيع</span></div></div>
       <div class="ac-copy">نسخة :<div><span>- لمكتب سعادة المشرف العام</span><span>- لسعادة مدير القسم</span><span>الختم الرسمي</span></div></div>
     </div></div>`}
@@ -75,11 +75,22 @@
     try{await document.fonts.ready}catch(e){}
     el.innerHTML=`<style>${CSS}</style>${formHTML(a)}`;
     const img=el.querySelector('img');if(img&&!img.complete)await new Promise(r=>{img.onload=img.onerror=r});
-    try{const canvas=await root.html2canvas(el.querySelector('.accp'),{scale:2,backgroundColor:'#ffffff',logging:false,useCORS:true});
-      const pdf=new root.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'});pdf.addImage(canvas.toDataURL('image/jpeg',.92),'JPEG',0,0,210,297);return pdf.output('blob')}
+    try{const pdf=new root.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+      const capture=async node=>{const canvas=await root.html2canvas(node,{scale:1.5,backgroundColor:'#ffffff',logging:false,useCORS:true});pdf.addImage(canvas.toDataURL('image/jpeg',.72),'JPEG',0,0,210,297)};
+      await capture(el.querySelector('.accp'));
+      // Full-text continuation keeps long replies/decisions that exceed the official form's fixed lines.
+      if(a.archiveClosing){
+        const paragraphs=[`سجل المساءلة النهائي · ${a.id}`,`المعلم: ${a.teacherFull||a.teacher}`,`تاريخ الواقعة: ${a.date||'—'} · تاريخ الإغلاق: ${a.archiveClosedDate||'—'}`,`أغلقها: ${a.archiveActor||'—'}`,'موضوع المساءلة:',...subjectText(a),'رد المعلم:',a.reply||'لم يسجل رد','قرار المسؤول المباشر:',a.decision||'—','قرار المشرف العام:',a.generalDecision||'لم يسجل قرار إضافي',`الإجراء: ${ACTIONS[(+a.action||0)-1]||'—'}`,`مبلغ الحسم: ${a.amount||'—'} · العقوبة: ${a.penalty||'—'}`,`إنشاء: ${isoOf(a.createdAt)||'غير مسجل'} · ${a.createdBy||a.monitor||'—'}`,`رد: ${isoOf(a.replyAt)||'غير مسجل'} · ${a.replyUid||a.teacher}`,`قرار: ${isoOf(a.decidedAt)||'غير مسجل'} · ${a.decidedBy||'—'}`];
+        const all=paragraphs.flatMap(t=>wrap(t,W-100,15));
+        for(let start=0;start<all.length;start+=30){pdf.addPage();el.innerHTML=`<style>${CSS}</style><div class="accp"><h2>ملحق المساءلة · ${esc(a.id)}</h2>${all.slice(start,start+30).map(t=>`<div style="height:30px;line-height:30px;font-size:15px;white-space:pre">${esc(t)}</div>`).join('')}<p>ملحق ${Math.floor(start/30)+1} · النص الكامل المحفوظ</p></div>`;await capture(el.querySelector('.accp'))}
+      }
+      return pdf.output('blob')}
     finally{el.innerHTML=''}}
-  const fileName=a=>('مساءلة-'+(a.teacher||'')+'-'+hijri(a.date).replace(/\//g,'-')).replace(/\s+/g,'-')+'.pdf';
-  async function pdfFile(a){return new File([await pdfBlob(a)],fileName(a),{type:'application/pdf'})}
+
+  const fileName=a=>('مساءلة-'+(a.teacher||'')+'-'+(a.date||'')+'-'+(a.id||'')).replace(/\s+/g,'-')+'.pdf';
+  let pdfQueue=Promise.resolve();
+  async function renderPdfFile(a){if(a.archivePdf){const bytes=Uint8Array.from(atob(a.archivePdf),c=>c.charCodeAt(0));return new File([bytes],a.archiveFileName||fileName(a),{type:'application/pdf'})}return new File([await pdfBlob(a)],fileName(a),{type:'application/pdf'})}
+  function pdfFile(a){const job=pdfQueue.then(()=>renderPdfFile(a));pdfQueue=job.catch(()=>{});return job}
   function download(file){const u=URL.createObjectURL(file);const x=document.createElement('a');x.href=u;x.download=file.name;document.body.appendChild(x);x.click();setTimeout(()=>{x.remove();URL.revokeObjectURL(u)},4000)}
   const canShare=f=>{try{return !!navigator.share&&!!navigator.canShare&&navigator.canShare({files:[f]})}catch(e){return false}};
   const waUrl=(phone,text)=>{const p=normPhone(phone);return 'https://wa.me/'+(p||'')+'?text='+encodeURIComponent(text)};
@@ -104,5 +115,13 @@
     download(f);root.open(waUrl(phone,text),'_blank','noopener');notify&&notify('تم تحميل PDF — أرفقه في محادثة الواتساب التي فُتحت')}
 
   const ADMIN_PHONE='966562518196'; // واتساب الإدارة الثابت لاستقبال ردود المعلمين
-  root.ACC={ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
+  async function archiveData(a){
+    const archiveClosedDate=riyadhISO(),archiveActor=a.archiveActor||'';
+    const f=await pdfFile({...a,archivePdf:null,archiveClosing:true,archiveClosedDate,archiveActor});
+    if(f.size>680000)throw Error('archive-too-large');
+    const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(f)});
+    return {archivePdf:base64,archiveFileName:f.name,archiveVersion:1,archiveClosedDate,archiveActor};
+  }
+  function viewPdf(a){return pdfFile(a).then(f=>{const u=URL.createObjectURL(f);const w=root.open(u,'_blank');if(!w)download(f);setTimeout(()=>URL.revokeObjectURL(u),60000)})}
+  root.ACC={archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
 })(window);
