@@ -67,8 +67,22 @@ service cloud.firestore {
   match /meta/rules2 { allow get: if true; allow write: if false; }
   match /teacherProfiles/{uid} { allow get: if request.auth != null && request.auth.uid == uid && teacher(); }
   function teacherName() { return get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.get('scheduleName', '-'); }
+  function employee() { return signed() && exists(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)) && get(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)).data.active == true; }
+  function employeeName() { return get(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)).data.name; }
+  function ownsAccountability() { return teacher() && resource.data.teacher == teacherName() || employee() && resource.data.teacher == employeeName(); }
+  match /employeeProfiles/{uid} {
+    allow get: if admin() || request.auth != null && request.auth.uid == uid && employee();
+    allow list: if admin();
+    allow create: if admin() && request.resource.data.keys().hasOnly(['name','title','memberId','phone','email','active','createdAt','createdBy']) &&
+      request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 150 &&
+      request.resource.data.title is string && request.resource.data.title.size() <= 250 && request.resource.data.memberId.matches('admin-[0-9]+') &&
+      request.resource.data.phone.matches('05[0-9]{8}') && request.resource.data.email == request.resource.data.phone + '@employees.alsahafa-followup.invalid' &&
+      request.resource.data.active == true && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+    allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active','phone','title']) && request.resource.data.active is bool && request.resource.data.phone.matches('05[0-9]{8}') && request.resource.data.title is string;
+    allow delete: if false;
+  }
   match /accountability/{id} {
-    allow read: if admin() || teacher() && resource.data.teacher == teacherName();
+    allow read: if admin() || ownsAccountability();
     allow create: if admin() && !request.resource.data.keys().hasAny(['archivedAt','archivePdf']);
     allow update: if admin() && !resource.data.keys().hasAny(['archivedAt']) &&
       (!request.resource.data.keys().hasAny(['archivedAt']) ||
@@ -77,12 +91,12 @@ service cloud.firestore {
        request.resource.data.archivedAt == request.time && request.resource.data.archivedBy == request.auth.uid &&
        request.resource.data.archiveActor == request.auth.uid && request.resource.data.archiveVersion == 1 &&
        request.resource.data.archivePdf is string && request.resource.data.archivePdf.size() > 0 && request.resource.data.archivePdf.size() < 910000);
-    allow update: if teacher() && resource.data.teacher == teacherName() && resource.data.status == 'sent' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply','replyAt','replyUid','status']) && request.resource.data.status == 'replied' && request.resource.data.replyUid == request.auth.uid && request.resource.data.replyAt == request.time && request.resource.data.reply is string && request.resource.data.reply.size() > 0 && request.resource.data.reply.size() <= 1500;
+    allow update: if ownsAccountability() && resource.data.status == 'sent' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply','replyAt','replyUid','status']) && request.resource.data.status == 'replied' && request.resource.data.replyUid == request.auth.uid && request.resource.data.replyAt == request.time && request.resource.data.reply is string && request.resource.data.reply.size() > 0 && request.resource.data.reply.size() <= 1500;
     allow delete: if false;
   }
   // PDF acknowledgements. Each signer can create one immutable receipt from their own account.
-  function signatureActor() { return staff() && role() >= -1 && role() <= 7 || teacher(); }
-  function signatureKey() { return staff() ? 's:' + string(role()) : 't:' + teacherName(); }
+  function signatureActor() { return staff() && role() >= -1 && role() <= 7 || teacher() || employee(); }
+  function signatureKey() { return staff() ? 's:' + string(role()) : employee() ? 'e:' + employeeName() : 't:' + teacherName(); }
   function signatureReader(data) { return admin() || signatureActor() && signatureKey() in data.targetKeys; }
   function signatureStatement(kind) { return kind == 'approval' ? 'اطلعت وأوافق' : 'اطلعت وأقرّ بالاستلام'; }
   match /signDocuments/{documentId} {

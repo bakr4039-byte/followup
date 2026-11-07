@@ -14,8 +14,9 @@
   const fs=()=>firebase.firestore();
   const LS='acc-reply-phone';
   const lsGet=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}},lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
-  const portal=id=>new URL('teacher.html#acc-'+id,location.href).href;
-  const pdfLink=id=>new URL('teacher.html#acc-'+id+'-pdf',location.href).href;
+  const personalPage=name=>window.DepartmentPersonnel?.admins.some(p=>p.name===name)?'employee.html':'teacher.html';
+  const portal=(id,name)=>new URL(personalPage(name)+'#acc-'+id,location.href).href;
+  const pdfLink=(id,name)=>new URL(personalPage(name)+'#acc-'+id+'-pdf',location.href).href;
   let list=[],stop=null,tab='log',scope='active';
 
   // ---------- markup ----------
@@ -75,7 +76,7 @@
   function paintForm(){const sel=$a('acT');const cur=sel.value;sel.innerHTML='<option value="">— اختر المنسوب —</option>'+teachers().map(t=>{const p=window.DepartmentPersonnel?.admins.find(p=>p.name===t);return `<option value="${esc(t)}">${esc(t)}${p?' — '+esc(p.title):''}</option>`}).join('');sel.value=cur;
     if(!$a('acTime').options.length){$a('acTime').innerHTML=A.TIMES.map(t=>`<option>${esc(t)}</option>`).join('');$a('acMon').innerHTML=A.MONITORS.map(t=>`<option>${esc(t)}</option>`).join('');
       $a('acCats').innerHTML=A.CATS.map((c,ci)=>`<details class="acc-cat" ${ci===0?'open':''}><summary>${esc(c.t)}<small data-cnt="${ci}"></small></summary><div class="acc-items">${c.items.map((x,i)=>`<label><input type="checkbox" data-acc="${ci}-${i}">${esc(x)}</label>`).join('')}</div></details>`).join('')}
-    if(!$a('acDate').value)$a('acDate').value=A.riyadhISO();$a('acPhone').value='0562518196';paintHijri()}
+    if(!$a('acDate').value)$a('acDate').value=A.riyadhISO();$a('acPhone').value='';paintHijri()}
   function paintHijri(){const d=$a('acDate').value;$a('acHijri').textContent=d?`· ${A.dayName(d)} ${A.hijri(d)}هـ`:''}
   function picked(){return [...$a('acCats').querySelectorAll('input[data-acc]:checked')].map(x=>{const[ci,i]=x.dataset.acc.split('-').map(Number);return A.CATS[ci].items[i]})}
   function draft(){return {teacher:$a('acT').value,teacherFull:$a('acFull').value.trim()||$a('acT').value,date:$a('acDate').value,replyDue:$a('acDue').value,time:$a('acTime').value,monitor:$a('acMon').value,items:picked(),other:$a('acOther').value.trim(),details:$a('acDetails').value.trim(),teacherPhone:A.normPhone($a('acTPhone').value),replyPhone:A.ADMIN_PHONE}}
@@ -85,7 +86,7 @@
   $a('acCats').addEventListener('change',()=>A.CATS.forEach((c,ci)=>{const n=$a('acCats').querySelectorAll(`input[data-acc^="${ci}-"]:checked`).length;const el=$a('acCats').querySelector(`[data-cnt="${ci}"]`);if(el)el.textContent=n?`(${n})`:''}));
   $a('acPreview').onclick=()=>{const p=$a('acPrev');if(!p.hidden){p.hidden=true;$a('acPreview').textContent='معاينة النموذج';return}p.innerHTML=`<style>${A.CSS}</style>`+A.formHTML(draft());p.hidden=false;$a('acPreview').textContent='إخفاء المعاينة';setTimeout(()=>p.scrollIntoView({behavior:'smooth',block:'start'}),50)};
   const tPhone=a=>A.normPhone(a.teacherPhone||phoneOf(a.teacher));
-  function teacherMsg(a,id){const ph=tPhone(a);return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم مساءلة إدارية بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة السبب وإرساله:',portal(id)].join('\n')}}
+  function teacherMsg(a,id){const ph=tPhone(a);return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم مساءلة إدارية بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة السبب وإرساله:',portal(id,a.teacher)].join('\n')}}
   let editId=null;
   function resetForm(){$a('acCats').querySelectorAll('input:checked').forEach(x=>x.checked=false);$a('acCats').dispatchEvent(new Event('change'));$a('acOther').value='';$a('acDetails').value='';$a('acDue').value='';$a('acPrev').hidden=true;$a('acPreview').textContent='معاينة النموذج'}
   function endEdit(){editId=null;$a('acEditBar').hidden=true;$a('acCancelEdit').hidden=true;$a('acSave').textContent='حفظ وإرسال واتساب للمعلم'}
@@ -155,7 +156,7 @@
     else if(b.hasAttribute('data-acc-pdf')){b.disabled=true;try{A.download(await A.pdfFile(a))}catch(err){toast('تعذّر إنشاء PDF')}finally{b.disabled=false}}
     else if(b.hasAttribute('data-acc-pdfwa')){const ph=tPhone(a);
       // يُرسل للمعلم على رقمه رابطًا يفتح حسابه ويحمّل نموذج المساءلة PDF مباشرة (واتساب لا يسمح للمواقع بإرفاق ملف تلقائيًا)
-      if(ph){const text=[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,`نموذج المساءلة بتاريخ ${A.hijri(a.date)}هـ${a.status==='decided'?' متضمنًا القرار والإجراء المتخذ':''}.`,'لتحميل النموذج PDF افتح الرابط وسجّل الدخول:',pdfLink(a.id)].join('\n');window.open(A.waUrl(ph,text),'_blank','noopener')}
+      if(ph){const text=[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,`نموذج المساءلة بتاريخ ${A.hijri(a.date)}هـ${a.status==='decided'?' متضمنًا القرار والإجراء المتخذ':''}.`,'لتحميل النموذج PDF افتح الرابط وسجّل الدخول:',pdfLink(a.id,a.teacher)].join('\n');window.open(A.waUrl(ph,text),'_blank','noopener')}
       else{toast('لا يوجد رقم جوال لهذا المعلم — أضفه من «تعديل» أو «تقارير المعلمين».')}}
     else if(b.hasAttribute('data-acc-edit')){startEdit(a)}
     else if(b.hasAttribute('data-acc-del')){if(!confirm(`حذف مساءلة ${a.teacher} بتاريخ ${A.hijri(a.date)}هـ؟\nستختفي من السجل ومن حساب المعلم، ويمكن استرجاعها من «المحذوفة».`))return;b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({prevStatus:a.status||'sent',status:'deleted',deletedAt:firebase.firestore.FieldValue.serverTimestamp(),deletedBy:(firebase.auth().currentUser||{}).uid||''});if(editId===a.id){endEdit();resetForm()}toast('تم حذف المساءلة')}catch(err){b.disabled=false;toast('تعذّر الحذف')}}
