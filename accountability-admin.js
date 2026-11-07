@@ -136,8 +136,8 @@
       b.disabled=true;
       try{const ref=fs().collection(A.COL).doc(a.id),fresh=await ref.get(),current={id:a.id,...fresh.data()};if(current.archivedAt||current.status!=='decided')throw Error('state-changed');
         const archive=await A.archiveData({...current,archiveActor:(firebase.auth().currentUser||{}).uid||''});
-        await fs().runTransaction(async tx=>{const snap=await tx.get(ref);const latest=snap.data();if(latest.archivedAt||JSON.stringify(latest)!==JSON.stringify(fresh.data()))throw Error('state-changed');tx.update(ref,{...archive,archivedAt:firebase.firestore.FieldValue.serverTimestamp(),archivedBy:(firebase.auth().currentUser||{}).uid||''})});toast('تم إغلاق المساءلة وحفظ PDF النهائي');
-      }catch(err){console.error(err);toast(err.message==='archive-too-large'?'ملف PDF كبير؛ لم تغلق المساءلة.':'تعذرت الأرشفة؛ حدّث السجل وحاول مجددًا.')}finally{b.disabled=false}
+        await fs().runTransaction(async tx=>{const snap=await tx.get(ref);const latest=snap.data();if(latest.archivedAt||!A.sameRecord(latest,fresh.data()))throw Error('state-changed');tx.update(ref,{...archive,archivedAt:firebase.firestore.FieldValue.serverTimestamp(),archivedBy:(firebase.auth().currentUser||{}).uid||''})});toast('تم إغلاق المساءلة وحفظ PDF النهائي');
+      }catch(err){console.error(err);toast(err.message==='archive-too-large'?'ملف PDF كبير؛ لم تغلق المساءلة.':err.message==='state-changed'?'تغيرت المساءلة أثناء الأرشفة أو سبق إغلاقها؛ افتحها من السجل وحاول مجددًا.':err.code==='permission-denied'?'رفضت قاعدة البيانات حفظ الأرشيف؛ تحقق من صلاحيات المدير وقواعد الحماية.':'تعذرت الأرشفة ('+(err.code||err.message||'unknown')+')؛ لم تُغلق المساءلة.')}finally{b.disabled=false}
     }
     else if(b.hasAttribute('data-acc-pdfview')){try{await A.viewPdf(a)}catch(err){toast('تعذر عرض PDF')}}
     else if(a.archivedAt&&(b.hasAttribute('data-acc-edit')||b.hasAttribute('data-acc-dec')||b.hasAttribute('data-acc-del'))){toast('المساءلة مغلقة ومحفوظة');return}

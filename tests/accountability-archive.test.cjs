@@ -40,3 +40,12 @@ test('teacher history retains legacy records, excludes deleted, sorts and filter
   elements.get('accStatus').onchange({target:{value:'archived'}});assert.ok(section.innerHTML.includes('acc-closed'));assert.ok(!section.innerHTML.includes('acc-old'));
   elements.get('accMonth').onchange({target:{value:'2026-10'}});assert.ok(section.innerHTML.includes('لا توجد مساءلات مطابقة'));
 });
+test('snapshot comparison ignores Firestore map ordering but detects actual edits',()=>{
+  const {A}=setup();
+  const first={teacher:'معلم',status:'decided',decidedAt:{seconds:123,nanoseconds:45},items:['أ','ب'],nested:{x:1,y:2}};
+  const reordered={nested:{y:2,x:1},items:['أ','ب'],decidedAt:{nanoseconds:45,seconds:123},status:'decided',teacher:'معلم'};
+  assert.equal(A.sameRecord(first,reordered),true);
+  assert.equal(A.sameRecord(first,{...reordered,decision:'تعديل حقيقي'}),false);
+  assert.equal(A.sameRecord(first,{...reordered,items:['ب','أ']}),false);
+  assert.equal(A.sameRecord(first,{...reordered,decidedAt:{seconds:123,nanoseconds:46}}),false);
+});

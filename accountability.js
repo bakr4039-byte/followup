@@ -123,5 +123,10 @@
     return {archivePdf:base64,archiveFileName:f.name,archiveVersion:1,archiveClosedDate,archiveActor};
   }
   function viewPdf(a){return pdfFile(a).then(f=>{const u=URL.createObjectURL(f);const w=root.open(u,'_blank');if(!w)download(f);setTimeout(()=>URL.revokeObjectURL(u),60000)})}
-  root.ACC={archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
+  // Firestore does not guarantee map key order across snapshot sources.
+  function sameRecord(a,b){
+    const canonical=v=>v instanceof Date?v.toISOString():Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
+    return JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
+  }
+  root.ACC={sameRecord,archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
 })(window);
