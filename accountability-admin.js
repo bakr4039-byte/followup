@@ -9,8 +9,8 @@
   // الأسماء الكاملة كما في نموذج رصد المخالفات (تُقترح تلقائيًا عند اختيار المعلم)
   const FULL=['وليد احمد حمود حامد الحداد','تركي إبراهيم شقير','مولي الطيب مولي الطيب','موسي حمد العطو','محمود محمد حمادة عبود','محمد محمود احمد زيد','محمد عبد الرحمن عبدالرحيم احمد','محمد صادق أحمد الشيمي','محمد ذواب فلاج العضيله المطيري','محمد السيد السيد الطاووس','محمد الحصري','مجاهد عبده مصلح الهجوة','ماهر راكان حميد أباظة','فيصل بشير محمد غريب','عبدالمجيد صالح محمد العمري','عبدالحكيم احمد محمد قاسم','عبدالتواب خليفة محمد احمد','عبد العزيز محمد عبد العزيز الشهري','عبد الرحمن احمد مصلع جذمي','عامر مجممي','عادل محمد محمد قايد','سعد عبد الله عايض القرني','حسين سعد حسين القحطاني','حسان طه صالح محمد','تامر محمد محمد السيد','ايهاب ابراهيم الشافعي','الصادق ابراهيم عبداللطيف عبدالله','احمد حمدي عبدالسلام طلبة','أحمد نجيب عبد السلام فهمي','أحمد عبد الحافظ','أحمد سمير منصور سعد','خالد محمد الشتوي','محمد سفر عايض الاحمري','على نعمان','محمد فكري','بكر الدوخي','صابر محمد','أحمد حفني'];
   const norm=s=>String(s||'').replace(/[أإآا]/g,'ا').replace(/[ىي]/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,'').replace(/^عبد/,'عبد');
-  function fullOf(short){const parts=String(short).split(/\s+/).map(norm).filter(Boolean);const hit=FULL.find(f=>{const n=norm(f);return parts.every(p=>n.includes(p))});return hit||short}
-  const teachers=()=>[...new Set(S.map(s=>s.teacher))].sort((a,b)=>a.localeCompare(b,'ar'));
+  function fullOf(short){const person=window.DepartmentPersonnel?.admins.find(p=>p.name===short);if(person)return person.name;const parts=String(short).split(/\s+/).map(norm).filter(Boolean);const hit=FULL.find(f=>{const n=norm(f);return parts.every(p=>n.includes(p))});return hit||short}
+  const teachers=()=>[...new Set([...S.map(s=>s.teacher),...(window.DepartmentPersonnel?.admins||[]).map(p=>p.name)])].sort((a,b)=>a.localeCompare(b,'ar'));
   const fs=()=>firebase.firestore();
   const LS='acc-reply-phone';
   const lsGet=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}},lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
@@ -51,7 +51,7 @@
    <div class="drawer-body" id="acNew">
     <div id="acEditBar" hidden style="background:var(--warn-soft);border-radius:10px;padding:8px 12px;font-weight:600;font-size:13.5px"></div>
     <div class="acc-grid">
-     <div class="field"><label for="acT">المعلم</label><select id="acT"></select></div>
+     <div class="field"><label for="acT">المنسوب</label><select id="acT"></select></div>
      <div class="field"><label for="acFull">الاسم في النموذج</label><input id="acFull" class="acc-in"></div>
      <div class="field"><label for="acTPhone">جوال المعلم (من المنصة)</label><input id="acTPhone" inputmode="tel" placeholder="لا يوجد رقم مسجّل — اكتبه هنا"></div>
      <div class="field"><label for="acDate">تاريخ المخالفة <small id="acHijri" style="color:var(--muted)"></small></label><input id="acDate" type="date"></div>
@@ -72,7 +72,7 @@
   const $a=id=>document.getElementById(id);
 
   // ---------- form ----------
-  function paintForm(){const sel=$a('acT');const cur=sel.value;sel.innerHTML='<option value="">— اختر المعلم —</option>'+teachers().map(t=>`<option>${esc(t)}</option>`).join('');sel.value=cur;
+  function paintForm(){const sel=$a('acT');const cur=sel.value;sel.innerHTML='<option value="">— اختر المنسوب —</option>'+teachers().map(t=>{const p=window.DepartmentPersonnel?.admins.find(p=>p.name===t);return `<option value="${esc(t)}">${esc(t)}${p?' — '+esc(p.title):''}</option>`}).join('');sel.value=cur;
     if(!$a('acTime').options.length){$a('acTime').innerHTML=A.TIMES.map(t=>`<option>${esc(t)}</option>`).join('');$a('acMon').innerHTML=A.MONITORS.map(t=>`<option>${esc(t)}</option>`).join('');
       $a('acCats').innerHTML=A.CATS.map((c,ci)=>`<details class="acc-cat" ${ci===0?'open':''}><summary>${esc(c.t)}<small data-cnt="${ci}"></small></summary><div class="acc-items">${c.items.map((x,i)=>`<label><input type="checkbox" data-acc="${ci}-${i}">${esc(x)}</label>`).join('')}</div></details>`).join('')}
     if(!$a('acDate').value)$a('acDate').value=A.riyadhISO();$a('acPhone').value='0562518196';paintHijri()}

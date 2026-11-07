@@ -397,7 +397,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
     <div class="views" role="group" aria-label="العرض">
       <button id="vSchedule" aria-pressed="true">جدول اليوم</button>
       <button id="vReport" aria-pressed="false">التقرير الأسبوعي</button>
-      <button id="vTeachers" aria-pressed="false">تقارير المعلمين</button>
+      <button id="vTeachers" aria-pressed="false">منسوبي القسم الثانوي</button>
       <button id="vBoard" aria-pressed="false">شاشة الأرقام</button>
       <button id="vStaff" aria-pressed="false" hidden>متابعة المسؤولين والمشرفين</button>
       <button id="vSubs" aria-pressed="false" hidden>حصص الانتظار</button>
@@ -462,10 +462,10 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
   <section id="teachersView" class="report" hidden>
     <div class="tablebox">
       <header>
-        <h2>تقارير المعلمين <small class="note" id="tCount"></small></h2>
+        <h2>منسوبي القسم الثانوي <small class="note" id="tCount"></small></h2>
         <div class="filters">
-          <input id="tSearch" type="search" placeholder="ابحث باسم المعلم أو المادة" aria-label="بحث باسم المعلم أو المادة">
-          <select id="tSort" aria-label="ترتيب المعلمين"><option value="name">الترتيب: الاسم</option><option value="pending">الأكثر انتظارًا للرصد</option><option value="issues">الأكثر احتياجًا للمتابعة</option><option value="progress">الأعلى في نسبة الرصد</option></select>
+          <input id="tSearch" type="search" placeholder="ابحث بالاسم أو الصفة أو المادة" aria-label="بحث بالاسم أو الصفة أو المادة">
+          <select id="tPersonnel" aria-label="فئة المنسوب"><option value="all">جميع المنسوبين</option><option value="teachers">المعلمون</option><option value="admins">الإداريون والمشرفون</option></select><select id="tSort" aria-label="ترتيب المعلمين"><option value="name">الترتيب: الاسم</option><option value="pending">الأكثر انتظارًا للرصد</option><option value="issues">الأكثر احتياجًا للمتابعة</option><option value="progress">الأعلى في نسبة الرصد</option></select>
           <label class="teacher-filter"><input id="tOnlyPending" type="checkbox">لم تُرصد لهم حصص</label>
           <label class="rng">من <select id="tFrom" aria-label="من يوم"></select></label>
           <label class="rng">إلى <select id="tTo" aria-label="إلى يوم"></select></label>
@@ -473,8 +473,8 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
           <span class="btngroup dlx" hidden><span>خطابات التنبيه:</span><button class="btn ghost" id="letPrint">طباعة</button><button class="btn" id="letPdf">PDF</button></span>
           <button class="btn ghost" id="tNotesOnly" aria-pressed="false" title="عرض المعلمين الذين لديهم ملاحظات مكتوبة في الأيام المحددة">عليهم ملاحظات</button>
           <span class="btngroup dlx" hidden><span>الملاحظات:</span><button class="btn ghost" id="notesPrint">طباعة</button><button class="btn" id="notesPdf">PDF</button></span>
-          <span class="btngroup dlx" hidden><span>كل المعلمين:</span><button class="btn ghost" id="allPrint">طباعة</button><button class="btn" id="allPdf">PDF</button></span>
-          <button class="wabtn master-only2" id="waAllBtn" hidden>إرسال للجميع بالواتساب</button>
+          <span class="btngroup dlx" hidden><span>كل المنسوبين:</span><button class="btn ghost" id="allPrint">طباعة</button><button class="btn" id="allPdf">PDF</button></span>
+          <button class="wabtn master-only2" id="waAllBtn" hidden>إرسال تقارير المعلمين بالواتساب</button>
           <span class="btngroup dlx master-only" hidden><span>التقرير العام:</span><button class="btn ghost" id="genPrint">طباعة</button><button class="btn" id="genPdf">PDF</button></span>
         </div>
       </header>
@@ -699,6 +699,7 @@ window.FIREBASE_CONFIG = {
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="department-personnel.js?v=personnel-20261107"></script>
 <script src="accountability.js?v=acc-20261107-pdf4"></script>
 <script>
 (function(){
@@ -980,13 +981,20 @@ function printLetters(kind,list){list=list||repeatTeachers();if(!list.length){to
 $('tRepeat').onclick=()=>{state.repeatOnly=!state.repeatOnly;$('tRepeat').setAttribute('aria-pressed',String(!!state.repeatOnly));renderTeachers()};
 $('tRepMin').onchange=renderTeachers;
 $('letPrint').onclick=()=>printLetters('print');$('letPdf').onclick=()=>printLetters('pdf');
-function renderTeachers(){const normal=s=>String(s).normalize('NFKC').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/\s/g,'');const q=normal($('tSearch').value);const all=teachersIn(scope().filter(inRange));const noted=new Set(teachersIn(scope().filter(s=>inRange(s)&&noteOf(s))).map(t=>t.name));const reps=new Set(all.filter(t=>incOf(t).length>=repMin()).map(t=>t.name));const list=all.filter(t=>(!q||normal(t.name+' '+subjOf(t.ss)).includes(q))&&(!state.notesOnly||noted.has(t.name))&&(!state.repeatOnly||reps.has(t.name))&&(!$('tOnlyPending').checked||tStats(t.ss).pending>0));
+function personnelCard(t){return `<article class="tcard teacher-card" aria-pressed="${state.teacher===t.name}"><div class="row"><b>${esc(t.name)}</b><span class="tag">إداري / إشرافي</span></div><p class="subjs">${esc(t.personnel.title)}</p><p class="note">${esc(t.personnel.group)}</p><p class="teacher-phone">${state.phones[t.name]?'الجوال متوفر ✓':'الجوال غير مسجل'}</p><div class="teacher-actions"><button class="btn" data-teacher="${esc(t.name)}">عرض الملف</button></div></article>`}
+function personnelPage(t){return `<section class="page">${printHeader('ملف منسوب القسم الثانوي','ثانوية الصحافة الأهلية')}<div class="info"><div><span>الاسم</span><b>${esc(t.name)}</b></div><div><span>الصفة</span><b>${esc(t.personnel.title)}</b></div><div><span>القسم</span><b>${esc(t.personnel.group)}</b></div><div><span>الجوال</span><b>${esc(state.phones[t.name]||'غير مسجل')}</b></div></div></section>`}
+function renderPersonnelProfile(t,box){const edit=state.role===-1&&state.isEditor&&state.db;
+ box.innerHTML=`<div class="tdetail-head"><div><h2>${esc(t.name)}</h2><p>${esc(t.personnel.title)}</p><p class="note">${esc(t.personnel.group)}</p></div><div class="filters">${state.downloads?'<button class="btn" id="pPdf">تحميل الملف PDF</button><button class="btn ghost" id="pPrint">طباعة</button>':''}<button class="btn ghost" id="pClose">إغلاق</button></div></div><div class="wa"><label for="pPhone">جوال المنسوب</label><input type="tel" id="pPhone" inputmode="tel" placeholder="05xxxxxxxx" value="${esc(state.phones[t.name]||'')}" ${edit?'':'disabled'}>${edit?'<button class="btn" id="pSavePhone">حفظ الرقم</button>':''}</div>`;
+ $('pClose').onclick=()=>{state.teacher=null;renderTeachers()};if($('pPdf')){$('pPdf').onclick=()=>exportDoc('pdf','ملف المنسوب '+t.name,[personnelPage(t)]);$('pPrint').onclick=()=>exportDoc('print','ملف المنسوب '+t.name,[personnelPage(t)])}
+ if($('pSavePhone'))$('pSavePhone').onclick=async()=>{const raw=$('pPhone').value.trim();if(raw&&!normPhone(raw)){toast('رقم الجوال غير صحيح');return}const phones={...state.phones};if(raw)phones[t.name]=raw.slice(0,20);else delete phones[t.name];try{await state.db.doc('config/phones').set({phones});state.phones=phones;toast('تم حفظ الرقم');renderTeachers()}catch(e){toast('تعذر حفظ الرقم')}};
+}
+function renderTeachers(){const normal=s=>String(s).normalize('NFKC').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/\s/g,'');const q=normal($('tSearch').value);const all=window.DepartmentPersonnel.members(teachersIn(scope().filter(inRange)));const noted=new Set(teachersIn(scope().filter(s=>inRange(s)&&noteOf(s))).map(t=>t.name));const reps=new Set(all.filter(t=>incOf(t).length>=repMin()).map(t=>t.name));const list=all.filter(t=>($('tPersonnel').value!=='teachers'||t.ss.length>0)&&($('tPersonnel').value!=='admins'||!!t.personnel)&&(!q||normal(t.name+' '+subjOf(t.ss)+' '+(t.personnel?.title||'')+' '+(t.personnel?.group||'')).includes(q))&&(!state.notesOnly||noted.has(t.name))&&(!state.repeatOnly||reps.has(t.name))&&(!$('tOnlyPending').checked||tStats(t.ss).pending>0));
   const sort=$('tSort').value;list.sort((a,b)=>{const x=tStats(a.ss),y=tStats(b.ss);return (sort==='pending'?y.pending-x.pending:sort==='issues'?(y.absent+y.tech+y.late)-(x.absent+x.tech+x.late):sort==='progress'?pct(y.logged,y.total)-pct(x.logged,x.total):0)||a.name.localeCompare(b.name,'ar')});
-  $('tCount').textContent=`${list.length} من ${all.length} معلم · ${noted.size} عليهم ملاحظات · ${reps.size} تكررت ملاحظاتهم`;
-  $('tGrid').innerHTML=list.map(t=>{const c=tStats(t.ss),progress=pct(c.logged,c.total);const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');const wa=waLink(t);
-    return `<article class="tcard teacher-card" aria-pressed="${state.teacher===t.name}"><div class="row"><b>${esc(t.name)}</b><span class="pct num">${progress}%</span></div><p class="subjs">${esc(subjOf(t.ss))}</p><div class="stack" aria-label="توزيع حالات الحصص">${seg}</div><div class="teacher-counts"><div><b class="num">${c.total}</b><span>حصة</span></div><div><b class="num">${c.logged}</b><span>مرصودة</span></div><div><b class="num">${c.pending}</b><span>لم تُرصد</span></div></div><p class="teacher-phone">نسبة الرصد ${progress}% · ${wa?'الجوال متوفر ✓':'الجوال غير مسجل'}</p>${reps.has(t.name)?`<span class="tag rep">تكرر ×${incOf(t).length}</span>`:''}${state.notesOnly?`<div class="tnote">${t.ss.filter(noteOf).map(s=>esc(DAYS[s.day].n+' · '+s.label+': '+noteOf(s))).join('\n')}</div>`:''}<div class="teacher-actions"><button class="btn" data-teacher="${esc(t.name)}">عرض التقرير</button>${wa?`<button type="button" class="wabtn" data-wapdf="${esc(t.name)}">واتساب PDF</button>`:'<span class="note">أضف الجوال من التقرير</span>'}</div></article>`}).join('')||'<p class="empty">لا يوجد معلم مطابق للبحث أو الفلتر.</p>';
+  $('tCount').textContent=`${list.length} من ${all.length} منسوب · ${all.filter(t=>t.personnel).length} إداري ومشرف · ${noted.size} عليهم ملاحظات · ${reps.size} تكررت ملاحظاتهم`;
+  $('tGrid').innerHTML=list.map(t=>{if(!t.ss.length)return personnelCard(t);const c=tStats(t.ss),progress=pct(c.logged,c.total);const seg=['done','late','absent','tech'].map(k=>c[k]?`<i class="s-${k}" style="width:${c[k]*100/c.total}%;background:var(--st)"></i>`:'').join('');const wa=waLink(t);
+    return `<article class="tcard teacher-card" aria-pressed="${state.teacher===t.name}"><div class="row"><b>${esc(t.name)}</b><span class="pct num">${progress}%</span></div><p class="subjs">${esc(subjOf(t.ss))}${t.personnel?' · '+esc(t.personnel.title):''}</p><div class="stack" aria-label="توزيع حالات الحصص">${seg}</div><div class="teacher-counts"><div><b class="num">${c.total}</b><span>حصة</span></div><div><b class="num">${c.logged}</b><span>مرصودة</span></div><div><b class="num">${c.pending}</b><span>لم تُرصد</span></div></div><p class="teacher-phone">نسبة الرصد ${progress}% · ${wa?'الجوال متوفر ✓':'الجوال غير مسجل'}</p>${reps.has(t.name)?`<span class="tag rep">تكرر ×${incOf(t).length}</span>`:''}${state.notesOnly?`<div class="tnote">${t.ss.filter(noteOf).map(s=>esc(DAYS[s.day].n+' · '+s.label+': '+noteOf(s))).join('\n')}</div>`:''}<div class="teacher-actions"><button class="btn" data-teacher="${esc(t.name)}">عرض التقرير</button>${wa?`<button type="button" class="wabtn" data-wapdf="${esc(t.name)}">واتساب PDF</button>`:'<span class="note">أضف الجوال من التقرير</span>'}</div></article>`}).join('')||'<p class="empty">لا يوجد منسوب مطابق للبحث أو الفلتر.</p>';
   const sel=all.find(t=>t.name===state.teacher);const box=$('tDetail');
-  if(!sel){box.hidden=true;return}box.hidden=false;const c=tStats(sel.ss);
+  if(!sel){box.hidden=true;return}box.hidden=false;if(!sel.ss.length){renderPersonnelProfile(sel,box);return}const c=tStats(sel.ss);
   box.innerHTML=`<div class="tdetail-head"><div><h2>${esc(sel.name)}</h2><p>${esc(subjOf(sel.ss))} · ${esc(clsOf(sel.ss))}</p></div><div class="filters">${state.downloads?'<button class="btn ghost" id="tPrint">طباعة</button><button class="btn" id="tPdf">تحميل PDF</button>'+(incOf(sel).length?`<button class="btn ghost" id="tLetter">خطاب تنبيه (${incOf(sel).length})</button>`:''):''}<button class="btn ghost" id="tClose">إغلاق</button></div></div>
   <div class="wa"><label for="tPhone">جوال المعلم</label><input id="tPhone" type="tel" inputmode="tel" placeholder="05xxxxxxxx" value="${esc(state.phones[sel.name]||'')}" ${state.role===-1&&state.isEditor&&state.db?'':'disabled'}>${state.role===-1&&state.isEditor&&state.db?'<button class="btn ghost" id="tPhoneSave">حفظ الرقم</button>':''}<button type="button" class="wabtn" id="tWa" data-wapdf="${esc(sel.name)}" aria-disabled="${waLink(sel)?'false':'true'}" ${waLink(sel)?'':'disabled'}>إرسال التقرير PDF بالواتساب</button><span class="note" id="tWaNote">${waLink(sel)?'يُرسَل التقرير كملف PDF بنفس شكل الطباعة. تظهر قائمة المشاركة ومعها الملف، فاختر واتساب ثم المعلم (في الكمبيوتر يلزم تثبيت تطبيق واتساب لويندوز).':(state.role===-1&&state.isEditor?'أضف رقم الجوال ثم احفظه لتفعيل الإرسال.':'لم يُضف رقم جوال لهذا المعلم بعد (يضيفه المدير).')}</span></div>
   <div class="tstats"><div class="tstat"><span>عدد الحصص</span><b class="num">${c.total}</b></div><div class="tstat s-done"><span>تمت في وقتها</span><b class="num">${c.done}</b></div><div class="tstat s-late"><span>بدأت متأخرة</span><b class="num">${c.late}</b></div><div class="tstat s-absent"><span>لم تُعقد</span><b class="num">${c.absent}</b></div><div class="tstat s-tech"><span>مشكلة تقنية</span><b class="num">${c.tech}</b></div><div class="tstat"><span>لم تُرصد</span><b class="num">${c.pending}</b></div><div class="tstat"><span>متوسط التقييم</span><b class="num">${fmtAvg(c.avg)}</b></div><div class="tstat"><span>نسبة حضور الطلاب</span><b class="num">${c.att==null?'—':c.att+'%'}</b></div></div>
@@ -998,7 +1006,7 @@ function renderTeachers(){const normal=s=>String(s).normalize('NFKC').replace(/[
     const phones={...state.phones};if(raw)phones[sel.name]=raw.slice(0,20);else delete phones[sel.name];
     try{await state.db.doc('config/phones').set({phones});state.phones=phones;toast('تم حفظ الرقم');renderTeachers()}catch(e){toast('تعذّر حفظ الرقم')}};}
 $('tSearch').addEventListener('input',renderTeachers);
-['tSort','tOnlyPending'].forEach(id=>$(id).addEventListener('change',renderTeachers));
+['tSort','tOnlyPending','tPersonnel'].forEach(id=>$(id).addEventListener('change',renderTeachers));
 // ---------- whatsapp PDF ----------
 const waPdfCache=new Map();
 function waShortText(t){return `السلام عليكم ورحمة الله، أ. ${t.name}\nمرفق تقرير متابعة الحصص عن بُعد – ثانوية الصحافة الأهلية\n${rangeText()}\nشاكرين جهودكم.`}
@@ -1127,8 +1135,8 @@ async function exportDoc(kind,title,pages){const dl=state.downloads;if(!dl){toas
   if(window.__STANDALONE){const f=document.createElement('iframe');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';f.srcdoc=wrapDoc(title,pages.join(''),false);
     f.onload=()=>{setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){toast('تعذّرت الطباعة')}setTimeout(()=>f.remove(),60000)},600)};document.body.appendChild(f);return}
   try{await dl.save({filename:fname+'-للطباعة.html',data:wrapDoc(title,pages.join(''),true)})}catch(e){if(e&&e.code!=='cancelled')toast('تعذّر التحميل')}}
-$('allPdf').onclick=()=>exportDoc('pdf','تقارير المعلمين',teachersIn(scope().filter(inRange)).map(teacherPage));
-$('allPrint').onclick=()=>exportDoc('print','تقارير المعلمين',teachersIn(scope().filter(inRange)).map(teacherPage));
+$('allPdf').onclick=()=>exportDoc('pdf','منسوبي القسم الثانوي',window.DepartmentPersonnel.members(teachersIn(scope().filter(inRange))).map(t=>t.ss.length?teacherPage(t):personnelPage(t)));
+$('allPrint').onclick=()=>exportDoc('print','منسوبي القسم الثانوي',window.DepartmentPersonnel.members(teachersIn(scope().filter(inRange))).map(t=>t.ss.length?teacherPage(t):personnelPage(t)));
 $('genPdf').onclick=()=>exportDoc('pdf','التقرير العام',[generalPage()]);
 $('genPrint').onclick=()=>exportDoc('print','التقرير العام',[generalPage()]);
 $('wkPdf').onclick=()=>{renderReport();exportDoc('pdf','التقرير الأسبوعي',[weekPage(state.reportRows||[])])};
@@ -1671,7 +1679,7 @@ function showBanner(t){const b=$('banner');b.textContent=t;b.hidden=false}
 })();
 </script>
 
-<script src="accountability-admin.js?v=acc-20261107-pdf4"></script>
+<script src="accountability-admin.js?v=personnel-20261107"></script>
 <script src="security-audit.js?v=login-20261014"></script></body>
 </html>
 
