@@ -4,6 +4,8 @@
   const F=window.__FUACC;if(!window.ACC||!F)return;
   const state=F.state,S=F.S,toast=F.toast;
   const A=window.ACC,esc=A.esc;
+  const standalone=new URLSearchParams(location.search).get('view')==='accountability';
+  if(standalone){document.body.classList.add('acc-page');document.title='إدارة المساءلات — ثانوية الصحافة';}
   // الأسماء الكاملة كما في نموذج رصد المخالفات (تُقترح تلقائيًا عند اختيار المعلم)
   const FULL=['وليد احمد حمود حامد الحداد','تركي إبراهيم شقير','مولي الطيب مولي الطيب','موسي حمد العطو','محمود محمد حمادة عبود','محمد محمود احمد زيد','محمد عبد الرحمن عبدالرحيم احمد','محمد صادق أحمد الشيمي','محمد ذواب فلاج العضيله المطيري','محمد السيد السيد الطاووس','محمد الحصري','مجاهد عبده مصلح الهجوة','ماهر راكان حميد أباظة','فيصل بشير محمد غريب','عبدالمجيد صالح محمد العمري','عبدالحكيم احمد محمد قاسم','عبدالتواب خليفة محمد احمد','عبد العزيز محمد عبد العزيز الشهري','عبد الرحمن احمد مصلع جذمي','عامر مجممي','عادل محمد محمد قايد','سعد عبد الله عايض القرني','حسين سعد حسين القحطاني','حسان طه صالح محمد','تامر محمد محمد السيد','ايهاب ابراهيم الشافعي','الصادق ابراهيم عبداللطيف عبدالله','احمد حمدي عبدالسلام طلبة','أحمد نجيب عبد السلام فهمي','أحمد عبد الحافظ','أحمد سمير منصور سعد','خالد محمد الشتوي','محمد سفر عايض الاحمري','على نعمان','محمد فكري','بكر الدوخي','صابر محمد','أحمد حفني'];
   const norm=s=>String(s||'').replace(/[أإآا]/g,'ا').replace(/[ىي]/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,'').replace(/^عبد/,'عبد');
@@ -19,6 +21,12 @@
   // ---------- markup ----------
   const css=document.createElement('style');css.textContent=`
   #acLog table th,#acLog table td{padding:10px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top} .acc-timeline{line-height:1.9;padding-inline-start:22px}
+  body.acc-page>:not(#acDrawer):not(#gate):not(script):not(style){display:none!important}
+  body.acc-page #acDrawer{inset:0!important;width:100%;max-width:none;height:100dvh;box-shadow:none}
+  body.acc-page #acDrawer .drawer-head,body.acc-page #acDrawer .drawer-foot{padding-inline:clamp(16px,4vw,64px)}
+  body.acc-page #acDrawer .drawer-body{padding-inline:clamp(16px,4vw,64px)}
+  body.acc-page #acStats{grid-template-columns:repeat(4,minmax(0,1fr))}
+  @media(max-width:620px){body.acc-page #acStats{grid-template-columns:repeat(2,minmax(0,1fr))}}
   .acc-tabs{display:flex;gap:6px}.acc-tabs button{flex:1;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:8px;font-weight:600}.acc-tabs button[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft)}
   .acc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}@media(max-width:620px){.acc-grid{grid-template-columns:1fr}}
   .acc-grid select,.acc-grid input,.acc-in{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:9px 10px;color:var(--ink)}
@@ -159,8 +167,9 @@
   document.querySelectorAll('[data-acctab]').forEach(x=>x.onclick=()=>setTab(x.dataset.acctab));
   function openAcc(){if(state.role!==-1)return;paintForm();setTab('log');listen();$a('acMsg').textContent='';$a('acScrim').hidden=false;$a('acDrawer').hidden=false;$a('acClose').focus({preventScroll:true})}
   function closeAcc(){$a('acScrim').hidden=true;$a('acDrawer').hidden=true}
-  btn.onclick=openAcc;$a('acClose').onclick=closeAcc;$a('acScrim').onclick=closeAcc;
-  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAcc()});
+  if(standalone){$a('acDrawer').setAttribute('role','main');$a('acDrawer').removeAttribute('aria-modal');$a('acClose').textContent='العودة للمنصة'}
+  btn.onclick=()=>{if(standalone){openAcc();return}const url=new URL(location.href);url.searchParams.set('view','accountability');url.hash='';window.open(url.href,'_blank')};$a('acClose').onclick=()=>{if(standalone){const url=new URL(location.href);url.searchParams.delete('view');location.href=url.href}else closeAcc()};$a('acScrim').onclick=closeAcc;
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!standalone)closeAcc()});
   // إظهار الزر للمدير فقط + إيقاف الاستماع عند تغيّر الحساب
-  setInterval(()=>{let signed=false;try{signed=!!(firebase.apps.length&&firebase.auth().currentUser)}catch(e){}const show=state.role===-1&&signed;if(btn.hidden===show)btn.hidden=!show;if(!show&&stop){stop();stop=null;list=[];closeAcc()}},800);
+  setInterval(()=>{let signed=false;try{signed=!!(firebase.apps.length&&firebase.auth().currentUser)}catch(e){}const show=state.role===-1&&signed;if(standalone&&show&&$a('acDrawer').hidden)openAcc();if(btn.hidden===show)btn.hidden=!show;if(!show&&stop){stop();stop=null;list=[];closeAcc()}},800);
 })();
