@@ -145,6 +145,66 @@ service cloud.firestore {
       allow delete: if false;
     }
   }
+  // Personal assignments: immutable originals, ordered account-owned signatures, shared final archive.
+  function assignmentUser() { return employee(); }
+  function assignmentReader(d) { return admin() || assignmentUser() && request.auth.uid in d.targetUids; }
+  function assignmentFinisher(d) { return assignmentReader(d) && d.status == 'open' && d.signedCount == d.order.size(); }
+  function assignmentOrder(d) {
+    let directory = get(/databases/$(database)/documents/config/employeeDirectory).data.entries;
+    let coordinator = directory['admin-2'].uid;
+    let manager = directory['admin-1'].uid;
+    return directory['admin-2'].active == true && directory['admin-1'].active == true &&
+      coordinator != manager && d.order is list && d.order.size() in [2,3] &&
+      d.order == (d.ownerUid in [coordinator,manager] ? [coordinator,manager] : [d.ownerUid,coordinator,manager]) &&
+      d.targetUids == d.order && d.targets is map && d.targets.keys().toSet() == d.order.toSet() &&
+      get(/databases/$(database)/documents/employeeProfiles/$(d.ownerUid)).data.active == true &&
+      get(/databases/$(database)/documents/employeeProfiles/$(d.ownerUid)).data.name == d.ownerName;
+  }
+  match /assignments/{assignmentId} {
+    allow read: if assignmentReader(resource.data);
+    allow create: if admin() && request.resource.data.keys().hasOnly(['title','fileName','fileSize','fileHash','chunkCount','ownerUid','ownerName','order','targetUids','targets','slots','status','signedCount','createdAt','createdBy']) &&
+      request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 150 &&
+      request.resource.data.fileName is string && request.resource.data.fileName.size() <= 255 &&
+      request.resource.data.fileSize is int && request.resource.data.fileSize > 0 && request.resource.data.fileSize <= 10485760 &&
+      request.resource.data.fileHash is string && request.resource.data.fileHash.matches('[0-9a-f]{64}') &&
+      request.resource.data.chunkCount is int && request.resource.data.chunkCount >= 1 && request.resource.data.chunkCount <= 26 &&
+      request.resource.data.slots is list && request.resource.data.slots.size() in [2,3] &&
+      assignmentOrder(request.resource.data) && request.resource.data.status == 'uploading' && request.resource.data.signedCount == 0 &&
+      request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+    allow update: if admin() && resource.data.status == 'uploading' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','publishedAt']) &&
+      request.resource.data.status == 'open' && request.resource.data.publishedAt == request.time;
+    allow update: if assignmentUser() && resource.data.status == 'open' && resource.data.signedCount < resource.data.order.size() && resource.data.order[resource.data.signedCount] == request.auth.uid &&
+      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['signedCount']) && request.resource.data.signedCount == resource.data.signedCount + 1 &&
+      !exists(/databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(request.auth.uid)) &&
+      getAfter(/databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(request.auth.uid)).data.signedBy == request.auth.uid &&
+      getAfter(/databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(request.auth.uid)).data.signedAt == request.time;
+    allow update: if assignmentFinisher(resource.data) &&
+      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','archivedAt','archivedBy','finalHash','finalSize','finalChunkCount']) &&
+      request.resource.data.status == 'archived' && request.resource.data.archivedAt == request.time && request.resource.data.archivedBy == request.auth.uid &&
+      request.resource.data.finalHash.matches('[0-9a-f]{64}') && request.resource.data.finalSize is int && request.resource.data.finalSize > 0 && request.resource.data.finalSize <= 20971520 &&
+      request.resource.data.finalChunkCount is int && request.resource.data.finalChunkCount >= 1 && request.resource.data.finalChunkCount <= 80;
+    allow delete: if false;
+    match /receipts/{uid} {
+      function assignment() { return get(/databases/$(database)/documents/assignments/$(assignmentId)).data; }
+      allow read: if assignmentReader(assignment());
+      allow create: if assignmentUser() && uid == request.auth.uid && assignment().status == 'open' && assignment().signedCount < assignment().order.size() && assignment().order[assignment().signedCount] == uid &&
+        request.resource.data.keys().hasOnly(['name','title','statement','signatureImage','fileHash','signedBy','signedAt']) &&
+        request.resource.data.name == assignment().targets[uid].name && request.resource.data.title == assignment().targets[uid].title &&
+        request.resource.data.statement == 'اطلعت على التكليف وأعتمده' && request.resource.data.fileHash == assignment().fileHash &&
+        request.resource.data.signatureImage is string && request.resource.data.signatureImage.size() > 50 && request.resource.data.signatureImage.size() <= 95000 &&
+        request.resource.data.signatureImage.matches('data:image/png;base64,[A-Za-z0-9+/=]+') &&
+        request.resource.data.signedBy == uid && request.resource.data.signedAt == request.time &&
+        getAfter(/databases/$(database)/documents/assignments/$(assignmentId)).data.signedCount == assignment().signedCount + 1;
+      allow update,delete: if false;
+    }
+    match /parts/{partId} {
+      function assignment() { return get(/databases/$(database)/documents/assignments/$(assignmentId)).data; }
+      allow read: if assignmentReader(assignment()) && (!partId.matches('final-.*') || assignment().status == 'archived');
+      allow create,update: if request.resource.data.keys().hasOnly(['data']) && request.resource.data.data is string && request.resource.data.data.size() > 0 && request.resource.data.data.size() <= 550000 &&
+        (admin() && assignment().status == 'uploading' && partId.matches('original-[0-9]+') || assignmentFinisher(assignment()) && partId.matches('final-[0-9]+'));
+      allow delete: if false;
+    }
+  }
   match /securityAudit/{event} { allow read: if admin(); allow write: if false; }
   match /securityLoginAttempts/{event} { allow read: if admin(); allow write: if false; }
   match /securityAlerts/{event} { allow read: if admin(); allow write: if false; }
