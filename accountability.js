@@ -76,22 +76,18 @@
     el.innerHTML=`<style>${CSS}</style>${formHTML(a)}`;
     const img=el.querySelector('img');if(img&&!img.complete)await new Promise(r=>{img.onload=img.onerror=r});
     try{const pdf=new root.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
-      const capture=async node=>{const canvas=await root.html2canvas(node,{scale:1.5,backgroundColor:'#ffffff',logging:false,useCORS:true});pdf.addImage(canvas.toDataURL('image/jpeg',.72),'JPEG',0,0,210,297)};
+      const capture=async node=>{const canvas=await root.html2canvas(node,{scale:1.5,backgroundColor:'#ffffff',logging:false,useCORS:true});if(canvas.width!==undefined&&(!canvas.width||!canvas.height))throw Error('pdf-empty-canvas');if(canvas.getContext){const pixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;let ink=false;for(let i=0;i<pixels.length;i+=388){if(pixels[i+3]>0&&(pixels[i]<240||pixels[i+1]<240||pixels[i+2]<240)){ink=true;break}}if(!ink)throw Error('pdf-empty-canvas');}pdf.addImage(canvas.toDataURL('image/jpeg',.72),'JPEG',0,0,210,297)};
       await capture(el.querySelector('.accp'));
-      // Full-text continuation keeps long replies/decisions that exceed the official form's fixed lines.
-      if(a.archiveClosing){
-        const paragraphs=[`سجل المساءلة النهائي · ${a.id}`,`المعلم: ${a.teacherFull||a.teacher}`,`تاريخ الواقعة: ${a.date||'—'} · تاريخ الإغلاق: ${a.archiveClosedDate||'—'}`,`أغلقها: ${a.archiveActor||'—'}`,'موضوع المساءلة:',...subjectText(a),'رد المعلم:',a.reply||'لم يسجل رد','قرار المسؤول المباشر:',a.decision||'—','قرار المشرف العام:',a.generalDecision||'لم يسجل قرار إضافي',`الإجراء: ${ACTIONS[(+a.action||0)-1]||'—'}`,`مبلغ الحسم: ${a.amount||'—'} · العقوبة: ${a.penalty||'—'}`,`إنشاء: ${isoOf(a.createdAt)||'غير مسجل'} · ${a.createdBy||a.monitor||'—'}`,`رد: ${isoOf(a.replyAt)||'غير مسجل'} · ${a.replyUid||a.teacher}`,`قرار: ${isoOf(a.decidedAt)||'غير مسجل'} · ${a.decidedBy||'—'}`];
-        const all=paragraphs.flatMap(t=>wrap(t,W-100,15));
-        for(let start=0;start<all.length;start+=30){pdf.addPage();el.innerHTML=`<style>${CSS}</style><div class="accp"><h2>ملحق المساءلة · ${esc(a.id)}</h2>${all.slice(start,start+30).map(t=>`<div style="height:30px;line-height:30px;font-size:15px;white-space:pre">${esc(t)}</div>`).join('')}<p>ملحق ${Math.floor(start/30)+1} · النص الكامل المحفوظ</p></div>`;await capture(el.querySelector('.accp'))}
-      }
       return pdf.output('blob')}
     finally{el.innerHTML=''}}
 
   const fileName=a=>('مساءلة-'+(a.teacher||'')+'-'+(a.date||'')+'-'+(a.id||'')).replace(/\s+/g,'-')+'.pdf';
   let pdfQueue=Promise.resolve();
-  async function renderPdfFile(a){if(a.archivePdf){const bytes=Uint8Array.from(atob(a.archivePdf),c=>c.charCodeAt(0));return new File([bytes],a.archiveFileName||fileName(a),{type:'application/pdf'})}return new File([await pdfBlob(a)],fileName(a),{type:'application/pdf'})}
+  // Files marked نموذج- use the corrected one-page renderer. Earlier saved PDFs remain untouched;
+  // their display copy is rebuilt from the immutable record to match the official preview.
+  async function renderPdfFile(a){if(a.archivePdf&&a.archiveFileName&&a.archiveFileName.startsWith('نموذج-')){const bytes=Uint8Array.from(atob(a.archivePdf),c=>c.charCodeAt(0));return new File([bytes],a.archiveFileName||fileName(a),{type:'application/pdf'})}return new File([await pdfBlob(a)],fileName(a),{type:'application/pdf'})}
   function pdfFile(a){const job=pdfQueue.then(()=>renderPdfFile(a));pdfQueue=job.catch(()=>{});return job}
-  function download(file){const u=URL.createObjectURL(file);const x=document.createElement('a');x.href=u;x.download=file.name;document.body.appendChild(x);x.click();setTimeout(()=>{x.remove();URL.revokeObjectURL(u)},4000)}
+  function download(file){const u=URL.createObjectURL(file);const x=document.createElement('a');x.href=u;x.download=file.name;document.body.appendChild(x);x.click();setTimeout(()=>{x.remove();URL.revokeObjectURL(u)},120000)}
   const canShare=f=>{try{return !!navigator.share&&!!navigator.canShare&&navigator.canShare({files:[f]})}catch(e){return false}};
   const waUrl=(phone,text)=>{const p=normPhone(phone);return 'https://wa.me/'+(p||'')+'?text='+encodeURIComponent(text)};
 
@@ -120,9 +116,21 @@
     const f=await pdfFile({...a,archivePdf:null,archiveClosing:true,archiveClosedDate,archiveActor});
     if(f.size>680000)throw Error('archive-too-large');
     const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(f)});
-    return {archivePdf:base64,archiveFileName:f.name,archiveVersion:1,archiveClosedDate,archiveActor};
+    return {archivePdf:base64,archiveFileName:'نموذج-'+f.name,archiveVersion:1,archiveClosedDate,archiveActor};
   }
-  function viewPdf(a){return pdfFile(a).then(f=>{const u=URL.createObjectURL(f);const w=root.open(u,'_blank');if(!w)download(f);setTimeout(()=>URL.revokeObjectURL(u),60000)})}
+  async function viewPdf(a){
+    const overlay=document.createElement('section');overlay.className='acc-pdf-viewer';
+    overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','عرض المساءلة PDF');
+    overlay.style.cssText='position:fixed;inset:0;z-index:1000;background:#eef2f6;flex-direction:column;direction:rtl';overlay.style.setProperty('display','flex','important');
+    overlay.innerHTML=`<div style="display:flex;gap:12px;align-items:center;padding:14px;background:#fff;flex-wrap:wrap"><strong>نسخة المساءلة · PDF</strong><a data-download hidden style="padding:10px">تحميل PDF</a><a data-open hidden target="_blank" rel="noopener" style="padding:10px">فتح في تبويب جديد</a><button data-close style="margin-inline-start:auto;padding:10px">إغلاق العرض</button></div><p data-loading style="padding:18px">جارٍ تجهيز الملف…</p><div data-paper style="overflow:auto;flex:1;min-height:0;padding:12px"><div style="width:max-content;margin:auto"><style>${CSS}</style>${formHTML(a)}</div></div>`;
+    document.body.appendChild(overlay);let url=null,closed=false;const close=()=>{closed=true;overlay.remove();document.removeEventListener('keydown',onKey);if(url)URL.revokeObjectURL(url)};const onKey=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();close()}};
+    overlay.querySelector('[data-close]').onclick=close;document.addEventListener('keydown',onKey);overlay.querySelector('[data-close]').focus();
+    try{const file=await pdfFile(a);if(closed)return;url=URL.createObjectURL(file);
+      const downloadLink=overlay.querySelector('[data-download]');downloadLink.href=url;downloadLink.download=file.name;downloadLink.hidden=false;
+      const openLink=overlay.querySelector('[data-open]');openLink.href=url;openLink.hidden=false;
+      overlay.querySelector('[data-loading]').textContent='النموذج المعروض مطابق لملف PDF · ورقة واحدة. استخدم «تحميل PDF» لحفظه.';
+    }catch(error){close();throw error}
+  }
   // Firestore does not guarantee map key order across snapshot sources.
   function sameRecord(a,b){
     const canonical=v=>v instanceof Date?v.toISOString():Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;

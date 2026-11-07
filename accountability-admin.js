@@ -21,12 +21,13 @@
   // ---------- markup ----------
   const css=document.createElement('style');css.textContent=`
   #acLog table th,#acLog table td{padding:10px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top} .acc-timeline{line-height:1.9;padding-inline-start:22px}
-  body.acc-page>:not(#acDrawer):not(#gate):not(script):not(style){display:none!important}
+  body.acc-page>:not(#acDrawer):not(#gate):not(#accPdfHost):not(.acc-pdf-viewer):not(.html2canvas-container):not(script):not(style){display:none!important}
   body.acc-page #acDrawer{inset:0!important;width:100%;max-width:none;height:100dvh;box-shadow:none}
   body.acc-page #acDrawer .drawer-head,body.acc-page #acDrawer .drawer-foot{padding-inline:clamp(16px,4vw,64px)}
   body.acc-page #acDrawer .drawer-body{padding-inline:clamp(16px,4vw,64px)}
   body.acc-page #acStats{grid-template-columns:repeat(4,minmax(0,1fr))}
   @media(max-width:620px){body.acc-page #acStats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .acc-card[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft)}
   .acc-tabs{display:flex;gap:6px}.acc-tabs button{flex:1;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:8px;font-weight:600}.acc-tabs button[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft)}
   .acc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}@media(max-width:620px){.acc-grid{grid-template-columns:1fr}}
   .acc-grid select,.acc-grid input,.acc-in{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:9px 10px;color:var(--ink)}
@@ -127,15 +128,16 @@
   function paintList(){
     const q=$a('acSearch').value.trim().toLocaleLowerCase('ar'),f=$a('acFilter').value,from=$a('acFrom').value,to=$a('acTo').value,type=$a('acType').value;
     const live=list.filter(a=>a.status!=='deleted');
-    $a('acStats').innerHTML=[['إجمالي المساءلات',live.length],['بانتظار رد المعلم',live.filter(a=>(a.status||'sent')==='sent').length],['بانتظار القرار',live.filter(a=>a.status==='replied').length],['مغلقة ومؤرشفة',live.filter(a=>a.archivedAt).length]].map(([t,n])=>`<div class="acc-card"><b>${esc(t)}</b><strong>${n}</strong></div>`).join('');
+    $a('acStats').innerHTML=[['إجمالي المساءلات',live.length,'all'],['بانتظار رد المعلم',live.filter(a=>(a.status||'sent')==='sent').length,'sent'],['بانتظار القرار',live.filter(a=>a.status==='replied').length,'replied'],['مغلقة ومؤرشفة',live.filter(a=>a.archivedAt).length,'archived']].map(([t,n,key])=>`<button type="button" class="acc-card" data-stat="${key}" aria-pressed="${String(key==='all'?f===''&&scope==='all':f===key)}" style="text-align:right;cursor:pointer;font:inherit;color:inherit"><b>${esc(t)}</b><strong>${n}</strong></button>`).join('');
     $a('acActive').setAttribute('aria-pressed',String(scope==='active'));$a('acArchive').setAttribute('aria-pressed',String(scope==='archive'));
     const types=[...new Set(live.flatMap(a=>a.items||[]))];$a('acType').innerHTML='<option value="">كل المخالفات</option>'+types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');$a('acType').value=type;
-    const rows=list.filter(a=>f==='deleted'?a.status==='deleted':a.status!=='deleted'&&(f==='archived'?!!a.archivedAt:(scope==='archive'?!!a.archivedAt:!a.archivedAt))&&(!f||f==='archived'||(a.status||'sent')===f)).filter(a=>(!q||[a.teacher,a.teacherFull,a.id,...A.subjectText(a)].join(' ').toLocaleLowerCase('ar').includes(q))&&(!from||a.date>=from)&&(!to||a.date<=to)&&(!type||(a.items||[]).includes(type))).sort((a,b)=>Number(!!overdue(b))-Number(!!overdue(a))||(b.date||'').localeCompare(a.date||'')||when(b)-when(a));
+    const rows=list.filter(a=>f==='deleted'?a.status==='deleted':a.status!=='deleted'&&(f==='archived'?!!a.archivedAt:(scope==='all'?true:scope==='archive'?!!a.archivedAt:!a.archivedAt))&&(!f||f==='archived'||(a.status||'sent')===f)).filter(a=>(!q||[a.teacher,a.teacherFull,a.id,...A.subjectText(a)].join(' ').toLocaleLowerCase('ar').includes(q))&&(!from||a.date>=from)&&(!to||a.date<=to)&&(!type||(a.items||[]).includes(type))).sort((a,b)=>Number(!!overdue(b))-Number(!!overdue(a))||(b.date||'').localeCompare(a.date||'')||when(b)-when(a));
     $a('acCount').textContent=`(${live.length})`;
     $a('acList').innerHTML=`<p class="muted">${rows.length} مساءلة · المتأخرة أولًا ثم الأحدث</p><div style="overflow:auto"><table style="width:100%;border-collapse:collapse;text-align:right"><thead><tr><th>الرقم</th><th>المعلم</th><th>الموضوع</th><th>تاريخ الواقعة</th><th>تاريخ الإغلاق</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>${rows.map(a=>`<tr><td>${esc(a.id)}</td><td>${esc(a.teacher)}</td><td>${esc(A.subjectText(a).join('، '))}</td><td>${esc(a.date||'—')}</td><td>${esc(A.isoOf(a.archivedAt)||'—')}</td><td><span class="acc-st ${esc(a.status||'sent')}">${a.archivedAt?'مغلقة ومؤرشفة':esc(A.STATUS[a.status||'sent'])}${overdue(a)?' · متأخرة':''}</span></td><td><button class="btn ghost" data-open-record="${esc(a.id)}">فتح التفاصيل</button></td></tr>`).join('')}</tbody></table></div>${rows.length?'':'<p>لا توجد مساءلات مطابقة.</p>'}<div id="acSelected"></div>`;
 
   }
   ['acSearch','acFrom','acTo'].forEach(id=>$a(id).oninput=paintList);['acFilter','acType'].forEach(id=>$a(id).onchange=paintList);
+  $a('acStats').addEventListener('click',e=>{const b=e.target.closest('[data-stat]');if(!b)return;const key=b.dataset.stat;scope=key==='all'?'all':key==='archived'?'archive':'active';$a('acFilter').value=key==='all'?'':key;$a('acSearch').value='';$a('acFrom').value='';$a('acTo').value='';$a('acType').value='';paintList()});
   $a('acActive').onclick=()=>{scope='active';$a('acFilter').value='';paintList()};$a('acArchive').onclick=()=>{scope='archive';$a('acFilter').value='';paintList()};
   function listen(){if(stop)return;stop=fs().collection(A.COL).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+(d.data().decidedAt&&d.data().decidedAt.seconds||'')}));paintList()},e=>{stop=null;$a('acMsg').textContent=e&&e.code==='permission-denied'?'لا توجد صلاحية لقراءة المساءلات — انشر قواعد الأمان المحدّثة في Firebase.':'تعذّر تحميل المساءلات.'})}
   $a('acList').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.openRecord){const record=list.find(a=>a.id===b.dataset.openRecord);if(record){$a('acSelected').innerHTML=card(record);$a('acSelected').scrollIntoView({behavior:'smooth',block:'start'})}return}const el=b.closest('[data-id]');const a=list.find(x=>x.id===el.dataset.id);if(!a)return;

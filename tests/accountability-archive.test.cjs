@@ -10,17 +10,17 @@ function setup(size=120){
   vm.runInNewContext(source,{window,document,URL,File,Blob,FileReader:Reader,Uint8Array,atob,setTimeout,console,Intl,Date});
   return {A:window.ACC,pages,get captures(){return captures}};
 }
-test('archive includes full long response, decisions, reference, closing date and actor',async()=>{
+test('archive creates a single-page official form and keeps stored source fields untouched',async()=>{
   const env=setup();const a={id:'legacy-123',teacher:'معلم',date:'2026-10-01',reply:('رد طويل '.repeat(400))+'علامةالنهاية',decision:'القرار النهائي',generalDecision:'قرار المشرف',status:'decided',archiveActor:'admin-1'};
   const result=await env.A.archiveData(a);
   assert.equal(result.archiveVersion,1);assert.equal(result.archiveActor,'admin-1');assert.match(result.archiveFileName,/2026-10-01-legacy-123/);
-  assert.ok(env.pages.length>2);assert.ok(env.pages.some(x=>x.includes('علامةالنهاية')));assert.ok(env.pages.some(x=>x.includes('قرار المشرف')));
+  assert.equal(env.pages.length,1);assert.ok(a.reply.endsWith('علامةالنهاية'));assert.ok(env.pages[0].includes('قرار المشرف'));
   const count=env.captures;const saved=await env.A.pdfFile({...a,...result});assert.equal(env.captures,count,'archived download must use saved bytes without regenerating');
   assert.deepEqual(Buffer.from(await saved.arrayBuffer()),Buffer.from(result.archivePdf,'base64'));
 });
 test('oversize PDFs reject before any archive is returned',async()=>{const {A}=setup(680001);await assert.rejects(A.archiveData({id:'1',teacher:'معلم',date:'2026-11-07'}),/archive-too-large/)});
 test('older records without archive fields still generate PDFs',async()=>{const {A}=setup();const f=await A.pdfFile({teacher:'قديم',date:'2026-10-01',reply:'رد محفوظ',decision:'قرار محفوظ'});assert.equal(f.type,'application/pdf');assert.ok(f.size)});
-test('PDF render queue recovers after failed job',async()=>{const {A}=setup();await assert.rejects(A.pdfFile({archivePdf:'!invalid'}));const f=await A.pdfFile({teacher:'معلم',date:'2026-11-07'});assert.ok(f.size)});
+test('PDF render queue recovers after failed job',async()=>{const {A}=setup();await assert.rejects(A.pdfFile({archivePdf:'!invalid',archiveFileName:'نموذج-invalid.pdf'}));const f=await A.pdfFile({teacher:'معلم',date:'2026-11-07'});assert.ok(f.size)});
 test('teacher history retains legacy records, excludes deleted, sorts and filters archive/month',()=>{
   const {A}=setup();const elements=new Map();let section,authCallback;
   const element=()=>({innerHTML:'',value:'',hidden:true,setAttribute(){},addEventListener(){}});
@@ -48,4 +48,9 @@ test('snapshot comparison ignores Firestore map ordering but detects actual edit
   assert.equal(A.sameRecord(first,{...reordered,decision:'تعديل حقيقي'}),false);
   assert.equal(A.sameRecord(first,{...reordered,items:['ب','أ']}),false);
   assert.equal(A.sameRecord(first,{...reordered,decidedAt:{seconds:123,nanoseconds:46}}),false);
+});
+
+test('older archived PDFs are rendered again as the one-page preview without changing original bytes',async()=>{
+ const env=setup();const old={id:'legacy-archived',teacher:'معلم',date:'2026-10-01',archivePdf:'old-multipage-bytes',archiveFileName:'مساءلة-old.pdf',archiveVersion:1};
+ const f=await env.A.pdfFile(old);assert.ok(f.size);assert.equal(env.captures,1);assert.equal(old.archivePdf,'old-multipage-bytes');
 });
