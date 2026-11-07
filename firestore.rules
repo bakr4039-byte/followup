@@ -80,6 +80,57 @@ service cloud.firestore {
     allow update: if teacher() && resource.data.teacher == teacherName() && resource.data.status == 'sent' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply','replyAt','replyUid','status']) && request.resource.data.status == 'replied' && request.resource.data.replyUid == request.auth.uid && request.resource.data.replyAt == request.time && request.resource.data.reply is string && request.resource.data.reply.size() > 0 && request.resource.data.reply.size() <= 1500;
     allow delete: if false;
   }
+  // PDF acknowledgements. Each signer can create one immutable receipt from their own account.
+  function signatureActor() { return staff() && role() >= -1 && role() <= 7 || teacher(); }
+  function signatureKey() { return staff() ? 's:' + string(role()) : 't:' + teacherName(); }
+  function signatureReader(data) { return admin() || signatureActor() && signatureKey() in data.targetKeys; }
+  function signatureStatement(kind) { return kind == 'approval' ? 'اطلعت وأوافق' : 'اطلعت وأقرّ بالاستلام'; }
+  match /signDocuments/{documentId} {
+    allow read: if signatureReader(resource.data);
+    allow create: if admin() && request.resource.data.keys().hasOnly(['title','fileName','fileSize','fileHash','chunkCount','targets','targetKeys','kind','status','signedCount','createdAt','createdBy']) &&
+      request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 150 &&
+      request.resource.data.fileName is string && request.resource.data.fileName.size() <= 255 &&
+      request.resource.data.fileSize is int && request.resource.data.fileSize > 0 && request.resource.data.fileSize <= 10485760 &&
+      request.resource.data.fileHash is string && request.resource.data.fileHash.matches('[0-9a-f]{64}') &&
+      request.resource.data.chunkCount is int && request.resource.data.chunkCount >= 1 && request.resource.data.chunkCount <= 26 &&
+      request.resource.data.targetKeys is list && request.resource.data.targetKeys.size() >= 1 && request.resource.data.targetKeys.size() <= 80 &&
+      request.resource.data.targetKeys.toSet().size() == request.resource.data.targetKeys.size() &&
+      request.resource.data.targets is map && request.resource.data.targets.keys().toSet() == request.resource.data.targetKeys.toSet() &&
+      request.resource.data.kind in ['receipt','approval'] && request.resource.data.status == 'uploading' && request.resource.data.signedCount == 0 &&
+      request.resource.data.createdAt == request.time && request.resource.data.createdBy == request.auth.uid;
+    allow update: if admin() && resource.data.status == 'uploading' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','publishedAt']) &&
+      request.resource.data.status == 'open' && request.resource.data.publishedAt == request.time;
+    allow update: if signatureActor() && resource.data.status == 'open' && signatureKey() in resource.data.targetKeys &&
+      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['signedCount']) && request.resource.data.signedCount == resource.data.signedCount + 1 &&
+      !exists(/databases/$(database)/documents/signDocuments/$(documentId)/receipts/$(signatureKey())) &&
+      getAfter(/databases/$(database)/documents/signDocuments/$(documentId)/receipts/$(signatureKey())).data.signedBy == request.auth.uid &&
+      getAfter(/databases/$(database)/documents/signDocuments/$(documentId)/receipts/$(signatureKey())).data.signedAt == request.time;
+    allow update: if admin() && resource.data.status == 'open' && resource.data.signedCount == resource.data.targetKeys.size() &&
+      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','archivedAt','archivedBy','finalHash','finalChunkCount','finalSize']) && request.resource.data.status == 'archived' &&
+      request.resource.data.archivedAt == request.time && request.resource.data.archivedBy == request.auth.uid &&
+      request.resource.data.finalHash is string && request.resource.data.finalHash.matches('[0-9a-f]{64}') &&
+      request.resource.data.finalChunkCount is int && request.resource.data.finalChunkCount >= 1 && request.resource.data.finalChunkCount <= 80 &&
+      request.resource.data.finalSize is int && request.resource.data.finalSize > 0 && request.resource.data.finalSize <= 20971520;
+    allow delete: if false;
+    match /receipts/{signerKey} {
+      function parent() { return get(/databases/$(database)/documents/signDocuments/$(documentId)).data; }
+      allow read: if signatureReader(parent());
+      allow create: if signatureActor() && signerKey == signatureKey() && signerKey in parent().targetKeys && parent().status == 'open' &&
+        request.resource.data.keys().hasOnly(['name','title','statement','fileHash','signedBy','signedAt']) &&
+        request.resource.data.name == parent().targets[signerKey].name && request.resource.data.title == parent().targets[signerKey].title &&
+        request.resource.data.statement == signatureStatement(parent().kind) && request.resource.data.fileHash == parent().fileHash &&
+        request.resource.data.signedBy == request.auth.uid && request.resource.data.signedAt == request.time &&
+        getAfter(/databases/$(database)/documents/signDocuments/$(documentId)).data.signedCount == parent().signedCount + 1;
+      allow update, delete: if false;
+    }
+    match /parts/{partId} {
+      function parent() { return get(/databases/$(database)/documents/signDocuments/$(documentId)).data; }
+      allow read: if signatureReader(parent()) && (!partId.matches('final-.*') || parent().status == 'archived');
+      allow create, update: if admin() && request.resource.data.keys().hasOnly(['data']) && request.resource.data.data is string && request.resource.data.data.size() > 0 && request.resource.data.data.size() <= 550000 &&
+        (partId.matches('original-[0-9]+') && parent().status == 'uploading' || partId.matches('final-[0-9]+') && parent().status == 'open' && parent().signedCount == parent().targetKeys.size());
+      allow delete: if false;
+    }
+  }
   match /securityAudit/{event} { allow read: if admin(); allow write: if false; }
   match /securityLoginAttempts/{event} { allow read: if admin(); allow write: if false; }
   match /securityAlerts/{event} { allow read: if admin(); allow write: if false; }

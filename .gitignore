@@ -1,0 +1,4 @@
+.openai/
+qa-preview/
+tests/node_modules/
+*-debug.log
