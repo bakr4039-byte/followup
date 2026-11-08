@@ -1,0 +1,3 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),WeekModes=require('../week-modes.js');
+test('unspecified weeks preserve remote and onsite weeks leave report denominator',()=>{const weeks=['2026-10-11','2026-10-18','2026-10-25'],m={'2026-10-18':'onsite'};assert.equal(WeekModes.remote(m,weeks[0]),true);assert.deepEqual(WeekModes.remoteWeeks(weeks,m),[weeks[0],weeks[2]]);m[weeks[1]]='remote';assert.deepEqual(WeekModes.remoteWeeks(weeks,m),weeks)});
+test('period reports use each week independently of displayed week',()=>{const s=fs.readFileSync('index.html','utf8');assert.match(s,/w>=from&&w<=to&&WeekModes.remote\(weekModes,w\)/);assert.match(s,/const list=scope\(w\);const c=withLogs/)});

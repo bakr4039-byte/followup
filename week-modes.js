@@ -1,0 +1,1 @@
+(function(root){'use strict';const api={remote:(m,w)=>m[w]!== 'onsite',remoteWeeks:(ws,m)=>ws.filter(w=>m[w]!=='onsite')};root.WeekModes=api;if(typeof module==='object')module.exports=api;})(typeof window==='object'?window:globalThis);
