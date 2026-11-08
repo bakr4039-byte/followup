@@ -187,6 +187,16 @@ service cloud.firestore {
       request.resource.data.finalHash.matches('[0-9a-f]{64}') && request.resource.data.finalSize is int && request.resource.data.finalSize > 0 && request.resource.data.finalSize <= 20971520 &&
       request.resource.data.finalChunkCount is int && request.resource.data.finalChunkCount >= 1 && request.resource.data.finalChunkCount <= 80;
     allow delete: if false;
+    match /notifications/{notificationId} {
+      function assignment() { return get(/databases/$(database)/documents/assignments/$(assignmentId)).data; }
+      allow read: if admin();
+      allow create: if admin() && assignment().status == 'open' && assignment().signedCount < assignment().order.size() &&
+        request.resource.data.keys().hasOnly(['recipientUid','confirmedBy','confirmedAt','channel','stage','fileHash']) &&
+        request.resource.data.recipientUid == assignment().order[assignment().signedCount] &&
+        request.resource.data.stage == assignment().signedCount && request.resource.data.fileHash == assignment().fileHash &&
+        request.resource.data.confirmedBy == request.auth.uid && request.resource.data.confirmedAt == request.time && request.resource.data.channel == 'whatsapp';
+      allow update,delete: if false;
+    }
     match /receipts/{uid} {
       function assignment() { return get(/databases/$(database)/documents/assignments/$(assignmentId)).data; }
       allow read: if assignmentReader(assignment());
