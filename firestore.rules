@@ -6,32 +6,38 @@ service cloud.firestore {
   function role() { return get(/databases/$(database)/documents/staffAccess/$(request.auth.uid)).data.role; }
   function admin() { return staff() && role() == -1; }
   function accountabilityRecorder() { return signed() && exists(/databases/$(database)/documents/accountabilityRecorders/$(request.auth.uid)) && get(/databases/$(database)/documents/accountabilityRecorders/$(request.auth.uid)).data.active == true; }
-  function fullRead() { return staff() && role() in [-1,8]; }
-  function ownStaff(id) { return staff() && (role() in [0,1,2,3] && id.matches(role() == 0 ? 'c1-.*' : role() == 1 ? 'c2-.*' : role() == 2 ? 'c3-.*' : '(ba|cs)-.*') || role() in [4,5,6,7] && get(/databases/$(database)/documents/lessonCatalog/$(id)).data.teacher in get(/databases/$(database)/documents/config/monitors).data.teachers.get('m' + string(role()-4), [])); }
+  function fullRead() { return staff() && role() in [-1,8] || hasPersonalTasks() && get(/databases/$(database)/documents/personalTasks/$(request.auth.uid)).data.get('reports',false) == true; }
+  function legacyStaff(id) { return staff() && (role() in [0,1,2,3] && id.matches(role() == 0 ? 'c1-.*' : role() == 1 ? 'c2-.*' : role() == 2 ? 'c3-.*' : '(ba|cs)-.*') || role() in [4,5,6,7] && get(/databases/$(database)/documents/lessonCatalog/$(id)).data.teacher in get(/databases/$(database)/documents/config/monitors).data.teachers.get('m' + string(role()-4), [])); }
+  function hasPersonalTasks() { return employee() && exists(/databases/$(database)/documents/personalTasks/$(request.auth.uid)) && get(/databases/$(database)/documents/personalTasks/$(request.auth.uid)).data.active == true; }
+  function lessonRole(id) { return id.matches('c1-.*') ? 0 : id.matches('c2-.*') ? 1 : id.matches('c3-.*') ? 2 : 3; }
+  function catalogId(id) { return id.split('@')[0]; }
+  function personalResponsible(id) { return hasPersonalTasks() && exists(/databases/$(database)/documents/lessonCatalog/$(catalogId(id))) && lessonRole(id) in get(/databases/$(database)/documents/personalTasks/$(request.auth.uid)).data.responsibilities; }
+  function personalMonitor(id) { return hasPersonalTasks() && get(/databases/$(database)/documents/lessonCatalog/$(catalogId(id))).data.teacher in get(/databases/$(database)/documents/personalTasks/$(request.auth.uid)).data.monitorTeachers; }
+  function ownStaff(id) { return legacyStaff(id) || personalResponsible(id) || personalMonitor(id); }
   function teacher() { return request.auth != null && request.auth.token.get('teacher',false) == true && get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.active == true; }
   function subTeacher(week, id) { return teacher() && exists(/databases/$(database)/documents/config/$('subs-' + week)) && get(/databases/$(database)/documents/config/$('subs-' + week)).data.get('map', {}).get(id, {}).get('t', '') == get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.get('scheduleName', '-'); }
   function ownTeacher(id) { return teacher() && get(/databases/$(database)/documents/teacherLessonAccess/$(request.auth.uid)).data.lessonIds.get(id,false) == true; }
   // Complete original records remain available as an immutable administrative archive.
   match /logs/{id} { allow read: if fullRead(); allow write: if false; }
   match /weeks/{week}/logs/{id} { allow read: if fullRead(); allow write: if false; }
-  function supervisor(id) { return ownStaff(id) && role() in [0,1,2,3]; }
-  function monitor(id) { return ownStaff(id) && role() in [4,5,6,7]; }
+  function supervisor(id) { return staff() && legacyStaff(id) && role() in [0,1,2,3] || personalResponsible(id); }
+  function monitor(id) { return staff() && legacyStaff(id) && role() in [4,5,6,7] || personalMonitor(id); }
   function cleanCore() { return request.resource.data.keys().hasOnly(['absent','by','day','entry','present','rating','ratingMon','reason','recorded','status','sup','teacher','updatedAt','updatedBy','week','monBy','monAt','monUid','src','cleared','clearedAt','clearedBy']) && (resource == null || request.resource.data.keys().hasAll(resource.data.keys())); }
   function changed(key) { return resource == null ? key in request.resource.data : request.resource.data.diff(resource.data).affectedKeys().hasAny([key]); }
   function countValue(key) { let value = request.resource.data.get(key,null); return !changed(key) || value == null || value is int && value >= 0; }
   function ratingValue(key) { let value = request.resource.data.get(key,0); return !changed(key) || value is int && value >= 0 && value <= 5; }
   function validValues() { return countValue('present') && countValue('absent') && ratingValue('rating') && ratingValue('ratingMon') && (!changed('status') || request.resource.data.status in ['', 'pending', 'done', 'late', 'absent', 'tech']); }
   function validClearActor() { return !changed('clearedBy') && !changed('clearedAt') || admin() && request.resource.data.clearedBy == request.auth.uid && request.resource.data.clearedAt is string; }
-  function responsibleActor() { return request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is string && request.resource.data.by == role(); }
-  function validMonitorActor() { return request.resource.data.monUid == request.auth.uid && request.resource.data.monAt is string && request.resource.data.monBy == (admin() ? -1 : role()-4); }
-  function adminCore() { return admin() && responsibleActor() && validClearActor() && (!(changed('ratingMon') || changed('monUid') || changed('monBy') || changed('monAt')) || validMonitorActor()); }
-  function supervisorCore(id) { return supervisor(id) && responsibleActor() && (resource == null ? request.resource.data.get('ratingMon',0) == 0 && !request.resource.data.keys().hasAny(['monBy','monAt','monUid','clearedAt','clearedBy']) : !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ratingMon','monBy','monAt','monUid','clearedAt','clearedBy'])); }
+  function responsibleActor(id) { return request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is string && (staff() && request.resource.data.by == role() || personalResponsible(id) && request.resource.data.by == lessonRole(id)); }
+  function validMonitorActor() { return request.resource.data.monUid == request.auth.uid && request.resource.data.monAt is string && (staff() && request.resource.data.monBy == (admin() ? -1 : role()-4) || hasPersonalTasks() && request.resource.data.monBy == 0); }
+  function adminCore(id) { return admin() && responsibleActor(id) && validClearActor() && (!(changed('ratingMon') || changed('monUid') || changed('monBy') || changed('monAt')) || validMonitorActor()); }
+  function supervisorCore(id) { return supervisor(id) && responsibleActor(id) && (resource == null ? request.resource.data.get('ratingMon',0) == 0 && !request.resource.data.keys().hasAny(['monBy','monAt','monUid','clearedAt','clearedBy']) : !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ratingMon','monBy','monAt','monUid','clearedAt','clearedBy'])); }
   function monitorCore(id) { return monitor(id) && validMonitorActor() && (resource == null ? request.resource.data.keys().hasOnly(['sup','day','teacher','week','ratingMon','monBy','monAt','monUid']) : request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingMon','monBy','monAt','monUid'])); }
   function validNote() { return request.resource.data.keys().hasOnly(['text','updatedBy','updatedAt']) && request.resource.data.text is string && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is string; }
   match /recordWeeks/{week}/logs/{id} {
     allow get: if fullRead() || ownStaff(id) || ownTeacher(id) || subTeacher(week, id);
     allow list: if fullRead();
-    allow create,update: if cleanCore() && validValues() && (adminCore() || supervisorCore(id) || monitorCore(id));
+    allow create,update: if cleanCore() && validValues() && (adminCore(id) || supervisorCore(id) || monitorCore(id));
     allow delete: if false;
   }
   match /recordWeeks/{week}/vcNotes/{id} {
@@ -57,20 +63,30 @@ service cloud.firestore {
     allow list: if fullRead();
     allow write: if false;
   }
-  match /links/{id} { allow get: if fullRead() || ownStaff(id); allow list: if fullRead(); allow write: if admin() || ownStaff(id) && role() in [0,1,2,3]; }
+  match /links/{id} { allow get: if fullRead() || ownStaff(id); allow list: if fullRead(); allow write: if admin() || supervisor(id); }
   match /staffAccess/{uid} { allow get: if request.auth != null && request.auth.uid == uid || admin(); allow list,write: if admin(); }
   match /lessonCatalog/{id} { allow read: if staff(); allow write: if false; }
   match /config/main { allow read: if true; allow write: if admin(); }
   match /config/monitors { allow read: if true; allow write: if admin(); }
   match /config/secure { allow read: if true; allow write: if admin() && request.resource.data.enabled == true; }
   match /config/phones { allow read: if staff(); allow write: if admin(); }
-  match /config/{id} { allow read: if admin() || id.matches('subs-.*') && (staff() || teacher()); allow write: if admin(); }
+  match /config/{id} { allow read: if admin() || id.matches('subs-.*') && (staff() || teacher() || hasPersonalTasks()); allow write: if admin(); }
   match /meta/rules2 { allow get: if true; allow write: if false; }
   match /teacherProfiles/{uid} { allow get: if request.auth != null && request.auth.uid == uid && teacher(); }
   function teacherName() { return get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.get('scheduleName', '-'); }
   function employee() { return signed() && exists(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)) && get(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)).data.active == true; }
   function employeeName() { return get(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)).data.name; }
   function ownsAccountability() { return teacher() && resource.data.teacher == teacherName() || employee() && resource.data.teacher == employeeName(); }
+  match /personalTasks/{uid} {
+    allow get: if admin() || employee() && uid == request.auth.uid;
+    allow list: if admin();
+    allow create,update: if admin() && request.resource.data.keys().hasOnly(['active','responsibilities','monitorTeachers','reports','updatedAt','updatedBy']) &&
+      request.resource.data.active is bool && request.resource.data.get('reports',false) is bool && request.resource.data.responsibilities is list && request.resource.data.responsibilities.size() <= 4 &&
+      request.resource.data.responsibilities.hasOnly([0,1,2,3]) && request.resource.data.monitorTeachers is list && request.resource.data.monitorTeachers.size() <= 100 &&
+      request.resource.data.updatedAt == request.time && request.resource.data.updatedBy == request.auth.uid &&
+      get(/databases/$(database)/documents/employeeProfiles/$(uid)).data.active == true;
+    allow delete: if false;
+  }
   match /employeeProfiles/{uid} {
     allow get: if admin() || request.auth != null && request.auth.uid == uid && employee();
     allow list: if admin();

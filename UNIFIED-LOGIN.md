@@ -1,0 +1,11 @@
+# Unified personnel access
+
+Teachers, employees and the accountability recorder enter through `login.html` with their existing username/password. Numbers written with Arabic digits normalize to the same login identifier. Existing Firebase identities, passwords, lesson IDs, accountability records, assignments and receipts are retained. Manager access remains separate in `index.html`. Passwords are never collected, decrypted, stored or copied by this change.
+
+Employees receive personal follow-up duties from manager-reviewed `personalTasks/{employeeUid}` documents. These specify responsibility for class groups, an explicit list of monitored schedule names and optional read-only report access. The employee portal links to the existing follow-up workspace, reusing its protected record and note groups. Database rules enforce scope independently of the UI; employees cannot edit their own duties, access another employee's assignment, view unauthorized note groups or write report-only records. Weekly lesson links resolve against the original catalog ID.
+
+Manager UI **توزيع مهام الإداريين والمشرفين** lets the manager choose a personal employee for each class responsibility and individual teachers for every supervisor. Exact unambiguous name matches are suggested for previous responsibility labels; unknown placeholders remain blank. No teacher assignments are guessed. Saving requires manager action. Optional retirement disables legacy shared staff role profiles (0–8) only after all previous responsibility and monitored-teacher coverage is assigned, and a report recipient is chosen when needed. Primary manager (-1) and personal identities are preserved. No historical IDs are removed or signatures reassigned.
+
+The unified entry contains no legacy shared-role login buttons. Existing legacy identity records remain until the manager explicitly retires them. This does not claim that existing passwords can be compared for uniqueness: Firebase does not reveal passwords. Account/usernames are retained, and the same person uses their personal account for approval and assigned duties.
+
+Deploy the tested Firestore rules before assigning duties. Existing account activation and password change steps remain manual and do not form part of this migration.
