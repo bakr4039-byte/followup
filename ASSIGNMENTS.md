@@ -9,3 +9,5 @@ Signers first view the PDF, then draw or upload their own PNG/JPEG/WebP signatur
 The last approval triggers composition and private final-PDF storage. Every target and the platform manager can retry finalization after a network interruption. Until finalization, the request remains open; archived originals, receipts and PDF parts cannot be modified. Existing accountability and generic document signing flows remain unchanged.
 
 Deploy the tested Firestore rules before importing. The rules grant each active recipient access only to their requests and completed PDFs. No outgoing messages or automatic signatures are generated.
+
+Independent assignment titles remain active side by side for the same employee; only a newer request with the same owner and title supersedes a previous version. A bundle containing a deputy signature slot adds the active educational deputy (directory admin-3) between coordinator and principal. Existing three-signer assignments retain their original route.

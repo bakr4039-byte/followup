@@ -153,9 +153,12 @@ service cloud.firestore {
     let directory = get(/databases/$(database)/documents/config/employeeDirectory).data.entries;
     let coordinator = directory['admin-2'].uid;
     let manager = directory['admin-1'].uid;
+    let deputy = directory.get('admin-3', {}).get('uid', '');
     return directory['admin-2'].active == true && directory['admin-1'].active == true &&
-      coordinator != manager && d.order is list && d.order.size() in [2,3] &&
-      d.order == (d.ownerUid in [coordinator,manager] ? [coordinator,manager] : [d.ownerUid,coordinator,manager]) &&
+      coordinator != manager && d.order is list && d.order.size() in [2,3,4] &&
+      (d.order == (d.ownerUid in [coordinator,manager] ? [coordinator,manager] : [d.ownerUid,coordinator,manager]) ||
+       (deputy != '' && deputy != coordinator && deputy != manager && directory['admin-3'].active == true &&
+        d.order == (d.ownerUid in [coordinator,deputy,manager] ? [coordinator,deputy,manager] : [d.ownerUid,coordinator,deputy,manager]))) &&
       d.targetUids == d.order && d.targets is map && d.targets.keys().toSet() == d.order.toSet() &&
       get(/databases/$(database)/documents/employeeProfiles/$(d.ownerUid)).data.active == true &&
       get(/databases/$(database)/documents/employeeProfiles/$(d.ownerUid)).data.name == d.ownerName;
@@ -168,7 +171,7 @@ service cloud.firestore {
       request.resource.data.fileSize is int && request.resource.data.fileSize > 0 && request.resource.data.fileSize <= 10485760 &&
       request.resource.data.fileHash is string && request.resource.data.fileHash.matches('[0-9a-f]{64}') &&
       request.resource.data.chunkCount is int && request.resource.data.chunkCount >= 1 && request.resource.data.chunkCount <= 26 &&
-      request.resource.data.slots is list && request.resource.data.slots.size() in [2,3] &&
+      request.resource.data.slots is list && request.resource.data.slots.size() in [2,3,4] &&
       assignmentOrder(request.resource.data) && request.resource.data.status == 'uploading' && request.resource.data.signedCount == 0 &&
       request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
     allow update: if admin() && resource.data.status == 'uploading' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','publishedAt']) &&
