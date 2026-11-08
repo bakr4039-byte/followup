@@ -1109,7 +1109,8 @@ function weekPage(rows){const c=tStats(rows);const sups=(effSup()<0?[0,1,2,3]:[e
   <h2>حسب المسؤول</h2><table><thead><tr><th>المسؤول</th><th>الصفوف</th><th>الحصص</th><th>مرصودة</th><th>تمت</th><th>متأخرة</th><th>لم تُعقد</th><th>تقنية</th><th>نسبة الرصد</th><th>التقييم</th></tr></thead><tbody>${supRows}</tbody></table>
   <h2>سجل الحصص</h2><table><thead><tr><th>اليوم</th><th>الحصة</th><th>الصف</th><th>المادة</th><th>المعلم</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>التقييم</th><th>ملاحظات</th></tr></thead><tbody>${body}</tbody></table>
   <div class="sign"><div>المتابِع</div><div>وكيل الشؤون التعليمية</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div></section>`}
-function wrapDoc(title,body,autoPrint){return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;700&display=swap"><style>${PRINT_CSS}</style></head><body><div class="toolbar"><span>${esc(title)}</span><button onclick="window.print()">طباعة</button></div><div class="wrapper">${body}</div>${autoPrint?'<script>window.addEventListener("load",function(){setTimeout(function(){window.print()},500)})<\/script>':''}</body></html>`}
+function wrapDoc(title,body,autoPrint){return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;700&display=swap"><style>${PRINT_CSS}</style></head><body><div class="toolbar"><span>${esc(title)}</span><button onclick="window.print()">طباعة</button></div><div class="wrapper">${body}</div>${autoPrint?'<script>window.addEventListener("load",function(){setTimeout(function(){window.print()},500)})<\/script>':''}<script src="recorder-accounts.js?v=20261108-1"></script>
+</body></html>`}
 // scoped copy of the print styles for in-page PDF rendering
 const PDF_CSS=('.pdfdoc{font-family:"IBM Plex Sans Arabic",Tahoma,Arial,sans-serif;direction:rtl;color:#13231f;font-size:12.5px;line-height:1.5;background:#fff}.pdfdoc *{box-sizing:border-box}.pdfdoc .page{width:718px;background:#fff;padding:0 0 6px}.pdfdoc table{min-width:0;width:100%;table-layout:auto}.pdfdoc th,.pdfdoc td{white-space:normal;position:static}'+
   PRINT_CSS.split('\n').filter(l=>!/^(@page|\.page|\.toolbar|\.wrapper|@media)/.test(l)).join('\n').replace(/(^|})\s*([^{}@]+)\{/g,(m,a,sel)=>a+sel.split(',').map(x=>'.pdfdoc '+x.trim()).join(',')+'{'));
@@ -1679,7 +1680,7 @@ function showBanner(t){const b=$('banner');b.textContent=t;b.hidden=false}
 })();
 </script>
 
-<script src="accountability-admin.js?v=acc-create-only-20261108"></script>
+<script src="accountability-admin.js?v=recorder-20261108-1"></script>
 <script src="security-audit.js?v=login-20261014"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script src="document-signing.js?v=employee-20261107-1"></script><script src="employee-accounts.js?v=employee-20261107-1"></script><script src="assignment-signing.js?v=assignment-20261108-wa1"></script>
 </body>
 </html>
