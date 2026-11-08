@@ -5,7 +5,7 @@
   const state=F.state,S=F.S,toast=F.toast;
   const A=window.ACC,esc=A.esc;
   const standalone=new URLSearchParams(location.search).get('view')==='accountability';
-  if(standalone){document.body.classList.add('acc-page');document.title='إدارة المساءلات — ثانوية الصحافة';}
+  if(standalone){document.body.classList.add('acc-page');document.title='مساءلة جديدة — ثانوية الصحافة';}
   // الأسماء الكاملة كما في نموذج رصد المخالفات (تُقترح تلقائيًا عند اختيار المعلم)
   const FULL=['وليد احمد حمود حامد الحداد','تركي إبراهيم شقير','مولي الطيب مولي الطيب','موسي حمد العطو','محمود محمد حمادة عبود','محمد محمود احمد زيد','محمد عبد الرحمن عبدالرحيم احمد','محمد صادق أحمد الشيمي','محمد ذواب فلاج العضيله المطيري','محمد السيد السيد الطاووس','محمد الحصري','مجاهد عبده مصلح الهجوة','ماهر راكان حميد أباظة','فيصل بشير محمد غريب','عبدالمجيد صالح محمد العمري','عبدالحكيم احمد محمد قاسم','عبدالتواب خليفة محمد احمد','عبد العزيز محمد عبد العزيز الشهري','عبد الرحمن احمد مصلع جذمي','عامر مجممي','عادل محمد محمد قايد','سعد عبد الله عايض القرني','حسين سعد حسين القحطاني','حسان طه صالح محمد','تامر محمد محمد السيد','ايهاب ابراهيم الشافعي','الصادق ابراهيم عبداللطيف عبدالله','احمد حمدي عبدالسلام طلبة','أحمد نجيب عبد السلام فهمي','أحمد عبد الحافظ','أحمد سمير منصور سعد','خالد محمد الشتوي','محمد سفر عايض الاحمري','على نعمان','محمد فكري','بكر الدوخي','صابر محمد','أحمد حفني'];
   const norm=s=>String(s||'').replace(/[أإآا]/g,'ا').replace(/[ىي]/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,'').replace(/^عبد/,'عبد');
@@ -140,7 +140,7 @@
   ['acSearch','acFrom','acTo'].forEach(id=>$a(id).oninput=paintList);['acFilter','acType'].forEach(id=>$a(id).onchange=paintList);
   $a('acStats').addEventListener('click',e=>{const b=e.target.closest('[data-stat]');if(!b)return;const key=b.dataset.stat;scope=key==='all'?'all':key==='archived'?'archive':'active';$a('acFilter').value=key==='all'?'':key;$a('acSearch').value='';$a('acFrom').value='';$a('acTo').value='';$a('acType').value='';paintList()});
   $a('acActive').onclick=()=>{scope='active';$a('acFilter').value='';paintList()};$a('acArchive').onclick=()=>{scope='archive';$a('acFilter').value='';paintList()};
-  function listen(){if(stop)return;stop=fs().collection(A.COL).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+(d.data().decidedAt&&d.data().decidedAt.seconds||'')}));paintList()},e=>{stop=null;$a('acMsg').textContent=e&&e.code==='permission-denied'?'لا توجد صلاحية لقراءة المساءلات — انشر قواعد الأمان المحدّثة في Firebase.':'تعذّر تحميل المساءلات.'})}
+  function listen(){if(standalone||stop)return;stop=fs().collection(A.COL).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+(d.data().decidedAt&&d.data().decidedAt.seconds||'')}));paintList()},e=>{stop=null;$a('acMsg').textContent=e&&e.code==='permission-denied'?'لا توجد صلاحية لقراءة المساءلات — انشر قواعد الأمان المحدّثة في Firebase.':'تعذّر تحميل المساءلات.'})}
   $a('acList').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.openRecord){const record=list.find(a=>a.id===b.dataset.openRecord);if(record){$a('acSelected').innerHTML=card(record);$a('acSelected').scrollIntoView({behavior:'smooth',block:'start'})}return}const el=b.closest('[data-id]');const a=list.find(x=>x.id===el.dataset.id);if(!a)return;
     if(b.hasAttribute('data-acc-archive')){
       if(!confirm('إغلاق المساءلة وحفظ نسخة PDF نهائية؟ لن يمكن تعديل النسخة المغلقة.'))return;
@@ -166,12 +166,12 @@
       b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({decision:dec,generalDecision:el.querySelector('[data-general]').value.trim(),action:r?+r.value:0,amount:el.querySelector('[data-amount]').value.trim(),penalty:el.querySelector('[data-penalty]').value.trim(),status:'decided',decidedAt:firebase.firestore.FieldValue.serverTimestamp(),decidedBy:(firebase.auth().currentUser||{}).uid||''});toast('تم إرسال القرار')}catch(err){toast('تعذّر إرسال القرار')}finally{b.disabled=false}}});
 
   // ---------- drawer ----------
-  function setTab(t){tab=t;document.querySelectorAll('[data-acctab]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.acctab===t)));$a('acNew').hidden=t!=='new';$a('acLog').hidden=t!=='log';if(t==='log')paintList()}
+  function setTab(t){if(standalone)t='new';tab=t;document.querySelectorAll('[data-acctab]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.acctab===t)));$a('acNew').hidden=t!=='new';$a('acLog').hidden=t!=='log';if(t==='log')paintList()}
   document.querySelectorAll('[data-acctab]').forEach(x=>x.onclick=()=>setTab(x.dataset.acctab));
-  function openAcc(){if(state.role!==-1)return;paintForm();setTab('log');listen();$a('acMsg').textContent='';$a('acScrim').hidden=false;$a('acDrawer').hidden=false;$a('acClose').focus({preventScroll:true})}
+  function openAcc(){if(state.role!==-1)return;paintForm();setTab(standalone?'new':'log');if(!standalone)listen();$a('acMsg').textContent='';$a('acScrim').hidden=false;$a('acDrawer').hidden=false;$a('acClose').focus({preventScroll:true})}
   function closeAcc(){$a('acScrim').hidden=true;$a('acDrawer').hidden=true}
-  if(standalone){$a('acDrawer').setAttribute('role','main');$a('acDrawer').removeAttribute('aria-modal');$a('acClose').textContent='العودة للمنصة'}
-  btn.onclick=()=>{if(standalone){openAcc();return}const url=new URL(location.href);url.searchParams.set('view','accountability');url.hash='';window.open(url.href,'_blank')};$a('acClose').onclick=()=>{if(standalone){const url=new URL(location.href);url.searchParams.delete('view');location.href=url.href}else closeAcc()};$a('acScrim').onclick=closeAcc;
+  if(standalone){$a('acTitle').textContent='مساءلة جديدة';document.querySelector('[data-acctab="new"]').parentElement.hidden=true;$a('acDrawer').querySelector('.drawer-head p').textContent='أنشئ مساءلة جديدة هنا. تُحفظ تلقائيًا في سجل حساب مدير المدرسة لمتابعة الرد والقرار والأرشفة.';$a('acDrawer').setAttribute('role','main');$a('acDrawer').removeAttribute('aria-modal');$a('acClose').textContent='العودة للمنصة'}
+  btn.onclick=()=>openAcc();$a('acClose').onclick=()=>{if(standalone){const url=new URL(location.href);url.searchParams.delete('view');location.href=url.href}else closeAcc()};$a('acScrim').onclick=closeAcc;
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!standalone)closeAcc()});
   // إظهار الزر للمدير فقط + إيقاف الاستماع عند تغيّر الحساب
   setInterval(()=>{let signed=false;try{signed=!!(firebase.apps.length&&firebase.auth().currentUser)}catch(e){}const show=state.role===-1&&signed;if(standalone&&show&&$a('acDrawer').hidden)openAcc();if(btn.hidden===show)btn.hidden=!show;if(!show&&stop){stop();stop=null;list=[];closeAcc()}},800);
