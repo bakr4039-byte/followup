@@ -574,7 +574,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
 <div class="gate" id="gate">
   <div class="gate-card">
     <div class="brand"><div class="seal" aria-hidden="true">ص</div><div><h1>متابعة الحصص عن بُعد</h1><p>ثانوية الصحافة الأهلية</p></div></div>
-    <a class="btn" href="login.html">دخول المعلمين والإداريين</a><a class="btn" href="login.html">الدخول الموحد للمنسوبين</a>
+    <a class="btn" href="login.html">دخول المعلمين والإداريين</a>
     <div id="gateMsg" class="hint" style="text-align:center">جارٍ التحميل…</div>
     <form id="loginForm" hidden style="display:grid;gap:14px">
       <div class="field"><span class="lbl">الدخول بصفة</span><div class="roles" id="roles"></div></div>
@@ -1418,7 +1418,7 @@ function renderRoles(){const ini=r=>{const n=String(roleName(r)||'').replace(/^(
   const mons=[4,5,6,7].filter(r=>state.secure?secureMons()[r-4]:state.auth&&(state.auth.mons||[])[r-4]);
   const repOn=state.secure?!!(state.secureDoc&&(state.secureDoc.rep||(state.secureDoc.ready||{}).rep===true)):!!storedHash(8);
   const grp=a=>a.map((r,i)=>btn(r,a.length%2===1&&i===a.length-1)).join('');
-  $('roles').innerHTML=btn(-1)+'<p class="rolesH"><a href="login.html">دخول المعلمين والإداريين باسم المستخدم وكلمة المرور</a></p>'}
+  $('roles').innerHTML=btn(-1)}
 
 $('roles').addEventListener('click',e=>{const b=e.target.closest('[data-role]');if(!b)return;loginRole=+b.dataset.role;renderRoles();$('pw').focus()});
 function showGate(mode,msg){const g=$('gate');g.hidden=false;$('gateMsg').textContent=msg||'';$('gateMsg').hidden=!msg;$('loginForm').hidden=mode!=='login';$('setupForm').hidden=mode!=='setup';
