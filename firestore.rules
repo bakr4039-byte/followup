@@ -34,38 +34,40 @@ service cloud.firestore {
   function supervisorCore(id) { return supervisor(id) && responsibleActor(id) && (resource == null ? request.resource.data.get('ratingMon',0) == 0 && !request.resource.data.keys().hasAny(['monBy','monAt','monUid','clearedAt','clearedBy']) : !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ratingMon','monBy','monAt','monUid','clearedAt','clearedBy'])); }
   function monitorCore(id) { return monitor(id) && validMonitorActor() && (resource == null ? request.resource.data.keys().hasOnly(['sup','day','teacher','week','ratingMon','monBy','monAt','monUid']) : request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingMon','monBy','monAt','monUid'])); }
   function validNote() { return request.resource.data.keys().hasOnly(['text','updatedBy','updatedAt']) && request.resource.data.text is string && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is string; }
-  function remoteWeek(week) { return !exists(/databases/$(database)/documents/weekModes/$(week)) || get(/databases/$(database)/documents/weekModes/$(week)).data.mode == 'remote'; }
+  function lessonDayKey(id) { return id.matches('.*-d0-.*') ? '0' : id.matches('.*-d1-.*') ? '1' : id.matches('.*-d2-.*') ? '2' : id.matches('.*-d3-.*') ? '3' : '4'; }
+  function remoteLesson(week,id) { return !exists(/databases/$(database)/documents/weekModes/$(week)) || get(/databases/$(database)/documents/weekModes/$(week)).data.get('days',{}).get(lessonDayKey(id),get(/databases/$(database)/documents/weekModes/$(week)).data.mode) == 'remote'; }
+  function validDayModes(d) { return d is map && d.keys().hasOnly(['0','1','2','3','4']) && d.get('0','remote') in ['remote','onsite'] && d.get('1','remote') in ['remote','onsite'] && d.get('2','remote') in ['remote','onsite'] && d.get('3','remote') in ['remote','onsite'] && d.get('4','remote') in ['remote','onsite']; }
   match /weekModes/{week} {
     allow read: if signed();
-    allow create, update: if admin() && week.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}') && request.resource.data.keys().hasOnly(['mode','updatedAt','updatedBy']) && request.resource.data.mode in ['remote','onsite'] && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+    allow create, update: if admin() && week.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}') && request.resource.data.keys().hasOnly(['mode','days','updatedAt','updatedBy']) && request.resource.data.mode in ['remote','onsite'] && validDayModes(request.resource.data.get('days',{})) && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
     allow delete: if false;
   }
   match /recordWeeks/{week}/logs/{id} {
-    allow get: if fullRead() || ownStaff(id) || remoteWeek(week) && (ownTeacher(id) || subTeacher(week, id));
+    allow get: if fullRead() || ownStaff(id) || remoteLesson(week,id) && (ownTeacher(id) || subTeacher(week, id));
     allow list: if fullRead();
-    allow create,update: if remoteWeek(week) && cleanCore() && validValues() && (adminCore(id) || supervisorCore(id) || monitorCore(id));
+    allow create,update: if remoteLesson(week,id) && cleanCore() && validValues() && (adminCore(id) || supervisorCore(id) || monitorCore(id));
     allow delete: if false;
   }
   match /recordWeeks/{week}/vcNotes/{id} {
-    allow get: if fullRead() || ownStaff(id) || remoteWeek(week) && (ownTeacher(id) || subTeacher(week, id));
+    allow get: if fullRead() || ownStaff(id) || remoteLesson(week,id) && (ownTeacher(id) || subTeacher(week, id));
     allow list: if fullRead();
-    allow create,update: if remoteWeek(week) && validNote() && (admin() || supervisor(id));
+    allow create,update: if remoteLesson(week,id) && validNote() && (admin() || supervisor(id));
     allow delete: if false;
   }
   match /recordWeeks/{week}/supNotes/{id} {
-    allow get: if fullRead() || supervisor(id) || remoteWeek(week) && (ownTeacher(id) || subTeacher(week, id));
+    allow get: if fullRead() || supervisor(id) || remoteLesson(week,id) && (ownTeacher(id) || subTeacher(week, id));
     allow list: if fullRead();
-    allow create,update: if remoteWeek(week) && validNote() && (admin() || supervisor(id));
+    allow create,update: if remoteLesson(week,id) && validNote() && (admin() || supervisor(id));
     allow delete: if false;
   }
   match /recordWeeks/{week}/monitorNotes/{id} {
-    allow get: if fullRead() || monitor(id) || remoteWeek(week) && (ownTeacher(id) || subTeacher(week, id));
+    allow get: if fullRead() || monitor(id) || remoteLesson(week,id) && (ownTeacher(id) || subTeacher(week, id));
     allow list: if fullRead();
-    allow create,update: if remoteWeek(week) && validNote() && (admin() || monitor(id));
+    allow create,update: if remoteLesson(week,id) && validNote() && (admin() || monitor(id));
     allow delete: if false;
   }
   match /recordWeeks/{week}/legacyNotes/{id} {
-    allow get: if fullRead() || remoteWeek(week) && (ownTeacher(id) || subTeacher(week, id));
+    allow get: if fullRead() || remoteLesson(week,id) && (ownTeacher(id) || subTeacher(week, id));
     allow list: if fullRead();
     allow write: if false;
   }
