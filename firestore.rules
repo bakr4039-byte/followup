@@ -77,7 +77,7 @@ service cloud.firestore {
   match /config/main { allow read: if true; allow write: if admin(); }
   match /config/monitors { allow read: if true; allow write: if admin(); }
   match /config/secure { allow read: if true; allow write: if admin() && request.resource.data.enabled == true; }
-  match /config/phones { allow read: if staff(); allow write: if admin(); }
+  match /config/phones { allow get: if staff() || accountabilityRecorder(); allow list: if staff(); allow write: if admin(); }
   match /config/{id} { allow read: if admin() || id.matches('subs-.*') && (staff() || teacher() || hasPersonalTasks()); allow write: if admin(); }
   match /meta/rules2 { allow get: if true; allow write: if false; }
   match /teacherProfiles/{uid} {
@@ -124,7 +124,7 @@ service cloud.firestore {
     return d.keys().hasOnly(['teacher','teacherFull','date','replyDue','time','monitor','items','other','details','teacherPhone','replyPhone','status','createdAt','createdBy']) &&
       d.teacher is string && d.teacher.size() > 0 && d.teacher.size() <= 150 && d.teacherFull is string && d.teacherFull.size() <= 200 &&
       d.date is string && d.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}') && d.replyDue is string && d.replyDue.size() <= 10 &&
-      d.time is string && d.time.size() <= 100 && d.monitor == 'مسؤول رصد المساءلات' &&
+      d.time is string && d.time.size() <= 100 && d.monitor in ["المدير / حسن بن محمد العمري", "الوكيل / عادل عبد الرحيم", "الوكيل / حسين القحطاني", "الوكيل / عبد المجيد العمري", "الأستاذ / محمد الأحمري", "الأستاذ / على نعمان", "الأستاذ / بكر الدوخي", "الأستاذ / إبراهيم المشرقي", "الأستاذ / محمود هلال", "الأستاذ / محمد جوده", "الأستاذ / السيد عبد المجيد", "مدير المدرسة / حسن بن محمد العمري", "وكيل القسم الثانوي، ومنسق الخطة التعليمي / عادل عبد الرحيم", "وكيل الشؤون التعليمية / محمد سفر عايض الأحمري", "وكيل شؤون الطلاب / حسين سعد حسين القحطاني", "وكيل الشؤون المدرسية / عبد المجيد صالح محمد العمري", "الموجه الطلابي والموجه الصحي، ومنسق الأمن والسلامة / خالد محمد سعد الشتوي", "معلم التربية البدنية، ومسؤول الإسعافات الأولية، ومساعد منسق الأمن والسلامة / علي محمد نعمان", "رائد النشاط، ومعلم ذوي الإعاقة / عبد العزيز محمد عبد العزيز الشهري", "مساعد رائد النشاط، وأمين مصادر التعلم / محمد عبد الرحمن عبد الرحيم أحمد", "سكرتير مدير المدرسة، ومسؤول نظام نور / محمد فكري السيد", "الدعم الفني، ومسؤول فيوكلاس وبوابة شواهد التقويم الذاتي / بكر الدوخي", "مدير الشؤون التعليمية والمدرسية، ومشرف الدراسات الإسلامية واللغة العربية / إبراهيم المشرقي", "مشرف العلوم والحاسب الآلي وبقية المواد / السيد عبد المجيد", "مشرف الرياضيات / محمود هلال", "مشرف اللغة الإنجليزية / محمد جودة", "مشرف الصيانة والنظافة / هاني فوده", "محضر مختبر / أحمد سمير منصور", "حارس / محمد علي ظافر العميري", "مساعد إداري لشؤون الطلاب / أحمد عبد الفتاح اللحام", "مساعد إداري لشؤون الطلاب / محمد حسن جباريه", "عامل خدمات / سامح نصر الدين", "عامل خدمات / محمد الباز", "مسؤول رصد المساءلات"] &&
       d.items is list && d.items.size() <= 80 && d.other is string && d.other.size() <= 200 && d.details is string && d.details.size() <= 600 &&
       d.teacherPhone is string && d.teacherPhone.size() <= 20 && d.replyPhone is string && d.replyPhone.size() <= 20 &&
       d.status == 'sent' && d.createdAt == request.time && d.createdBy == request.auth.uid;

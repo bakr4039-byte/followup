@@ -11,7 +11,7 @@
   const FULL=['وليد احمد حمود حامد الحداد','تركي إبراهيم شقير','مولي الطيب مولي الطيب','موسي حمد العطو','محمود محمد حمادة عبود','محمد محمود احمد زيد','محمد عبد الرحمن عبدالرحيم احمد','محمد صادق أحمد الشيمي','محمد ذواب فلاج العضيله المطيري','محمد السيد السيد الطاووس','محمد الحصري','مجاهد عبده مصلح الهجوة','ماهر راكان حميد أباظة','فيصل بشير محمد غريب','عبدالمجيد صالح محمد العمري','عبدالحكيم احمد محمد قاسم','عبدالتواب خليفة محمد احمد','عبد العزيز محمد عبد العزيز الشهري','عبد الرحمن احمد مصلع جذمي','عامر مجممي','عادل محمد محمد قايد','سعد عبد الله عايض القرني','حسين سعد حسين القحطاني','حسان طه صالح محمد','تامر محمد محمد السيد','ايهاب ابراهيم الشافعي','الصادق ابراهيم عبداللطيف عبدالله','احمد حمدي عبدالسلام طلبة','أحمد نجيب عبد السلام فهمي','أحمد عبد الحافظ','أحمد سمير منصور سعد','خالد محمد الشتوي','محمد سفر عايض الاحمري','على نعمان','محمد فكري','بكر الدوخي','صابر محمد','أحمد حفني'];
   const norm=s=>String(s||'').replace(/[أإآا]/g,'ا').replace(/[ىي]/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,'').replace(/^عبد/,'عبد');
   function fullOf(short){const person=window.DepartmentPersonnel?.admins.find(p=>p.name===short);if(person)return person.name;const parts=String(short).split(/\s+/).map(norm).filter(Boolean);const hit=FULL.find(f=>{const n=norm(f);return parts.every(p=>n.includes(p))});return hit||short}
-  const teachers=()=>[...new Set([...S.map(s=>s.teacher),...(window.DepartmentPersonnel?.admins||[]).map(p=>p.name)])].sort((a,b)=>a.localeCompare(b,'ar'));
+  const teachers=()=>[...new Set([...S.map(s=>s.teacher),...Object.keys(state.phones||{}),...(window.DepartmentPersonnel?.admins||[]).map(p=>p.name)])].sort((a,b)=>a.localeCompare(b,'ar'));
   const fs=()=>firebase.firestore();
   const LS='acc-reply-phone';
   const lsGet=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}},lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
@@ -55,7 +55,7 @@
     <div class="acc-grid">
      <div class="field"><label for="acT">المنسوب</label><select id="acT"></select></div>
      <div class="field"><label for="acFull">الاسم في النموذج</label><input id="acFull" class="acc-in"></div>
-     <div class="field"><label for="acTPhone">جوال المعلم (من المنصة)</label><input id="acTPhone" inputmode="tel" placeholder="لا يوجد رقم مسجّل — اكتبه هنا"></div>
+     <div class="field"><label for="acTPhone">جوال المنسوب (من المنصة)</label><input id="acTPhone" inputmode="tel" placeholder="لا يوجد رقم مسجّل — اكتبه هنا"></div>
      <div class="field"><label for="acDate">تاريخ المخالفة <small id="acHijri" style="color:var(--muted)"></small></label><input id="acDate" type="date"></div>
      <div class="field"><label for="acDue">آخر موعد للرد (اختياري)</label><input id="acDue" type="date"></div><div class="field"><label for="acTime">الوقت</label><select id="acTime"></select></div>
      <div class="field"><label for="acMon">قام برصد المخالفة</label><select id="acMon"></select></div>
@@ -75,14 +75,15 @@
 
   // ---------- form ----------
   function paintForm(){const sel=$a('acT');const cur=sel.value;sel.innerHTML='<option value="">— اختر المنسوب —</option>'+teachers().map(t=>{const p=window.DepartmentPersonnel?.admins.find(p=>p.name===t);return `<option value="${esc(t)}">${esc(t)}${p?' — '+esc(p.title):''}</option>`}).join('');sel.value=cur;
-    if(!$a('acTime').options.length){$a('acTime').innerHTML=A.TIMES.map(t=>`<option>${esc(t)}</option>`).join('');$a('acMon').innerHTML=A.MONITORS.map(t=>`<option>${esc(t)}</option>`).join('');
+    if(!$a('acTime').options.length){$a('acTime').innerHTML=A.TIMES.map(t=>`<option>${esc(t)}</option>`).join('');
       $a('acCats').innerHTML=A.CATS.map((c,ci)=>`<details class="acc-cat" ${ci===0?'open':''}><summary>${esc(c.t)}<small data-cnt="${ci}"></small></summary><div class="acc-items">${c.items.map((x,i)=>`<label><input type="checkbox" data-acc="${ci}-${i}">${esc(x)}</label>`).join('')}</div></details>`).join('')}
-    if(window.AccountabilityRecorder){$a('acMon').innerHTML='<option>مسؤول رصد المساءلات</option>';$a('acMon').disabled=true}if(!$a('acDate').value)$a('acDate').value=A.riyadhISO();$a('acPhone').value='';paintHijri()}
+    const monitor=$a('acMon'),currentMonitor=monitor.value;monitor.innerHTML=[...new Set([...A.MONITORS,...(window.DepartmentPersonnel?.admins||[]).map(p=>p.title+' / '+p.name),'مسؤول رصد المساءلات'])].map(t=>`<option>${esc(t)}</option>`).join('');monitor.disabled=false;if([...monitor.options].some(o=>o.value===currentMonitor))monitor.value=currentMonitor;if(!$a('acDate').value)$a('acDate').value=A.riyadhISO();$a('acPhone').value='';paintHijri()}
   function paintHijri(){const d=$a('acDate').value;$a('acHijri').textContent=d?`· ${A.dayName(d)} ${A.hijri(d)}هـ`:''}
   function picked(){return [...$a('acCats').querySelectorAll('input[data-acc]:checked')].map(x=>{const[ci,i]=x.dataset.acc.split('-').map(Number);return A.CATS[ci].items[i]})}
   function draft(){return {teacher:$a('acT').value,teacherFull:$a('acFull').value.trim()||$a('acT').value,date:$a('acDate').value,replyDue:$a('acDue').value,time:$a('acTime').value,monitor:$a('acMon').value,items:picked(),other:$a('acOther').value.trim(),details:$a('acDetails').value.trim(),teacherPhone:A.normPhone($a('acTPhone').value),replyPhone:A.ADMIN_PHONE}}
   const phoneOf=t=>(state.phones&&state.phones[t])||'';
   $a('acT').onchange=()=>{const t=$a('acT').value;$a('acFull').value=t?fullOf(t):'';$a('acTPhone').value=t?phoneOf(t):''};
+  document.addEventListener('accountability-contacts-ready',e=>{const selected=$a('acT').value,previous=e.detail?.previous||{};const refresh=!$a('acTPhone').value||$a('acTPhone').value===(previous[selected]||'');paintForm();if(refresh&&selected)$a('acTPhone').value=phoneOf(selected)});
   $a('acDate').oninput=paintHijri;
   $a('acCats').addEventListener('change',()=>A.CATS.forEach((c,ci)=>{const n=$a('acCats').querySelectorAll(`input[data-acc^="${ci}-"]:checked`).length;const el=$a('acCats').querySelector(`[data-cnt="${ci}"]`);if(el)el.textContent=n?`(${n})`:''}));
   $a('acPreview').onclick=()=>{const p=$a('acPrev');if(!p.hidden){p.hidden=true;$a('acPreview').textContent='معاينة النموذج';return}p.innerHTML=`<style>${A.CSS}</style>`+A.formHTML(draft());p.hidden=false;$a('acPreview').textContent='إخفاء المعاينة';setTimeout(()=>p.scrollIntoView({behavior:'smooth',block:'start'}),50)};
