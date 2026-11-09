@@ -81,9 +81,10 @@ service cloud.firestore {
   match /config/{id} { allow read: if admin() || id.matches('subs-.*') && (staff() || teacher() || hasPersonalTasks()); allow write: if admin(); }
   match /meta/rules2 { allow get: if true; allow write: if false; }
   match /teacherProfiles/{uid} {
-    allow get: if request.auth != null && request.auth.uid == uid && teacher();
+    allow get: if admin() || request.auth != null && request.auth.uid == uid && teacher();
     allow create: if admin() && request.resource.data.keys().hasOnly(['name','scheduleName','phone','email','active','createdBy','createdAt']) && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 150 && request.resource.data.scheduleName == request.resource.data.name && request.resource.data.phone.matches('05[0-9]{8}') && request.resource.data.email == request.resource.data.phone + '@teachers.alsahafa-followup.invalid' && request.resource.data.active == true && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
-    allow update,delete,list: if false;
+    allow list: if admin();
+    allow update,delete: if false;
   }
   function teacherName() { return get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.get('scheduleName', '-'); }
   function employee() { return signed() && exists(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)) && get(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)).data.active == true; }
@@ -194,8 +195,32 @@ service cloud.firestore {
     }
   }
   // Personal assignments: immutable originals, ordered account-owned signatures, shared final archive.
+  function assignmentUid() {
+    let path = /databases/$(database)/documents/accountLinks/$(request.auth.uid);
+    return exists(path) && get(path).data.active == true &&
+      exists(/databases/$(database)/documents/employeeProfiles/$(get(path).data.canonicalUid)) &&
+      get(/databases/$(database)/documents/employeeProfiles/$(get(path).data.canonicalUid)).data.active == true
+      ? get(path).data.canonicalUid : request.auth.uid;
+  }
+  match /accountLinks/{uid} {
+    allow get: if admin() || signed() && request.auth.uid == uid;
+    allow list: if admin();
+    allow create: if admin() && request.resource.data.keys().hasOnly(['canonicalUid','active','ownerName','teacherName','createdBy','createdAt']) &&
+      request.resource.data.canonicalUid is string && request.resource.data.canonicalUid.matches('[A-Za-z0-9_-]{1,128}') &&
+      uid != request.resource.data.canonicalUid && request.resource.data.active == true &&
+      exists(/databases/$(database)/documents/teacherProfiles/$(uid)) &&
+      exists(/databases/$(database)/documents/employeeProfiles/$(request.resource.data.canonicalUid)) &&
+      get(/databases/$(database)/documents/teacherProfiles/$(uid)).data.active == true &&
+      get(/databases/$(database)/documents/employeeProfiles/$(request.resource.data.canonicalUid)).data.active == true &&
+      get(/databases/$(database)/documents/teacherProfiles/$(uid)).data.phone == get(/databases/$(database)/documents/employeeProfiles/$(request.resource.data.canonicalUid)).data.phone &&
+      request.resource.data.ownerName == get(/databases/$(database)/documents/employeeProfiles/$(request.resource.data.canonicalUid)).data.name &&
+      request.resource.data.teacherName == get(/databases/$(database)/documents/teacherProfiles/$(uid)).data.scheduleName &&
+      request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+    allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active']) && request.resource.data.active is bool;
+    allow delete: if false;
+  }
   function assignmentUser() { return employee() || teacher(); }
-  function assignmentReader(d) { return admin() || assignmentUser() && request.auth.uid in d.targetUids; }
+  function assignmentReader(d) { return admin() || assignmentUser() && (request.auth.uid in d.targetUids || assignmentUid() in d.targetUids); }
   function assignmentFinisher(d) { return assignmentReader(d) && d.status == 'open' && d.signedCount == d.order.size(); }
   function assignmentOrder(d) {
     let directory = get(/databases/$(database)/documents/config/employeeDirectory).data.entries;
@@ -224,11 +249,11 @@ service cloud.firestore {
       request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
     allow update: if admin() && resource.data.status == 'uploading' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','publishedAt']) &&
       request.resource.data.status == 'open' && request.resource.data.publishedAt == request.time;
-    allow update: if assignmentUser() && resource.data.status == 'open' && resource.data.signedCount < resource.data.order.size() && resource.data.order[resource.data.signedCount] == request.auth.uid &&
+    allow update: if assignmentUser() && resource.data.status == 'open' && resource.data.signedCount < resource.data.order.size() && resource.data.order[resource.data.signedCount] in [request.auth.uid,assignmentUid()] &&
       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['signedCount']) && request.resource.data.signedCount == resource.data.signedCount + 1 &&
-      !exists(/databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(request.auth.uid)) &&
-      getAfter(/databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(request.auth.uid)).data.signedBy == request.auth.uid &&
-      getAfter(/databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(request.auth.uid)).data.signedAt == request.time;
+      !exists(/databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(resource.data.order[resource.data.signedCount])) &&
+      getAfter(/databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(resource.data.order[resource.data.signedCount])).data.signedBy == resource.data.order[resource.data.signedCount] &&
+      getAfter(/databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(resource.data.order[resource.data.signedCount])).data.signedAt == request.time;
     allow update: if assignmentFinisher(resource.data) &&
       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','archivedAt','archivedBy','finalHash','finalSize','finalChunkCount']) &&
       request.resource.data.status == 'archived' && request.resource.data.archivedAt == request.time && request.resource.data.archivedBy == request.auth.uid &&
@@ -248,13 +273,13 @@ service cloud.firestore {
     match /receipts/{uid} {
       function assignment() { return get(/databases/$(database)/documents/assignments/$(assignmentId)).data; }
       allow read: if assignmentReader(assignment());
-      allow create: if assignmentUser() && uid == request.auth.uid && assignment().status == 'open' && assignment().signedCount < assignment().order.size() && assignment().order[assignment().signedCount] == uid &&
-        request.resource.data.keys().hasOnly(['name','title','statement','signatureImage','fileHash','signedBy','signedAt']) &&
+      allow create: if assignmentUser() && uid in [request.auth.uid,assignmentUid()] && assignment().status == 'open' && assignment().signedCount < assignment().order.size() && assignment().order[assignment().signedCount] == uid &&
+        request.resource.data.keys().hasOnly(['name','title','statement','signatureImage','fileHash','signedBy','signedAt','actorUid']) &&
         request.resource.data.name == assignment().targets[uid].name && request.resource.data.title == assignment().targets[uid].title &&
         request.resource.data.statement == 'اطلعت على التكليف وأعتمده' && request.resource.data.fileHash == assignment().fileHash &&
         request.resource.data.signatureImage is string && request.resource.data.signatureImage.size() > 50 && request.resource.data.signatureImage.size() <= 95000 &&
         request.resource.data.signatureImage.matches('data:image/png;base64,[A-Za-z0-9+/=]+') &&
-        request.resource.data.signedBy == uid && request.resource.data.signedAt == request.time &&
+        request.resource.data.signedBy == uid && request.resource.data.get('actorUid',request.auth.uid) == request.auth.uid && (uid == request.auth.uid || request.resource.data.get('actorUid','') == request.auth.uid) && request.resource.data.signedAt == request.time &&
         getAfter(/databases/$(database)/documents/assignments/$(assignmentId)).data.signedCount == assignment().signedCount + 1;
       allow update,delete: if false;
     }

@@ -81,11 +81,11 @@ const admins=[
     "title": "مشرف الصيانة والنظافة",
     "group": "الإشراف (إدارة المدارس)"
   }
-,{"name": "أحمد سمير منصور", "title": "محضر مختبر", "group": "التكليفات الوظيفية"},{"name": "محمد علي ظافر العميري", "title": "حارس", "group": "التكليفات الوظيفية"},{"name": "أحمد عبد الفتاح اللحام", "title": "مساعد إداري لشؤون الطلاب", "group": "التكليفات الوظيفية"},{"name": "محمد حسن جباريه", "title": "مساعد إداري لشؤون الطلاب", "group": "التكليفات الوظيفية"},{"name": "سامح نصر الدين", "title": "عامل خدمات", "group": "التكليفات الوظيفية"},{"name": "محمد الباز", "title": "عامل خدمات", "group": "التكليفات الوظيفية"}
+,{"name": "أحمد سمير منصور", "aliases": ["أحمد سمير"], "title": "محضر مختبر", "group": "التكليفات الوظيفية"},{"name": "محمد علي ظافر العميري", "title": "حارس", "group": "التكليفات الوظيفية"},{"name": "أحمد عبد الفتاح اللحام", "title": "مساعد إداري لشؤون الطلاب", "group": "التكليفات الوظيفية"},{"name": "محمد حسن جباريه", "title": "مساعد إداري لشؤون الطلاب", "group": "التكليفات الوظيفية"},{"name": "سامح نصر الدين", "title": "عامل خدمات", "group": "التكليفات الوظيفية"},{"name": "محمد الباز", "title": "عامل خدمات", "group": "التكليفات الوظيفية"}
 ];
 const normalize=s=>String(s||'').normalize('NFKC').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/\s+/g,'');
 function members(teachers){const result=teachers.map(t=>({...t,kind:'teacher'}));
- for(const person of admins){const existing=result.find(t=>normalize(t.name)===normalize(person.name));if(existing){existing.personnel=person;existing.kind='both'}else result.push({name:person.name,ss:[],kind:'admin',personnel:person})}
+ for(const person of admins){const existing=result.find(t=>normalize(t.name)===normalize(person.name)||(person.aliases||[]).some(a=>normalize(t.name)===normalize(a)));if(existing){existing.personnel=person;existing.kind='both'}else result.push({name:person.name,ss:[],kind:'admin',personnel:person})}
  return result.sort((a,b)=>a.name.localeCompare(b.name,'ar'));
 }
 root.DepartmentPersonnel={admins,members,normalize};
