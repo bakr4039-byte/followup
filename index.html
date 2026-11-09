@@ -375,7 +375,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
     <div class="brand">
       <div class="seal" aria-hidden="true">ص</div>
       <div>
-        <h1>متابعة الحصص</h1>
+        <h1>إدارة ثانوية الصحافة الأهلية</h1>
         <p id="weekSub">ثانوية الصحافة الأهلية</p>
       </div>
     </div>
@@ -394,7 +394,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
   <section id="overviewSummary" class="overview-summary" aria-label="ملخص المتابعة"></section>
   <div class="nav">
     <div class="weeknav" role="group" aria-label="الأسبوع"><button class="iconbtn" id="wPrev" aria-label="الأسبوع السابق">→ السابق</button><select id="wSel" aria-label="اختيار الأسبوع"></select><label id="weekModeLabel" hidden>نوع الأسبوع <select id="weekMode" aria-label="نوع الأسبوع"><option value="remote">عن بُعد</option><option value="onsite">حضوري</option><option value="mixed" disabled>مختلط حسب الأيام</option></select></label><button class="iconbtn" id="wNext" aria-label="الأسبوع التالي">التالي ←</button><button class="iconbtn" id="wNow" hidden>العودة لهذا الأسبوع</button></div>
-    <section id="dayModesPanel" hidden style="margin:12px 0;padding:14px;border:1px solid #cbded9;border-radius:12px;background:var(--surface,#fff)"><b>نوع الدوام لكل يوم</b><p class="note">اختيار الأسبوع يطبّق النوع على كل الأيام. يمكنك تخصيص أي يوم أدناه؛ الأيام الحضورية تُستبعد من جدول عن بُعد والتقارير، وتبقى السجلات محفوظة.</p><div id="dayModeChoices" style="display:flex;gap:12px;flex-wrap:wrap"></div></section><div id="dayModesNotice" class="note" role="status"></div><div class="views" role="group" aria-label="العرض">
+    <details id="dayModesPanel" hidden style="margin:12px 0;padding:14px;border:1px solid #cbded9;border-radius:12px;background:var(--surface,#fff)"><summary>تخصيص الدوام حسب اليوم</summary><p class="note">اختيار الأسبوع يطبّق النوع على كل الأيام. يمكنك تخصيص أي يوم أدناه؛ الأيام الحضورية تُستبعد من جدول عن بُعد والتقارير، وتبقى السجلات محفوظة.</p><div id="dayModeChoices" style="display:flex;gap:12px;flex-wrap:wrap"></div></details><div id="dayModesNotice" class="note" role="status"></div><div class="views" role="group" aria-label="العرض">
       <button id="vSchedule" aria-pressed="true">جدول اليوم</button>
       <button id="vReport" aria-pressed="false">التقرير الأسبوعي</button>
       <button id="vTeachers" aria-pressed="false">منسوبي القسم الثانوي</button>
@@ -573,7 +573,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
 
 <div class="gate" id="gate">
   <div class="gate-card">
-    <div class="brand"><div class="seal" aria-hidden="true">ص</div><div><h1>متابعة الحصص</h1><p>ثانوية الصحافة الأهلية</p></div></div>
+    <div class="brand"><div class="seal" aria-hidden="true">ص</div><div><h1>إدارة ثانوية الصحافة الأهلية</h1><p>ثانوية الصحافة الأهلية</p></div></div>
     <a class="btn" href="login.html">الدخول الموحد للمنسوبين</a>
     <div id="gateMsg" class="hint" style="text-align:center">جارٍ التحميل…</div>
     <form id="loginForm" hidden style="display:grid;gap:14px">
@@ -1694,10 +1694,10 @@ function showBanner(t){const b=$('banner');b.textContent=t;b.hidden=false}
 </script>
 
 <script src="accountability-admin.js?v=recorder-20261108-1"></script>
-<script src="security-audit.js?v=login-20261014"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script src="document-signing.js?v=employee-20261107-1"></script><script src="employee-accounts.js?v=employee-20261107-1"></script><script src="assignment-signing.js?v=committees-20261109-1"></script>
+<script src="security-audit.js?v=login-20261014"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script src="document-signing.js?v=navigation-20261109-1"></script><script src="employee-accounts.js?v=employee-20261107-1"></script><script src="assignment-signing.js?v=committees-20261109-1"></script>
 <script src="recorder-accounts.js?v=20261108-1"></script>
 <script src="personnel-tasks-admin.js?v=20261108-1"></script>
-<script src="teacher-provision.js?v=20261109-1"></script><script src="duty-fields.js?v=20261109-1"></script><script src="written-duties.js?v=fields-20261109-2"></script><script src="school-operations.js?v=duty-fields-20261109-1"></script></body>
+<script src="teacher-provision.js?v=navigation-20261109-1"></script><script src="duty-fields.js?v=20261109-1"></script><script src="written-duties.js?v=navigation-20261109-1"></script><script src="school-operations.js?v=navigation-20261109-1"></script><link rel="stylesheet" href="school-navigation.css?v=20261109-1"><script src="school-navigation.js?v=20261109-1"></script></body>
 </html>
 
 

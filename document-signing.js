@@ -41,7 +41,7 @@ main.innerHTML=`<div class="sig-head"><h2>التوقيعات والإقرارا�
 if(teacherPage){const account=document.getElementById('account');account?.prepend(main)}else document.body.appendChild(main);
 const $=id=>document.getElementById(id);
 let nav=null;if(!teacherPage){nav=document.createElement('button');nav.id='vSignatures';nav.textContent='التوقيعات';nav.hidden=true;const anchor=$('vAcc')||$('vTeachers');anchor?.after(nav);nav.onclick=()=>{if(standalone)open();else{const u=new URL(location.href);u.searchParams.set('view','signatures');u.hash='';window.open(u.href,'_blank')}}}
-if(teacherPage){nav=document.createElement('button');nav.className='btn';nav.textContent='التوقيعات';nav.hidden=true;document.querySelector('#account .welcome .actions')?.appendChild(nav);nav.onclick=open}
+if(teacherPage){nav=document.createElement('button');nav.id='vSignatures';nav.className='btn';nav.textContent='التوقيعات';nav.hidden=true;document.querySelector('#account .welcome .actions')?.appendChild(nav);nav.onclick=open}
 if(standalone){document.body.classList.add('sig-page');document.title='التوقيعات — ثانوية الصحافة'}
 $('sigBack').onclick=()=>{if(standalone){const u=new URL(location.href);u.searchParams.delete('view');location.href=u.href}else main.hidden=true};
 function message(e){console.error(e);return e?.code==='permission-denied'?'تعذر الوصول: يلزم نشر قواعد التوقيعات في Firebase أو مراجعة صلاحية الحساب.':e?.code==='unavailable'?'الاتصال غير متاح؛ أعد المحاولة بعد عودة الشبكة.':e?.message||'تعذر إكمال العملية؛ لم يسجل إقرار.'}
