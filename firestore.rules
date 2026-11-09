@@ -14,7 +14,7 @@ service cloud.firestore {
   function personalResponsible(id) { return hasPersonalTasks() && exists(/databases/$(database)/documents/lessonCatalog/$(catalogId(id))) && lessonRole(id) in get(/databases/$(database)/documents/personalTasks/$(request.auth.uid)).data.responsibilities; }
   function personalMonitor(id) { return hasPersonalTasks() && get(/databases/$(database)/documents/lessonCatalog/$(catalogId(id))).data.teacher in get(/databases/$(database)/documents/personalTasks/$(request.auth.uid)).data.monitorTeachers; }
   function ownStaff(id) { return legacyStaff(id) || personalResponsible(id) || personalMonitor(id); }
-  function teacher() { return request.auth != null && request.auth.token.get('teacher',false) == true && get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.active == true; }
+  function teacher() { return request.auth != null && (request.auth.token.get('teacher',false) == true || signed()) && exists(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)) && get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.active == true; }
   function subTeacher(week, id) { return teacher() && exists(/databases/$(database)/documents/config/$('subs-' + week)) && get(/databases/$(database)/documents/config/$('subs-' + week)).data.get('map', {}).get(id, {}).get('t', '') == get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.get('scheduleName', '-'); }
   function ownTeacher(id) { return teacher() && get(/databases/$(database)/documents/teacherLessonAccess/$(request.auth.uid)).data.lessonIds.get(id,false) == true; }
   // Complete original records remain available as an immutable administrative archive.
@@ -80,7 +80,11 @@ service cloud.firestore {
   match /config/phones { allow read: if staff(); allow write: if admin(); }
   match /config/{id} { allow read: if admin() || id.matches('subs-.*') && (staff() || teacher() || hasPersonalTasks()); allow write: if admin(); }
   match /meta/rules2 { allow get: if true; allow write: if false; }
-  match /teacherProfiles/{uid} { allow get: if request.auth != null && request.auth.uid == uid && teacher(); }
+  match /teacherProfiles/{uid} {
+    allow get: if request.auth != null && request.auth.uid == uid && teacher();
+    allow create: if admin() && request.resource.data.keys().hasOnly(['name','scheduleName','phone','email','active','createdBy','createdAt']) && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 150 && request.resource.data.scheduleName == request.resource.data.name && request.resource.data.phone.matches('05[0-9]{8}') && request.resource.data.email == request.resource.data.phone + '@teachers.alsahafa-followup.invalid' && request.resource.data.active == true && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+    allow update,delete,list: if false;
+  }
   function teacherName() { return get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.get('scheduleName', '-'); }
   function employee() { return signed() && exists(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)) && get(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)).data.active == true; }
   function employeeName() { return get(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)).data.name; }
@@ -190,7 +194,7 @@ service cloud.firestore {
     }
   }
   // Personal assignments: immutable originals, ordered account-owned signatures, shared final archive.
-  function assignmentUser() { return employee(); }
+  function assignmentUser() { return employee() || teacher(); }
   function assignmentReader(d) { return admin() || assignmentUser() && request.auth.uid in d.targetUids; }
   function assignmentFinisher(d) { return assignmentReader(d) && d.status == 'open' && d.signedCount == d.order.size(); }
   function assignmentOrder(d) {
@@ -204,18 +208,18 @@ service cloud.firestore {
        (deputy != '' && deputy != coordinator && deputy != manager && directory['admin-3'].active == true &&
         d.order == (d.ownerUid in [coordinator,deputy,manager] ? [coordinator,deputy,manager] : [d.ownerUid,coordinator,deputy,manager]))) &&
       d.targetUids == d.order && d.targets is map && d.targets.keys().toSet() == d.order.toSet() &&
-      get(/databases/$(database)/documents/employeeProfiles/$(d.ownerUid)).data.active == true &&
-      get(/databases/$(database)/documents/employeeProfiles/$(d.ownerUid)).data.name == d.ownerName;
+      ((exists(/databases/$(database)/documents/employeeProfiles/$(d.ownerUid)) && get(/databases/$(database)/documents/employeeProfiles/$(d.ownerUid)).data.active == true && get(/databases/$(database)/documents/employeeProfiles/$(d.ownerUid)).data.name == d.ownerName) ||
+       (exists(/databases/$(database)/documents/teacherProfiles/$(d.ownerUid)) && get(/databases/$(database)/documents/teacherProfiles/$(d.ownerUid)).data.active == true && get(/databases/$(database)/documents/teacherProfiles/$(d.ownerUid)).data.scheduleName == d.get('ownerScheduleName','') && d.ownerName is string && d.ownerName.size() > 0 && d.ownerName.size() <= 150 && d.targets[d.ownerUid].name == d.ownerName));
   }
   match /assignments/{assignmentId} {
     allow read: if assignmentReader(resource.data);
-    allow create: if admin() && request.resource.data.keys().hasOnly(['title','fileName','fileSize','fileHash','chunkCount','ownerUid','ownerName','order','targetUids','targets','slots','status','signedCount','createdAt','createdBy']) &&
+    allow create: if admin() && request.resource.data.keys().hasOnly(['title','fileName','fileSize','fileHash','chunkCount','ownerUid','ownerName','ownerScheduleName','order','targetUids','targets','slots','status','signedCount','createdAt','createdBy']) &&
       request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 150 &&
       request.resource.data.fileName is string && request.resource.data.fileName.size() <= 255 &&
       request.resource.data.fileSize is int && request.resource.data.fileSize > 0 && request.resource.data.fileSize <= 10485760 &&
       request.resource.data.fileHash is string && request.resource.data.fileHash.matches('[0-9a-f]{64}') &&
       request.resource.data.chunkCount is int && request.resource.data.chunkCount >= 1 && request.resource.data.chunkCount <= 26 &&
-      request.resource.data.slots is list && request.resource.data.slots.size() in [2,3,4] &&
+      request.resource.data.slots is list && request.resource.data.slots.size() >= 2 && request.resource.data.slots.size() <= 16 &&
       assignmentOrder(request.resource.data) && request.resource.data.status == 'uploading' && request.resource.data.signedCount == 0 &&
       request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
     allow update: if admin() && resource.data.status == 'uploading' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','publishedAt']) &&
