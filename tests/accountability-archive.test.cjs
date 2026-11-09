@@ -34,9 +34,9 @@ test('teacher history retains legacy records, excludes deleted, sorts and filter
       return {onSnapshot(cb){cb({docs:records.map(a=>({id:a.id,data:()=>a}))});return ()=>{}}};
     }};
   }};
-  vm.runInNewContext(fs.readFileSync('teacher-acc.js','utf8'),{window:{ACC:A},document,auth,rawDb,profile:{scheduleName:'أ'},location:{hash:''},setTimeout,console});
+  vm.runInNewContext(fs.readFileSync('teacher-acc.js','utf8'),{RecordWorkflow:require('../record-workflow.js'),window:{ACC:A},document,auth,rawDb,profile:{scheduleName:'أ'},location:{hash:''},setTimeout,console});
   authCallback(user);assert.ok(section.innerHTML.includes('الرد القديم'));assert.ok(!section.innerHTML.includes('acc-gone'));
-  assert.ok(section.innerHTML.indexOf('acc-waiting')<section.innerHTML.indexOf('acc-old'));
+  assert.ok(section.innerHTML.indexOf('acc-waiting')<section.innerHTML.indexOf('acc-old'));assert.ok(section.innerHTML.indexOf('acc-old')<section.innerHTML.indexOf('acc-closed'));
   elements.get('accStatus').onchange({target:{value:'archived'}});assert.ok(section.innerHTML.includes('acc-closed'));assert.ok(!section.innerHTML.includes('acc-old'));
   elements.get('accMonth').onchange({target:{value:'2026-10'}});assert.ok(section.innerHTML.includes('لا توجد مساءلات مطابقة'));
 });
