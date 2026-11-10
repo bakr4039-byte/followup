@@ -755,7 +755,7 @@ CS.forEach(([di,pi,a,b])=>S.push({id:`cs-d${di}-p${pi}`,sup:3,day:di,slot:pi,lab
 S.sort((x,y)=>x.day-y.day||x.slot-y.slot||x.sup-y.sup);
 const byId=Object.fromEntries(S.map(s=>[s.id,s]));
 
-const state={week:CUR_WEEK,archive:null,phones:{},from:0,to:4,view:'schedule',sup:-1,day:2,logs:{},links:{},names:['المسؤول 1','المسؤول 2','المسؤول 3','المسؤول 4'],mnames:['المشرف 1','المشرف 2','المشرف 3','المشرف 4'],mteachers:[[],[],[],[]],db:null,user:null,canWrite:true,uid:null,profiles:{},open:null,draft:null};
+const state={week:CUR_WEEK,archive:null,phones:{},from:0,to:4,view:'schedule',sup:-1,day:Math.max(0,DAYS.findIndex(d=>d.g===riyadhDate())),logs:{},links:{},names:['المسؤول 1','المسؤول 2','المسؤول 3','المسؤول 4'],mnames:['المشرف 1','المشرف 2','المشرف 3','المشرف 4'],mteachers:[[],[],[],[]],db:null,user:null,canWrite:true,uid:null,profiles:{},open:null,draft:null};
 window.__FUACC={state,S,toast:t=>toast(t)}; // للمساءلات (accountability-admin.js)
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1697,7 +1697,7 @@ function showBanner(t){const b=$('banner');b.textContent=t;b.hidden=false}
 <script src="security-audit.js?v=login-20261014"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script src="document-signing.js?v=navigation-20261109-1"></script><script src="employee-accounts.js?v=pending-20261109-1"></script><script src="assignment-signing.js?v=linked-identities-20261109-1"></script>
 <script src="recorder-accounts.js?v=20261108-1"></script>
 <script src="personnel-tasks-admin.js?v=20261108-1"></script>
-<script src="teacher-provision.js?v=navigation-20261109-1"></script><script src="duty-fields.js?v=20261109-1"></script><script src="written-duties.js?v=navigation-20261109-1"></script><script src="school-operations.js?v=navigation-20261109-1"></script><link rel="stylesheet" href="school-navigation.css?v=20261109-1"><script src="school-navigation.js?v=20261109-1"></script><script src="pending-assignments.js?v=linked-identities-20261109-1"></script></body>
+<script src="teacher-provision.js?v=navigation-20261109-1"></script><script src="duty-fields.js?v=20261109-1"></script><script src="written-duties.js?v=navigation-20261109-1"></script><script src="school-operations.js?v=approved-schedule-20261110-1"></script><link rel="stylesheet" href="school-navigation.css?v=20261109-1"><script src="school-navigation.js?v=20261109-1"></script><script src="pending-assignments.js?v=linked-identities-20261109-1"></script></body>
 </html>
 
 
