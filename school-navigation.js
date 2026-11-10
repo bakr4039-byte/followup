@@ -99,7 +99,7 @@ const toggle=document.createElement('button');toggle.type='button';toggle.id='sc
 const overlay=document.createElement('div');overlay.className='school-sidebar-overlay';overlay.setAttribute('aria-hidden','true');
 document.body.append(side,toggle,overlay);
 const media=root.matchMedia('(max-width:1000px)'),links=side.querySelector('.school-sidebar-links'),session=side.querySelector('.school-sidebar-session');
-let queued=false,lastFocus=null,selected=personal?(root.EmployeePortal?'followup':'schedule'):'native';
+let queued=false,lastFocus=null,selected=personal?(root.EmployeePortal?'followup':'schedule'):(new URLSearchParams(location.search).has('view')?'native':'home');
 const sectionMap={vAssignments:'assignments',vSignatures:'signatures',vSchoolDuty:'duty',vSchoolSchedule:'duty',vAcc:'accountability',vEmployeeAccounts:'accounts'};
 const nativeIds=['vSchedule','vReport','vTeachers','vBoard','vStaff'];
 const selectionStyle=document.createElement('style');document.head.append(selectionStyle);
@@ -110,6 +110,7 @@ if(key!=='native'){
 css+='.school-sidebar-page #schoolSection-'+key+':not([hidden]){display:block!important}';
 if(!personal)css+='.school-sidebar-page #scheduleView,.school-sidebar-page #reportView,.school-sidebar-page #teachersView,.school-sidebar-page #boardView,.school-sidebar-page #staffView,.school-sidebar-page #overviewSummary,.school-sidebar-page .wrap>.nav,.school-sidebar-page #dueBar{display:none!important}';
 }
+if(key==='home')css+='.school-sidebar-page #banner,.school-sidebar-page .wrap>.foot,.school-sidebar-page>.credit{display:none!important}';
 css+='.school-sidebar-page #schoolWorkspace>details>summary{pointer-events:none;list-style:none}.school-sidebar-page #schoolWorkspace>details>summary::marker{content:""}';
 if(selectionStyle.textContent!==css)selectionStyle.textContent=css;
 const region=$('schoolSection-'+key);if(region&&!region.hidden)region.open=true;
@@ -130,13 +131,13 @@ const ready=personal?!!account&&!account.hidden:recorder?root.__FUACC?.state?.ro
 if(side.hidden===ready)side.hidden=!ready;if(toggle.hidden===ready)toggle.hidden=!ready;
 document.body.classList.toggle('school-sidebar-page',ready);document.body.classList.toggle('school-recorder-page',recorder&&ready);
 if(!ready){close();return}
-move(nav,links);selectSection(selected);
+move(nav,links);if(!personal&&!recorder&&selected==='home'&&root.__FUACC?.state?.role!=null&&root.__FUACC.state.role!==-1)selected='native';selectSection(selected);if(selected==='home'){for(const id of nativeIds)$(id)?.setAttribute('aria-pressed','false');for(const b of links.querySelectorAll('[data-sidebar-active]'))b.removeAttribute('data-sidebar-active')}
 const name=personal?$('name')?.textContent.trim():null;
 const role=personal?(root.EmployeePortal?'حساب الإداري':'حساب المعلم'):recorder?'مسؤول رصد المساءلات':root.__FUACC?.state?.role===-1?'حساب مدير المدرسة':root.__FUACC?.state?.role!=null?'حساب المتابعة':'الإدارة والمتابعة';
 const label=name?name+' · '+role:role;if($('schoolSidebarAccount').textContent!==label)$('schoolSidebarAccount').textContent=label;
 move($(personal?'logout':'logoutBtn'),session);
 if(recorder&&!links.querySelector('.school-recorder-link')){const b=document.createElement('button');b.type='button';b.className='school-recorder-link';b.textContent='رصد المساءلات';b.onclick=()=>$('acDrawer')?.scrollIntoView({behavior:'smooth'});links.append(b)}
-if(!links.querySelector('[data-sidebar-active=true]')&&!links.querySelector('[aria-pressed=true]')){const first=[...links.querySelectorAll('button')].find(b=>!b.hidden&&!b.closest('[hidden]'));if(first)first.dataset.sidebarActive='true'}
+if(selected!=='home'&&!links.querySelector('[data-sidebar-active=true]')&&!links.querySelector('[aria-pressed=true]')){const first=[...links.querySelectorAll('button')].find(b=>!b.hidden&&!b.closest('[hidden]'));if(first)first.dataset.sidebarActive='true'}
 }
 function schedule(){if(!queued){queued=true;queueMicrotask(sync)}}
 new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']});sync();
