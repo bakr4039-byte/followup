@@ -540,7 +540,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
   </div>
   <div class="drawer-foot">
     <button class="btn ghost" id="dClear">مسح الرصد</button>
-    <button class="btn" id="dSave">حفظ المتابعة</button>
+    <button class="btn ghost" id="dAttendance">حفظ الحضور والغياب فقط</button><button class="btn" id="dSave">حفظ المتابعة</button>
   </div>
 </aside>
 
@@ -1297,7 +1297,7 @@ async function openDrawer(id){if(!onlineWeek(state.week,byId[id]?.day)){toast("�
   const notMine=state.role==null||(state.role>=0&&s.sup!==state.role);
   const ro=!state.db||!state.canWrite||notMine;
   const monOk=isMon()&&monTeachers(state.role).has(s.teacher);
-  if(notMine&&state.role!=null)$('dWho').textContent=($('dWho').textContent?$('dWho').textContent+' · ':'')+(isMon()?(monOk?'صلاحيتك: تقييم المشرف وملاحظاته فقط':'هذا المعلم ليس ضمن معلميك (عرض فقط)'):'هذه الحصة من مسؤولية '+state.names[s.sup]+' (عرض فقط)');['dEntry','dPresent','dAbsent','nVC','nSup','dLink'].forEach(x=>$(x).disabled=ro);const admOk=!!state.db&&state.canWrite&&(state.role===-1||monOk);$('nAdm').disabled=!admOk;$('drawer').classList.toggle('monmode',isMon());$('drawer').classList.toggle('supmode',isSupRole(state.role)||isRep());{const vis=notePartsFor();NOTE_PARTS.forEach(([k,,el])=>$(el).closest('.field').classList.toggle('hidef',!vis.includes(k)))}$('dLinkSave').disabled=ro;$('dSave').disabled=ro&&!monOk;$('dClear').disabled=state.role!==-1||!state.logs[id];
+  if(notMine&&state.role!=null)$('dWho').textContent=($('dWho').textContent?$('dWho').textContent+' · ':'')+(isMon()?(monOk?'صلاحيتك: تقييم المشرف وملاحظاته فقط':'هذا المعلم ليس ضمن معلميك (عرض فقط)'):'هذه الحصة من مسؤولية '+state.names[s.sup]+' (عرض فقط)');['dEntry','dPresent','dAbsent','nVC','nSup','dLink'].forEach(x=>$(x).disabled=ro);const admOk=!!state.db&&state.canWrite&&(state.role===-1||monOk);$('nAdm').disabled=!admOk;$('drawer').classList.toggle('monmode',isMon());$('drawer').classList.toggle('supmode',isSupRole(state.role)||isRep());{const vis=notePartsFor();NOTE_PARTS.forEach(([k,,el])=>$(el).closest('.field').classList.toggle('hidef',!vis.includes(k)))}$('dLinkSave').disabled=ro;$('dSave').disabled=ro&&!monOk;$('dAttendance').disabled=ro;$('dClear').disabled=state.role!==-1||!state.logs[id];
   paintDraft();$('scrim').hidden=false;$('drawer').hidden=false;$('dClose').focus();}
 function closeDrawer(){flushNotes();$('scrim').hidden=true;$('drawer').hidden=true;state.open=null}
 $('dClose').onclick=closeDrawer;$('scrim').onclick=closeDrawer;
@@ -1317,6 +1317,18 @@ $('dLinkSave').onclick=async()=>{const id=state.open;if(!state.db||!id)return;co
     if(wk===CUR_WEEK){try{if(url)await state.db.doc('links/'+id).set({url,updatedAt:now});else await state.db.doc('links/'+id).delete()}catch(e){}}
     if(url)state.links[id]=url;else delete state.links[id];toast('تم حفظ الرابط');render()}
   catch(e){toast('تعذّر حفظ الرابط')}};
+// Save verified attendance independently of lesson status and teacher evaluations.
+$('dAttendance').onclick=async()=>{
+  const id=state.open,s=byId[id],wk=state.week;
+  if(!s||!state.db||!state.canWrite||!onlineWeek(wk,s.day)||state.role==null||state.role!==-1&&(!isSupRole(state.role)||s.sup!==state.role))return;
+  const values=['dPresent','dAbsent'].map(key=>$(key).value.trim());
+  if(values.some(value=>!/^\d+$/.test(value)||!Number.isSafeInteger(Number(value)))){toast('أدخل عدد الحضور والغياب كأعداد صحيحة غير سالبة');return}
+  const patch={present:Number(values[0]),absent:Number(values[1]),teacher:s.teacher,week:wk,sup:s.sup,day:s.day,by:state.role,updatedBy:state.uid||'',updatedAt:new Date().toISOString(),notesVC:$('nVC').value.trim().slice(0,600)};
+  $('dAttendance').disabled=true;
+  try{const ref=state.db.doc(logsCol(wk)+'/'+id);await ref.update(patch);const saved=await ref.get();state.logs[id]=saved.data();toast('تم حفظ الحضور والغياب دون تغيير حالة الحصة أو التقييم');if(state.open===id)closeDrawer();render()}
+  catch(e){console.error(e);toast('تعذر حفظ الحضور والغياب؛ لم يتم تأكيد الحفظ')}
+  finally{if(state.open===id)$('dAttendance').disabled=false}
+};
 $('dSave').onclick=async()=>{if(!onlineWeek(state.week,byId[state.open]?.day))return;const id=state.open;if(!state.db||!id)return;const d=state.draft;
   if(isMon()){const s=byId[id];if(!monTeachers(state.role).has(s.teacher))return;const prev=state.logs[id]||{sup:s.sup,day:s.day};const p={...splitNotes(prev),notesAdm:$('nAdm').value.trim().slice(0,600)};
     const doc={...prev,notesAdm:p.notesAdm,ratingMon:d.ratingMon||0,notes:joinNotes(p).slice(0,2000),teacher:s.teacher,week:state.week,monBy:state.role-4,monAt:new Date().toISOString()};
