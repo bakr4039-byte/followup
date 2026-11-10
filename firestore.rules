@@ -164,11 +164,15 @@ service cloud.firestore {
       request.resource.data.createdAt == request.time && request.resource.data.createdBy == request.auth.uid;
     allow update: if admin() && resource.data.status == 'uploading' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','publishedAt']) &&
       request.resource.data.status == 'open' && request.resource.data.publishedAt == request.time;
-    allow update: if signatureActor() && resource.data.status == 'open' && signatureKey() in resource.data.targetKeys &&
-      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['signedCount']) && request.resource.data.signedCount == resource.data.signedCount + 1 &&
-      !exists(/databases/$(database)/documents/signDocuments/$(documentId)/receipts/$(signatureKey())) &&
-      getAfter(/databases/$(database)/documents/signDocuments/$(documentId)/receipts/$(signatureKey())).data.signedBy == request.auth.uid &&
-      getAfter(/databases/$(database)/documents/signDocuments/$(documentId)/receipts/$(signatureKey())).data.signedAt == request.time;
+    function acknowledgementCounter(key,uid) {
+      let path = /databases/$(database)/documents/signDocuments/$(documentId)/receipts/$(key);
+      let receipt = getAfter(path).data;
+      return key in resource.data.targetKeys && !exists(path) && receipt.signedBy == uid && receipt.signedAt == request.time;
+    }
+    allow update: if resource.data.status == 'open' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['signedCount']) &&
+      request.resource.data.signedCount == resource.data.signedCount + 1 &&
+      (signatureActor() && acknowledgementCounter(signatureKey(),request.auth.uid) ||
+       admin() && coordinatorTarget(coordinatorUid()) && acknowledgementCounter(coordinatorSignatureKey(),coordinatorUid()));
     allow update: if admin() && resource.data.status == 'open' && resource.data.signedCount == resource.data.targetKeys.size() &&
       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','archivedAt','archivedBy','finalHash','finalChunkCount','finalSize']) && request.resource.data.status == 'archived' &&
       request.resource.data.archivedAt == request.time && request.resource.data.archivedBy == request.auth.uid &&
@@ -179,12 +183,19 @@ service cloud.firestore {
     match /receipts/{signerKey} {
       function parent() { return get(/databases/$(database)/documents/signDocuments/$(documentId)).data; }
       allow read: if signatureReader(parent());
-      allow create: if signatureActor() && signerKey == signatureKey() && signerKey in parent().targetKeys && parent().status == 'open' &&
-        request.resource.data.keys().hasOnly(['name','title','statement','fileHash','signedBy','signedAt']) &&
-        request.resource.data.name == parent().targets[signerKey].name && request.resource.data.title == parent().targets[signerKey].title &&
-        request.resource.data.statement == signatureStatement(parent().kind) && request.resource.data.fileHash == parent().fileHash &&
-        request.resource.data.signedBy == request.auth.uid && request.resource.data.signedAt == request.time &&
-        getAfter(/databases/$(database)/documents/signDocuments/$(documentId)).data.signedCount == parent().signedCount + 1;
+      function newAcknowledgement() {
+        let before = parent();
+        let receipt = request.resource.data;
+        let scoped = receipt.get('managerAccess',false);
+        return (scoped ? admin() && coordinatorTarget(coordinatorUid()) && signerKey == coordinatorSignatureKey() && receipt.signedBy == coordinatorUid() && receipt.actorUid == request.auth.uid
+          : signatureActor() && signerKey == signatureKey() && receipt.signedBy == request.auth.uid && !receipt.keys().hasAny(['actorUid','managerAccess'])) &&
+          signerKey in before.targetKeys && before.status == 'open' &&
+          receipt.keys().hasOnly(['name','title','statement','fileHash','signedBy','signedAt','actorUid','managerAccess']) &&
+          receipt.name == before.targets[signerKey].name && receipt.title == before.targets[signerKey].title &&
+          receipt.statement == signatureStatement(before.kind) && receipt.fileHash == before.fileHash && receipt.signedAt == request.time &&
+          getAfter(/databases/$(database)/documents/signDocuments/$(documentId)).data.signedCount == before.signedCount + 1;
+      }
+      allow create: if newAcknowledgement();
       allow update, delete: if false;
     }
     match /parts/{partId} {
@@ -223,13 +234,12 @@ service cloud.firestore {
   function assignmentSigned(d) {
     return d.get('signedUids', d.signedCount == 0 ? [] : d.signedCount == 1 ? [d.order[0]] : d.signedCount == 2 ? [d.order[0],d.order[1]] : d.signedCount == 3 ? [d.order[0],d.order[1],d.order[2]] : d.order);
   }
+  function coordinatorUid() { return get(/databases/$(database)/documents/config/employeeDirectory).data.entries['admin-2'].uid; }
   function coordinatorTarget(uid) {
-    return exists(/databases/$(database)/documents/config/coordinatorTransfer) &&
-      get(/databases/$(database)/documents/config/coordinatorTransfer).data.active == true &&
-      get(/databases/$(database)/documents/config/coordinatorTransfer).data.uid == uid &&
-      get(/databases/$(database)/documents/config/employeeDirectory).data.entries['admin-2'].uid == uid &&
-      get(/databases/$(database)/documents/employeeProfiles/$(uid)).data.get('loginDisabled',false) == true;
+    return get(/databases/$(database)/documents/config/employeeDirectory).data.entries['admin-2'].active == true &&
+      coordinatorUid() == uid && get(/databases/$(database)/documents/employeeProfiles/$(uid)).data.active == true;
   }
+  function coordinatorSignatureKey() { return 'e:' + get(/databases/$(database)/documents/employeeProfiles/$(coordinatorUid())).data.name; }
   function assignmentSigner(uid) { return admin() ? coordinatorTarget(uid) : assignmentUser() && uid in [request.auth.uid,assignmentUid()]; }
   function assignmentUser() { return employee() || teacher(); }
   function assignmentReader(d) { return admin() || assignmentUser() && (request.auth.uid in d.targetUids || assignmentUid() in d.targetUids); }
@@ -297,11 +307,11 @@ service cloud.firestore {
         let before = assignment();
         let after = getAfter(/databases/$(database)/documents/assignments/$(assignmentId)).data;
         let receipt = request.resource.data;
-        let delegated = receipt.get('delegated',false);
+        let managerAccess = receipt.get('managerAccess',false);
         return assignmentSigner(uid) && before.status == 'open' && before.signedCount < before.order.size() && uid in before.order && !(uid in assignmentSigned(before)) &&
-          receipt.keys().hasOnly(['name','title','statement','signatureImage','fileHash','signedBy','signedAt','actorUid','delegated']) &&
+          receipt.keys().hasOnly(['name','title','statement','signatureImage','fileHash','signedBy','signedAt','actorUid','managerAccess']) &&
           receipt.name == before.targets[uid].name && receipt.title == before.targets[uid].title && receipt.statement == 'اطلعت على التكليف وأعتمده' &&
-          delegated == (admin() && coordinatorTarget(uid)) && receipt.fileHash == before.fileHash &&
+          managerAccess == (admin() && coordinatorTarget(uid)) && receipt.fileHash == before.fileHash &&
           receipt.signatureImage is string && receipt.signatureImage.size() > 50 && receipt.signatureImage.size() <= 95000 && receipt.signatureImage.matches('data:image/png;base64,[A-Za-z0-9+/=]+') &&
           receipt.signedBy == uid && receipt.get('actorUid',request.auth.uid) == request.auth.uid && (uid == request.auth.uid || receipt.get('actorUid','') == request.auth.uid) && receipt.signedAt == request.time &&
           after.signedCount == before.signedCount + 1 && (after.get('lastSignerUid','') == uid || !('signedUids' in before) && before.order[before.signedCount] == uid);

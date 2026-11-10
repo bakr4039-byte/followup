@@ -68,4 +68,27 @@ async function parallelSign(id,actor,uid=actor,extra={}){const d=db(actor),ref=d
 
 test('named signers can sign out of order and concurrent signatures preserve all approvals',async()=>{await newAssignment('parallel');await assertSucceeds(parallelSign('parallel','principal'));await assertFails(parallelSign('parallel','principal'));await assertFails(parallelSign('parallel','unassigned','assigned'));await Promise.all([parallelSign('parallel','assigned'),parallelSign('parallel','coordinator')]);const v=(await getDoc(doc(db('admin'),'assignments/parallel'))).data();require('node:assert/strict').equal(v.signedCount,3);require('node:assert/strict').deepEqual(new Set(v.signedUids),new Set(['principal','assigned','coordinator']));await assertFails(updateDoc(doc(db('admin'),'assignments/parallel'),{signedCount:2,signedUids:['principal','assigned']}));});
 test('parallel migration keeps historical receipts and requires atomic counters and signer lists',async()=>{await newAssignment('parallel-old');await assignmentSign('parallel-old','assigned');await assertFails(updateDoc(doc(db('principal'),'assignments/parallel-old'),{signedCount:2,signedUids:['assigned','principal'],lastSignerUid:'principal'}));await assertSucceeds(parallelSign('parallel-old','principal'));await assertFails(assignmentSign('parallel-old','coordinator'));await assertSucceeds(parallelSign('parallel-old','coordinator'));});
-test('moving coordinator page keeps its receipts, blocks old login and audits the actual manager',async()=>{await newAssignment('delegated');await assertFails(parallelSign('delegated','admin','coordinator',{delegated:true}));await setDoc(doc(db('admin'),'config/coordinatorTransfer'),{uid:'coordinator',active:true});await assertFails(parallelSign('delegated','admin','coordinator',{delegated:true}));await updateDoc(doc(db('admin'),'employeeProfiles/coordinator'),{loginDisabled:true});await assertFails(getDoc(doc(db('coordinator'),'assignments/delegated')));await assertFails(parallelSign('delegated','coordinator'));await assertFails(parallelSign('delegated','admin','coordinator'));await assertSucceeds(parallelSign('delegated','admin','coordinator',{delegated:true}));await assertFails(parallelSign('delegated','admin','assigned',{delegated:true}));await assertFails(parallelSign('delegated','unassigned','coordinator',{delegated:true}));const receipt=(await getDoc(doc(db('admin'),'assignments/delegated/receipts/coordinator'))).data();require('node:assert/strict').equal(receipt.actorUid,'admin');require('node:assert/strict').equal(receipt.delegated,true);await updateDoc(doc(db('admin'),'config/coordinatorTransfer'),{active:false});await newAssignment('delegated-disabled');await assertFails(parallelSign('delegated-disabled','admin','coordinator',{delegated:true}));});
+test('manager opens the coordinator identity without disabling it or moving its approval',async()=>{
+ await newAssignment('manager-coordinator');
+ await assertFails(parallelSign('manager-coordinator','admin','coordinator'));
+ await assertFails(parallelSign('manager-coordinator','admin','coordinator',{delegated:true}));
+ await assertFails(parallelSign('manager-coordinator','unassigned','coordinator',{managerAccess:true}));
+ await assertFails(parallelSign('manager-coordinator','admin','assigned',{managerAccess:true}));
+ await assertFails(parallelSign('manager-coordinator','admin','coordinator',{managerAccess:true,actorUid:'coordinator'}));
+ await assertSucceeds(parallelSign('manager-coordinator','admin','coordinator',{managerAccess:true}));
+ const receipt=(await getDoc(doc(db('admin'),'assignments/manager-coordinator/receipts/coordinator'))).data();
+ require('node:assert/strict').equal(receipt.actorUid,'admin');require('node:assert/strict').equal(receipt.signedBy,'coordinator');require('node:assert/strict').equal(receipt.name,'المنسق');require('node:assert/strict').equal(receipt.title,'إداري');
+ await assertSucceeds(getDoc(doc(db('coordinator'),'assignments/manager-coordinator')));
+ await assertFails(parallelSign('manager-coordinator','coordinator'));
+ await newAssignment('coordinator-still-enabled');await assertSucceeds(parallelSign('coordinator-still-enabled','coordinator'));
+ await newAssignment('inactive-coordinator');await env.withSecurityRulesDisabled(async c=>updateDoc(doc(c.firestore(),'employeeProfiles/coordinator'),{active:false}));
+ await assertFails(parallelSign('inactive-coordinator','admin','coordinator',{managerAccess:true}));
+});
+test('original coordinator acknowledgements retain their recipient key and record the real manager',async()=>{
+ await assignmentSeed();const a=db('admin'),key='e:المنسق',id='coordinator-doc';
+ await setDoc(doc(a,'signDocuments/'+id),{...draft(),targetKeys:[key],targets:{[key]:{name:'المنسق',title:'منسق الخطة'}}});await updateDoc(doc(a,'signDocuments/'+id),{status:'open',publishedAt:serverTimestamp()});
+ const receipt={name:'المنسق',title:'منسق الخطة',statement:'اطلعت وأقرّ بالاستلام',fileHash:hash,signedBy:'coordinator',actorUid:'admin',managerAccess:true,signedAt:serverTimestamp()};
+ const submit=(actor,changes={})=>{const d=db(actor),b=writeBatch(d);b.set(doc(d,'signDocuments/'+id+'/receipts/'+key),{...receipt,...changes});b.update(doc(d,'signDocuments/'+id),{signedCount:1});return b.commit()};
+ await assertFails(submit('staff0',{actorUid:'staff0'}));await assertFails(submit('admin',{signedBy:'assigned'}));await assertFails(submit('admin',{actorUid:'coordinator'}));await assertSucceeds(submit('admin'));
+ await assertFails(submit('admin'));await assertSucceeds(getDocs(query(collection(db('coordinator'),'signDocuments'),where('targetKeys','array-contains',key))));
+});

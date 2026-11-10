@@ -41,7 +41,7 @@
     else if(b.hasAttribute('data-send')){if(a.archivedAt)return;const t=el.querySelector('[data-reply]').value.trim();if(t.length<3){toast('اكتب السبب أولاً.');return}
       if(!confirm('سيتم إرسال ردك للإدارة ولا يمكن تعديله بعد الإرسال. متابعة؟'))return;
       b.disabled=true;b.textContent='جارٍ الإرسال…';
-      try{await rawDb.collection(A.COL).doc(a.id).update({reply:t,replyAt:firebase.firestore.FieldValue.serverTimestamp(),replyUid:uid,status:'replied'})}
+      try{await rawDb.collection(A.COL).doc(a.id).update({reply:t,replyAt:firebase.firestore.FieldValue.serverTimestamp(),replyUid:uid,...(auth.currentUser?.managerAccess?{replyActorUid:auth.currentUser.actorUid}:{}),status:'replied'})}
       catch(err){console.error(err);b.disabled=false;b.textContent='إرسال الرد';toast('تعذّر إرسال الرد، حاول مرة أخرى.')}}
     else if(b.hasAttribute('data-pdf')){b.disabled=true;try{A.download(await A.pdfFile({...a,teacherFull:fullName(a)}))}catch(err){toast('تعذّر إنشاء PDF.')}finally{b.disabled=false}}
     else if(b.hasAttribute('data-wa')){A.sharePdfWa({...a,teacherFull:fullName(a)},A.ADMIN_PHONE,waText(a),b,toast)}});
