@@ -141,3 +141,44 @@ if(!links.querySelector('[data-sidebar-active=true]')&&!links.querySelector('[ar
 function schedule(){if(!queued){queued=true;queueMicrotask(sync)}}
 new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']});sync();
 })(window);
+
+/* Four compact navigation groups, one expanded at a time. */
+(function(){
+'use strict';
+if(typeof document==='undefined')return;
+const css=document.createElement('style');
+css.textContent=`
+.school-sidebar .school-nav-group header{display:block;padding:0;margin:0}
+.school-sidebar .school-group-toggle{display:flex;align-items:center;gap:10px;width:100%;min-height:55px;border:1px solid #ffffff24;border-radius:12px;background:#ffffff08;color:#e2eee8;padding:12px;text-align:right;font:inherit;cursor:pointer}
+.school-sidebar .school-group-toggle:hover{background:#ffffff14}
+.school-sidebar .school-group-toggle .school-group-order{display:grid;place-items:center;width:30px;height:30px;flex:0 0 30px;border-radius:9px;background:#ffffff12;color:#dfc788;font-size:13px;font-weight:700}
+.school-sidebar .school-group-toggle h3{font-size:13px;color:#e2eee8;font-weight:600;margin:0}
+.school-sidebar .school-group-toggle:after{content:'+';margin-inline-start:auto;font-size:20px;color:#b9d2c5}
+.school-sidebar .school-group-toggle[aria-expanded=true]{background:#ffffff17;border-color:#a8c4b46b}
+.school-sidebar .school-group-toggle[aria-expanded=true]:after{content:'−'}
+.school-sidebar .school-nav-group:not([data-school-expanded=true]) .school-nav-links{display:none!important}
+.school-sidebar .school-nav-group[data-school-expanded=true] .school-nav-links{display:grid;gap:6px;padding:9px 3px 2px}
+.school-sidebar .views.school-hub{gap:10px!important}
+`;document.head.append(css);
+let queued=false;
+function sync(){
+queued=false;
+for(const group of document.querySelectorAll('.school-sidebar .school-nav-group')){
+const header=group.querySelector('header'),links=group.querySelector('.school-nav-links');
+if(!header||!links||header.querySelector('.school-group-toggle'))continue;
+const button=document.createElement('button');button.type='button';button.className='school-group-toggle';
+links.id=group.id+'-links';button.setAttribute('aria-controls',links.id);button.setAttribute('aria-expanded','false');
+button.setAttribute('aria-label',header.textContent.trim());
+const children=[...header.childNodes];button.append(...children);header.append(button);
+button.addEventListener('click',()=>{
+const expand=button.getAttribute('aria-expanded')!=='true';
+for(const other of document.querySelectorAll('.school-sidebar .school-nav-group')){
+other.removeAttribute('data-school-expanded');other.querySelector('.school-group-toggle')?.setAttribute('aria-expanded','false');
+}
+if(expand){group.dataset.schoolExpanded='true';button.setAttribute('aria-expanded','true')}
+});
+}
+}
+function schedule(){if(!queued){queued=true;queueMicrotask(sync)}}
+new MutationObserver(schedule).observe(document.body,{subtree:true,childList:true});sync();
+})();
