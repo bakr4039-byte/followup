@@ -40,7 +40,7 @@ main.innerHTML=`<div class="sig-head"><h2>التوقيعات والإقرارا�
 <div class="sig-filters"><button data-sigfilter="open" aria-pressed="true">تحتاج إجراء</button><button data-sigfilter="archived">الأرشيف</button><button data-sigfilter="all">الكل</button><input id="sigSearch" placeholder="بحث بعنوان الملف"><button id="sigClearPerson" hidden></button></div><div id="sigList" class="sig-grid"></div><div id="sigDetail"></div>`;
 if(teacherPage){const account=document.getElementById('account');account?.prepend(main)}else document.body.appendChild(main);
 const $=id=>document.getElementById(id);
-let nav=null;if(!teacherPage){nav=document.createElement('button');nav.id='vSignatures';nav.textContent='التوقيعات';nav.hidden=true;const anchor=$('vAcc')||$('vTeachers');anchor?.after(nav);nav.onclick=()=>{if(standalone)open();else{const u=new URL(location.href);u.searchParams.set('view','signatures');u.hash='';window.open(u.href,'_blank')}}}
+let nav=null;if(!teacherPage){nav=document.createElement('button');nav.id='vSignatures';nav.textContent='التوقيعات';nav.hidden=true;const anchor=$('vAcc')||$('vTeachers');anchor?.after(nav);nav.onclick=open}
 if(teacherPage){nav=document.createElement('button');nav.id='vSignatures';nav.className='btn';nav.textContent='التوقيعات';nav.hidden=true;document.querySelector('#account .welcome .actions')?.appendChild(nav);nav.onclick=open}
 if(standalone){document.body.classList.add('sig-page');document.title='التوقيعات — ثانوية الصحافة'}
 $('sigBack').onclick=()=>{if(standalone){const u=new URL(location.href);u.searchParams.delete('view');location.href=u.href}else main.hidden=true};
