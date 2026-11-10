@@ -100,7 +100,7 @@ const overlay=document.createElement('div');overlay.className='school-sidebar-ov
 document.body.append(side,toggle,overlay);
 const media=root.matchMedia('(max-width:1000px)'),links=side.querySelector('.school-sidebar-links'),session=side.querySelector('.school-sidebar-session');
 let queued=false,lastFocus=null,selected=personal?(root.EmployeePortal?'followup':'schedule'):(new URLSearchParams(location.search).has('view')?'native':'home');
-const sectionMap={vAssignments:'assignments',vSignatures:'signatures',vSchoolDuty:'duty',vSchoolSchedule:'duty',vAcc:'accountability',vEmployeeAccounts:'accounts'};
+const sectionMap={vCoordinatorPage:'assignments',vAssignments:'assignments',vSignatures:'signatures',vSchoolDuty:'duty',vSchoolSchedule:'duty',vAcc:'accountability',vEmployeeAccounts:'accounts'};
 const nativeIds=['vSchedule','vReport','vTeachers','vBoard','vStaff'];
 const selectionStyle=document.createElement('style');document.head.append(selectionStyle);
 function selectSection(key){
