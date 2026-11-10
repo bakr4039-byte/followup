@@ -2,10 +2,11 @@ rules_version = '2';
 service cloud.firestore {
  match /databases/{database}/documents {
   function signed() { return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password'; }
-  function staff() { return signed() && exists(/databases/$(database)/documents/staffAccess/$(request.auth.uid)) && get(/databases/$(database)/documents/staffAccess/$(request.auth.uid)).data.active == true; }
+  function accountEnabled() { return !exists(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)) || get(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)).data.get('loginDisabled',false) != true; }
+  function staff() { return signed() && accountEnabled() && exists(/databases/$(database)/documents/staffAccess/$(request.auth.uid)) && get(/databases/$(database)/documents/staffAccess/$(request.auth.uid)).data.active == true; }
   function role() { return get(/databases/$(database)/documents/staffAccess/$(request.auth.uid)).data.role; }
   function admin() { return staff() && role() == -1; }
-  function accountabilityRecorder() { return signed() && exists(/databases/$(database)/documents/accountabilityRecorders/$(request.auth.uid)) && get(/databases/$(database)/documents/accountabilityRecorders/$(request.auth.uid)).data.active == true; }
+  function accountabilityRecorder() { return signed() && accountEnabled() && exists(/databases/$(database)/documents/accountabilityRecorders/$(request.auth.uid)) && get(/databases/$(database)/documents/accountabilityRecorders/$(request.auth.uid)).data.active == true; }
   function fullRead() { return staff() && role() in [-1,8] || hasPersonalTasks() && get(/databases/$(database)/documents/personalTasks/$(request.auth.uid)).data.get('reports',false) == true; }
   function legacyStaff(id) { return staff() && (role() in [0,1,2,3] && id.matches(role() == 0 ? 'c1-.*' : role() == 1 ? 'c2-.*' : role() == 2 ? 'c3-.*' : '(ba|cs)-.*') || role() in [4,5,6,7] && get(/databases/$(database)/documents/lessonCatalog/$(id)).data.teacher in get(/databases/$(database)/documents/config/monitors).data.teachers.get('m' + string(role()-4), [])); }
   function hasPersonalTasks() { return employee() && exists(/databases/$(database)/documents/personalTasks/$(request.auth.uid)) && get(/databases/$(database)/documents/personalTasks/$(request.auth.uid)).data.active == true; }
@@ -14,7 +15,7 @@ service cloud.firestore {
   function personalResponsible(id) { return hasPersonalTasks() && exists(/databases/$(database)/documents/lessonCatalog/$(catalogId(id))) && lessonRole(id) in get(/databases/$(database)/documents/personalTasks/$(request.auth.uid)).data.responsibilities; }
   function personalMonitor(id) { return hasPersonalTasks() && get(/databases/$(database)/documents/lessonCatalog/$(catalogId(id))).data.teacher in get(/databases/$(database)/documents/personalTasks/$(request.auth.uid)).data.monitorTeachers; }
   function ownStaff(id) { return legacyStaff(id) || personalResponsible(id) || personalMonitor(id); }
-  function teacher() { return request.auth != null && (request.auth.token.get('teacher',false) == true || signed()) && exists(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)) && get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.active == true; }
+  function teacher() { return request.auth != null && accountEnabled() && (request.auth.token.get('teacher',false) == true || signed()) && exists(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)) && get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.active == true; }
   function subTeacher(week, id) { return teacher() && exists(/databases/$(database)/documents/config/$('subs-' + week)) && get(/databases/$(database)/documents/config/$('subs-' + week)).data.get('map', {}).get(id, {}).get('t', '') == get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.get('scheduleName', '-'); }
   function ownTeacher(id) { return teacher() && get(/databases/$(database)/documents/teacherLessonAccess/$(request.auth.uid)).data.lessonIds.get(id,false) == true; }
   // Complete original records remain available as an immutable administrative archive.
@@ -87,7 +88,7 @@ service cloud.firestore {
     allow update,delete: if false;
   }
   function teacherName() { return get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.get('scheduleName', '-'); }
-  function employee() { return signed() && exists(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)) && get(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)).data.active == true; }
+  function employee() { return signed() && accountEnabled() && exists(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)) && get(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)).data.active == true; }
   function employeeName() { return get(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)).data.name; }
   function ownsAccountability() { return teacher() && resource.data.teacher == teacherName() || employee() && resource.data.teacher == employeeName(); }
   match /personalTasks/{uid} {
@@ -101,14 +102,14 @@ service cloud.firestore {
     allow delete: if false;
   }
   match /employeeProfiles/{uid} {
-    allow get: if admin() || request.auth != null && request.auth.uid == uid && employee();
+    allow get: if admin() || request.auth != null && request.auth.uid == uid && signed();
     allow list: if admin();
     allow create: if admin() && request.resource.data.keys().hasOnly(['name','title','memberId','phone','email','active','createdAt','createdBy']) &&
       request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 150 &&
       request.resource.data.title is string && request.resource.data.title.size() <= 250 && request.resource.data.memberId.matches('admin-[0-9]+') &&
       request.resource.data.phone.matches('05[0-9]{8}') && request.resource.data.email == request.resource.data.phone + '@employees.alsahafa-followup.invalid' &&
       request.resource.data.active == true && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
-    allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active','phone','title']) && request.resource.data.active is bool && request.resource.data.phone.matches('05[0-9]{8}') && request.resource.data.title is string;
+    allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active','phone','title','loginDisabled']) && request.resource.data.get('loginDisabled',false) is bool && request.resource.data.active is bool && request.resource.data.phone.matches('05[0-9]{8}') && request.resource.data.title is string;
     allow delete: if false;
   }
   match /accountabilityRecorders/{uid} {
@@ -194,12 +195,12 @@ service cloud.firestore {
       allow delete: if false;
     }
   }
-  // Personal assignments: immutable originals, ordered account-owned signatures, shared final archive.
+  // Personal assignments: immutable originals, independent account-owned signatures, shared final archive.
   function assignmentUid() {
     let path = /databases/$(database)/documents/accountLinks/$(request.auth.uid);
     return exists(path) && get(path).data.active == true &&
       exists(/databases/$(database)/documents/employeeProfiles/$(get(path).data.canonicalUid)) &&
-      get(/databases/$(database)/documents/employeeProfiles/$(get(path).data.canonicalUid)).data.active == true
+      get(/databases/$(database)/documents/employeeProfiles/$(get(path).data.canonicalUid)).data.active == true && get(/databases/$(database)/documents/employeeProfiles/$(get(path).data.canonicalUid)).data.get('loginDisabled',false) != true
       ? get(path).data.canonicalUid : request.auth.uid;
   }
   match /accountLinks/{uid} {
@@ -219,6 +220,17 @@ service cloud.firestore {
     allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active']) && request.resource.data.active is bool;
     allow delete: if false;
   }
+  function assignmentSigned(d) {
+    return d.get('signedUids', d.signedCount == 0 ? [] : d.signedCount == 1 ? [d.order[0]] : d.signedCount == 2 ? [d.order[0],d.order[1]] : d.signedCount == 3 ? [d.order[0],d.order[1],d.order[2]] : d.order);
+  }
+  function coordinatorTarget(uid) {
+    return exists(/databases/$(database)/documents/config/coordinatorTransfer) &&
+      get(/databases/$(database)/documents/config/coordinatorTransfer).data.active == true &&
+      get(/databases/$(database)/documents/config/coordinatorTransfer).data.uid == uid &&
+      get(/databases/$(database)/documents/config/employeeDirectory).data.entries['admin-2'].uid == uid &&
+      get(/databases/$(database)/documents/employeeProfiles/$(uid)).data.get('loginDisabled',false) == true;
+  }
+  function assignmentSigner(uid) { return admin() ? coordinatorTarget(uid) : assignmentUser() && uid in [request.auth.uid,assignmentUid()]; }
   function assignmentUser() { return employee() || teacher(); }
   function assignmentReader(d) { return admin() || assignmentUser() && (request.auth.uid in d.targetUids || assignmentUid() in d.targetUids); }
   function assignmentFinisher(d) { return assignmentReader(d) && d.status == 'open' && d.signedCount == d.order.size(); }
@@ -249,11 +261,19 @@ service cloud.firestore {
       request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
     allow update: if admin() && resource.data.status == 'uploading' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','publishedAt']) &&
       request.resource.data.status == 'open' && request.resource.data.publishedAt == request.time;
-    allow update: if assignmentUser() && resource.data.status == 'open' && resource.data.signedCount < resource.data.order.size() && resource.data.order[resource.data.signedCount] in [request.auth.uid,assignmentUid()] &&
-      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['signedCount']) && request.resource.data.signedCount == resource.data.signedCount + 1 &&
-      !exists(/databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(resource.data.order[resource.data.signedCount])) &&
-      getAfter(/databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(resource.data.order[resource.data.signedCount])).data.signedBy == resource.data.order[resource.data.signedCount] &&
-      getAfter(/databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(resource.data.order[resource.data.signedCount])).data.signedAt == request.time;
+    function signatureCounter() {
+      let old = resource.data;
+      let fresh = request.resource.data;
+      let uid = fresh.get('lastSignerUid', old.order[old.signedCount]);
+      let prior = assignmentSigned(old);
+      let path = /databases/$(database)/documents/assignments/$(assignmentId)/receipts/$(uid);
+      let receipt = getAfter(path).data;
+      return assignmentSigner(uid) && uid in old.order && !(uid in prior) &&
+        fresh.diff(old).affectedKeys().hasOnly(['signedCount','signedUids','lastSignerUid']) && fresh.signedCount == old.signedCount + 1 &&
+        (fresh.get('signedUids',[]) == prior.concat([uid]) || !('signedUids' in old) && !('signedUids' in fresh) && !('lastSignerUid' in fresh)) &&
+        !exists(path) && receipt.signedBy == uid && receipt.signedAt == request.time;
+    }
+    allow update: if resource.data.status == 'open' && resource.data.signedCount < resource.data.order.size() && signatureCounter();
     allow update: if assignmentFinisher(resource.data) &&
       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','archivedAt','archivedBy','finalHash','finalSize','finalChunkCount']) &&
       request.resource.data.status == 'archived' && request.resource.data.archivedAt == request.time && request.resource.data.archivedBy == request.auth.uid &&
@@ -265,22 +285,28 @@ service cloud.firestore {
       allow read: if admin();
       allow create: if admin() && assignment().status == 'open' && assignment().signedCount < assignment().order.size() &&
         request.resource.data.keys().hasOnly(['recipientUid','confirmedBy','confirmedAt','channel','stage','fileHash']) &&
-        request.resource.data.recipientUid == assignment().order[assignment().signedCount] &&
-        request.resource.data.stage == assignment().signedCount && request.resource.data.fileHash == assignment().fileHash &&
+        request.resource.data.recipientUid in assignment().order && !(request.resource.data.recipientUid in assignmentSigned(assignment())) &&
+        request.resource.data.stage is int && request.resource.data.stage >= 0 && request.resource.data.stage < assignment().order.size() && assignment().order[request.resource.data.stage] == request.resource.data.recipientUid && request.resource.data.fileHash == assignment().fileHash &&
         request.resource.data.confirmedBy == request.auth.uid && request.resource.data.confirmedAt == request.time && request.resource.data.channel == 'whatsapp';
       allow update,delete: if false;
     }
     match /receipts/{uid} {
       function assignment() { return get(/databases/$(database)/documents/assignments/$(assignmentId)).data; }
       allow read: if assignmentReader(assignment());
-      allow create: if assignmentUser() && uid in [request.auth.uid,assignmentUid()] && assignment().status == 'open' && assignment().signedCount < assignment().order.size() && assignment().order[assignment().signedCount] == uid &&
-        request.resource.data.keys().hasOnly(['name','title','statement','signatureImage','fileHash','signedBy','signedAt','actorUid']) &&
-        request.resource.data.name == assignment().targets[uid].name && request.resource.data.title == assignment().targets[uid].title &&
-        request.resource.data.statement == 'اطلعت على التكليف وأعتمده' && request.resource.data.fileHash == assignment().fileHash &&
-        request.resource.data.signatureImage is string && request.resource.data.signatureImage.size() > 50 && request.resource.data.signatureImage.size() <= 95000 &&
-        request.resource.data.signatureImage.matches('data:image/png;base64,[A-Za-z0-9+/=]+') &&
-        request.resource.data.signedBy == uid && request.resource.data.get('actorUid',request.auth.uid) == request.auth.uid && (uid == request.auth.uid || request.resource.data.get('actorUid','') == request.auth.uid) && request.resource.data.signedAt == request.time &&
-        getAfter(/databases/$(database)/documents/assignments/$(assignmentId)).data.signedCount == assignment().signedCount + 1;
+      function newSignature() {
+        let before = assignment();
+        let after = getAfter(/databases/$(database)/documents/assignments/$(assignmentId)).data;
+        let receipt = request.resource.data;
+        let delegated = receipt.get('delegated',false);
+        return assignmentSigner(uid) && before.status == 'open' && before.signedCount < before.order.size() && uid in before.order && !(uid in assignmentSigned(before)) &&
+          receipt.keys().hasOnly(['name','title','statement','signatureImage','fileHash','signedBy','signedAt','actorUid','delegated']) &&
+          receipt.name == before.targets[uid].name && receipt.title == before.targets[uid].title && receipt.statement == 'اطلعت على التكليف وأعتمده' &&
+          delegated == (admin() && coordinatorTarget(uid)) && receipt.fileHash == before.fileHash &&
+          receipt.signatureImage is string && receipt.signatureImage.size() > 50 && receipt.signatureImage.size() <= 95000 && receipt.signatureImage.matches('data:image/png;base64,[A-Za-z0-9+/=]+') &&
+          receipt.signedBy == uid && receipt.get('actorUid',request.auth.uid) == request.auth.uid && (uid == request.auth.uid || receipt.get('actorUid','') == request.auth.uid) && receipt.signedAt == request.time &&
+          after.signedCount == before.signedCount + 1 && (after.get('lastSignerUid','') == uid || !('signedUids' in before) && before.order[before.signedCount] == uid);
+      }
+      allow create: if newSignature();
       allow update,delete: if false;
     }
     match /parts/{partId} {

@@ -3,7 +3,7 @@
 const groups=[
  {key:'day',title:'اليوم الدراسي',note:'تنظيم اليوم والبيئة المدرسية',ids:['vSchedule','vSchoolDuty','vSubs','vSchoolSchedule']},
  {key:'followup',title:'المتابعة والتقارير',note:'متابعة التنفيذ وتحسين الأداء',ids:['vReport','vBoard','vStaff','vAcc']},
- {key:'people',title:'شؤون المنسوبين',note:'الدليل والتكليفات والاعتمادات',ids:['vTeachers','vAssignments','vSignatures']},
+ {key:'people',title:'شؤون المنسوبين',note:'الدليل والتكليفات والاعتمادات',ids:['vTeachers','vAssignments','vCoordinatorPage','vSignatures']},
  {key:'admin',title:'الإدارة والإعدادات',note:'الحسابات والصلاحيات وحماية المنصة',ids:['vEmployeeAccounts','namesBtn','pwBtn','securityAuditBtn','securityLoginBtn']}
 ];
 const labels={vSchoolSchedule:'الجداول والفصول',vEmployeeAccounts:'الحسابات والصلاحيات',namesBtn:'إعدادات المدرسة',pwBtn:'كلمة مروري',securityLoginBtn:'أمان الدخول',vTeachers:'دليل المنسوبين',vBoard:'مؤشرات المدرسة',vStaff:'متابعة المسؤولين والمشرفين',vSignatures:'التوقيعات والإقرارات'};
