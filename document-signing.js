@@ -37,7 +37,7 @@ const css=document.createElement('style');css.textContent=`
 #sigForm{margin:16px 0;padding:16px;border:1px solid var(--line,#ccd);border-radius:14px}
 #sigForm h3{margin:0 0 8px}#sigCircularFields textarea{width:100%;box-sizing:border-box;border:1px solid var(--line,#ccd);border-radius:9px;padding:10px;font:inherit;color:inherit;background:var(--surface,#fff);resize:vertical}
 #sigCircularFields label{min-width:0}#sigCircularFields .sig-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}
-.sig-modal{position:fixed;inset:0;background:#e8eef5;z-index:1000;display:flex!important;flex-direction:column;direction:rtl;color:#123}.sig-modal header{background:white;padding:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}.sig-pages{overflow:auto;flex:1;padding:16px;text-align:center}.sig-pages canvas{display:block;max-width:100%;height:auto;margin:0 auto 16px;box-shadow:0 2px 12px #0002;background:white}
+.sig-modal{position:fixed;inset:0;background:#e8eef5;z-index:1000;display:flex!important;flex-direction:column;direction:rtl;color:#123}.sig-modal header{background:white;padding:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}.sig-pages{overflow:auto;flex:1;padding:16px;text-align:center}.sig-modal .sig-draft-recipients{margin:0;max-height:18vh;overflow:auto;padding:8px 12px;background:#fff;border-top:1px solid #dce4e0}.sig-draft-recipients summary{cursor:pointer}.sig-draft-recipients p{margin:6px 0}.sig-pages canvas{display:block;max-width:100%;height:auto;margin:0 auto 16px;box-shadow:0 2px 12px #0002;background:white}
 `;
 document.head.appendChild(css);
 const main=document.createElement('section');main.id='sigMain';main.hidden=true;
@@ -53,7 +53,7 @@ main.innerHTML=`<div class="sig-head"><h2>التوقيعات والإقرارا�
 </div>
 <label>تفاصيل المطلوب الاطلاع عليه<textarea id="sigCircularBody" maxlength="1200" rows="5" disabled></textarea></label>
 <div class="sig-grid"><label>إرفاق التعميم بصيغة PDF (اختياري)<input id="sigCircularAttachment" type="file" accept="application/pdf,.pdf" disabled></label></div>
-</div><div id="sigUploadFields"><div class="sig-grid"><label>عنوان الملف<input id="sigTitle" required maxlength="150"></label><label>ملف PDF — حتى 10 ميجابايت<input id="sigUpload" type="file" accept="application/pdf,.pdf" required></label><label>نوع الإقرار<select id="sigKind"><option value="receipt">اطلعت وأقرّ بالاستلام</option><option value="approval">اطلعت وأوافق</option></select></label></div></div><p class="sig-note">الاطلاع والاستلام لا يعنيان الموافقة على المحتوى. لا يمكن تغيير الملف أو المستلمين بعد الإرسال.</p><div class="sig-actions"><button type="button" id="sigAll">تحديد جميع الحسابات المتاحة</button><button type="button" id="sigNone">إلغاء التحديد</button></div><div id="sigRecipients"></div><p class="sig-note">مربع الاختيار يظهر للحسابات المرتبطة فقط. عبارة «غير مرتبط بحساب دخول» تعني أن المنسوب يحتاج ربط حسابه قبل إرسال طلب الإقرار إليه.</p><button type="submit" id="sigSend">رفع الملف وإرسال طلب الإقرار</button></form>
+</div><div id="sigUploadFields"><div class="sig-grid"><label>عنوان الملف<input id="sigTitle" required maxlength="150"></label><label>ملف PDF — حتى 10 ميجابايت<input id="sigUpload" type="file" accept="application/pdf,.pdf" required></label><label>نوع الإقرار<select id="sigKind"><option value="receipt">اطلعت وأقرّ بالاستلام</option><option value="approval">اطلعت وأوافق</option></select></label></div></div><p class="sig-note">الاطلاع والاستلام لا يعنيان الموافقة على المحتوى. لا يمكن تغيير الملف أو المستلمين بعد الإرسال.</p><div class="sig-actions"><button type="button" id="sigAll">تحديد جميع الحسابات المتاحة</button><button type="button" id="sigNone">إلغاء التحديد</button></div><div id="sigRecipients"></div><p class="sig-note">مربع الاختيار يظهر للحسابات المرتبطة فقط. عبارة «غير مرتبط بحساب دخول» تعني أن المنسوب يحتاج ربط حسابه قبل إرسال طلب الإقرار إليه.</p><div class="sig-actions"><button type="submit" id="sigSend">رفع الملف وإرسال طلب الإقرار</button><button type="button" id="sigPreview" hidden>معاينة البيان</button></div></form>
 <div class="sig-filters"><button data-sigfilter="open" aria-pressed="true">تحتاج إجراء</button><button data-sigfilter="archived">الأرشيف</button><button data-sigfilter="all">الكل</button><input id="sigSearch" placeholder="بحث بعنوان الملف"><button id="sigClearPerson" hidden></button></div><div id="sigList" class="sig-grid"></div><div id="sigDetail"></div>`;
 if(teacherPage){const account=document.getElementById('account');account?.prepend(main)}else document.body.appendChild(main);
 const $=id=>document.getElementById(id);
@@ -80,6 +80,7 @@ function setFormMode(mode){
  $('sigCircularFields').querySelectorAll('input,textarea').forEach(field=>field.disabled=!circular);
  for(const id of ['sigCircularSubject','sigCircularBody'])$(id).required=circular;
  for(const id of ['sigTitle','sigUpload','sigKind'])$(id).disabled=circular;
+ $('sigPreview').hidden=!circular;
  $('sigSend').textContent=circular?'إنشاء البيان وإرسال طلب الإقرار':'رفع الملف وإرسال طلب الإقرار';
 }
 for(const [id,mode,field] of [['sigCircularNew','circular','sigCircularSubject'],['sigNew','upload','sigTitle']]){
@@ -159,16 +160,41 @@ async function buildCircularPDF(details,attachment){
   return bytes;
  }finally{host.remove()}
 }
+function circularDetails(){
+ const details=Object.fromEntries(['Subject','Number','Date','Issuer','Body'].map(key=>[key.toLowerCase(),$('sigCircular'+key).value.trim()]));
+ if(!details.subject||!details.body)throw Error('اكتب موضوع التعميم وتفاصيل المطلوب الاطلاع عليه');
+ return details;
+}
+function selectedRecipients(){
+ return [...$('sigRecipients').querySelectorAll('input:checked')].map(x=>people.find(p=>p.key===x.value)).filter(Boolean);
+}
+$('sigPreview').onclick=async()=>{
+ if(busy||!current?.admin||formMode!=='circular')return;
+ if(!$('sigForm').reportValidity())return;
+ const owner=current;
+ const selected=selectedRecipients();
+ const attachment=$('sigCircularAttachment').files[0];
+ busy=true;$('sigSend').disabled=true;$('sigPreview').disabled=true;
+ try{
+  const details=circularDetails();
+  toast('جارٍ إعداد المعاينة…');
+  const bytes=await buildCircularPDF(details,attachment);
+  if(current!==owner)return;
+  toast('');
+  await viewer({title:'معاينة بيان اطلاع · '+details.subject},false,{bytes,selected});
+ }catch(err){toast(message(err))}
+ finally{busy=false;$('sigSend').disabled=false;$('sigPreview').disabled=false}
+};
 $('sigForm').onsubmit=async e=>{
  e.preventDefault();
  if(busy||!current?.admin||!formMode)return;
- const selected=[...document.querySelectorAll('#sigRecipients input:checked')].map(x=>people.find(p=>p.key===x.value)).filter(Boolean);
+ const selected=selectedRecipients();
  const circular=formMode==='circular',uid=current.uid;
  const limit=circular?CIRCULAR_LIMIT:80;
  if(!selected.length||selected.length>limit){toast('اختر منسوبًا واحدًا على الأقل وبحد أقصى '+limit);return}
- const details=circular?Object.fromEntries(['Subject','Number','Date','Issuer','Body'].map(key=>[key.toLowerCase(),$('sigCircular'+key).value.trim()])):null;
+ let details=null;
+ try{if(circular)details=circularDetails()}catch(err){toast(err.message);return}
  const title=circular?'بيان اطلاع · '+details.subject:$('sigTitle').value.trim();
- if(circular&&(!details.subject||!details.body)){toast('اكتب موضوع التعميم وتفاصيل المطلوب الاطلاع عليه');return}
  if(!title){toast('اكتب عنوان الملف');return}
  const file=$(circular?'sigCircularAttachment':'sigUpload').files[0],kind=circular?'receipt':$('sigKind').value;
  busy=true;$('sigSend').disabled=true;
@@ -189,8 +215,10 @@ $('sigForm').onsubmit=async e=>{
  }catch(err){toast(message(err)+(ref?' تعذّر تأكيد إرسال الطلب. راجع قائمة الطلبات قبل إعادة الإرسال.':''))}
  finally{busy=false;$('sigSend').disabled=false}
 };
-async function viewer(d,final=false){const overlay=document.createElement('section');overlay.className='sig-modal';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.innerHTML=`<header><strong>${esc(d.title)}</strong><span data-status>جارٍ تحميل الملف…</span><a data-download hidden>تحميل PDF</a><button data-close>إغلاق العرض</button></header><div class="sig-pages"></div>`;document.body.appendChild(overlay);let closed=false,url=null;const close=()=>{closed=true;overlay.remove();document.removeEventListener('keydown',key);if(url)URL.revokeObjectURL(url)};const key=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',key);overlay.querySelector('[data-close]').onclick=close;
- try{const bytes=await readParts(d,final);if(closed)return;const file=new File([bytes],(final?'نهائي-':'')+d.fileName,{type:'application/pdf'});url=URL.createObjectURL(file);const a=overlay.querySelector('[data-download]');a.href=url;a.download=file.name;a.hidden=false;if(!root.pdfjsLib)throw Error('يمكنك تحميل الملف لقراءته؛ تعذر تحميل العارض');pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';const pdf=await pdfjsLib.getDocument({data:bytes}).promise;let page=1;const renderNext=async()=>{const end=Math.min(page+9,pdf.numPages);for(;page<=end;page++){if(closed)return;const p=await pdf.getPage(page),viewport=p.getViewport({scale:1.3}),canvas=document.createElement('canvas');canvas.width=viewport.width;canvas.height=viewport.height;overlay.querySelector('.sig-pages').appendChild(canvas);await p.render({canvasContext:canvas.getContext('2d'),viewport}).promise}overlay.querySelector('[data-status]').textContent=`${pdf.numPages} صفحة`;if(page>pdf.numPages){readFiles.add(d.id);if(selectedId===d.id)updateSignButton(d)}else{const more=document.createElement('button');more.textContent='عرض الصفحات التالية';overlay.querySelector('.sig-pages').appendChild(more);more.onclick=async()=>{more.remove();await renderNext()}}};await renderNext();
+async function viewer(d,final=false,draft=null){const previousFocus=document.activeElement;const overlay=document.createElement('section');overlay.className='sig-modal';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label',d.title);overlay.innerHTML=`<header><strong>${esc(d.title)}</strong><span data-status>جارٍ تحميل الملف…</span><a data-download hidden>تحميل PDF</a><button data-close>إغلاق العرض</button></header>${draft?`<details class="sig-draft-recipients"><summary>المنسوبون المحددون (${draft.selected.length})</summary><p>${draft.selected.map(p=>esc(p.name)).join('، ')||'لم تحدد منسوبين بعد.'}</p></details>`:''}<div class="sig-pages"></div>`;document.body.appendChild(overlay);let closed=false,url=null;const close=()=>{closed=true;overlay.remove();document.removeEventListener('keydown',key);if(url)URL.revokeObjectURL(url);previousFocus?.focus()};const key=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',key);const closeButton=overlay.querySelector('[data-close]');closeButton.onclick=close;closeButton.focus();
+ try{const bytes=draft?draft.bytes:await readParts(d,final);if(closed)return;
+ if(!draft){const file=new File([bytes],(final?'نهائي-':'')+d.fileName,{type:'application/pdf'});url=URL.createObjectURL(file);const a=overlay.querySelector('[data-download]');a.href=url;a.download=file.name;a.hidden=false}
+ if(!root.pdfjsLib)throw Error(draft?'تعذر تحميل عارض المعاينة؛ حدّث الصفحة':'يمكنك تحميل الملف لقراءته؛ تعذر تحميل العارض');pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';const pdf=await pdfjsLib.getDocument({data:bytes}).promise;let page=1;const renderNext=async()=>{const end=Math.min(page+9,pdf.numPages);for(;page<=end;page++){if(closed)return;const p=await pdf.getPage(page),viewport=p.getViewport({scale:1.3}),canvas=document.createElement('canvas');canvas.width=viewport.width;canvas.height=viewport.height;overlay.querySelector('.sig-pages').appendChild(canvas);await p.render({canvasContext:canvas.getContext('2d'),viewport}).promise}overlay.querySelector('[data-status]').textContent=`${pdf.numPages} صفحة`;if(page>pdf.numPages){if(!draft){readFiles.add(d.id);if(selectedId===d.id)updateSignButton(d)}}else{const more=document.createElement('button');more.textContent='عرض الصفحات التالية';overlay.querySelector('.sig-pages').appendChild(more);more.onclick=async()=>{more.remove();try{await renderNext()}catch(err){overlay.querySelector('[data-status]').textContent=message(err)}}}};await renderNext();
  }catch(err){overlay.querySelector('[data-status]').textContent=message(err)}
 }
 function updateSignButton(d){const b=$('sigAcknowledge');if(b)b.disabled=!readFiles.has(d.id)}
