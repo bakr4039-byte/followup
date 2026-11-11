@@ -6,7 +6,7 @@ const circularFooter = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDA
 const STATEMENTS={receipt:'اطلعت وأقرّ بالاستلام',approval:'اطلعت وأوافق'};
 const CHUNK=400*1024,MAX_FILE=10*1024*1024,CIRCULAR_LIMIT=36;
 const CIRCULAR_TEMPLATE='followup-circular-original-v2';
-const CIRCULAR_LAYOUT={width:794,height:1123,tableX:74,tableY:330,tableWidth:625,rowHeight:26.5};
+const CIRCULAR_LAYOUT={width:794,height:1123,tableX:74,tableY:330,tableWidth:646,rowHeight:26.5};
 const CIRCULAR_FILE_PREFIX='بيان-اطلاع · ';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normal=s=>String(s||'').normalize('NFKC').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/[\s\u2066-\u2069\u200e\u200f]/g,'');
@@ -105,15 +105,18 @@ async function validatePDF(file){if(!file||file.size>MAX_FILE||file.size===0)thr
 function circularTable(entries){
  const {tableWidth,rowHeight}=CIRCULAR_LAYOUT;
  const groups=entries.length>18?[entries.slice(0,18),entries.slice(18)]:[entries];
+ const columnWidth=tableWidth/groups.length;
+ const signatureWidth=groups.length===2?108:188;
  let index=0;
- const cell='border:1px solid #000;padding:0 3px;overflow-wrap:anywhere;text-align:center';
- return `<div dir="rtl" style="display:flex;align-items:flex-start;width:${tableWidth}px;background:#fff;color:#000;font:700 12px/1.05 'Times New Roman',Arial">
- ${groups.map(group=>`<table style="width:${tableWidth/groups.length}px;flex:none;table-layout:fixed;border-collapse:collapse;border:2px solid #000">
- <colgroup><col style="width:36px"><col><col style="width:${groups.length===2?83:165}px"></colgroup>
- <thead><tr style="height:${rowHeight}px;background:#d9d9d9"><th style="${cell}">م</th><th style="${cell}">اسم الموظف</th><th style="${cell}">التوقيع</th></tr></thead>
- <tbody>${group.map(entry=>`<tr style="height:${rowHeight}px"><td style="${cell}">${++index}</td>
- <td style="${cell};font-size:${entry.name.length>52?10:12}px">${esc(entry.name)}</td>
- <td style="${cell};font-size:8px;line-height:1">${entry.signedAt?`اطّلع وأقرّ بالاستلام<br>${esc(stamp(entry.signedAt))}`:''}</td></tr>`).join('')}</tbody>
+ const cell='box-sizing:border-box;border:1px solid #444;padding:1px 4px;white-space:normal;overflow-wrap:anywhere;text-align:center;vertical-align:middle';
+ const header=cell+';position:static;background:#e2e7e5;color:#172621;font-size:13px;font-weight:700';
+ return `<div dir="rtl" style="display:flex;align-items:flex-start;width:${tableWidth}px;background:#fff;color:#18221e;font:700 13px/1.08 Tahoma,Arial">
+ ${groups.map(group=>`<table style="width:${columnWidth}px;min-width:0;max-width:${columnWidth}px;flex:0 0 ${columnWidth}px;table-layout:fixed;border-collapse:collapse;border:2px solid #313d38">
+ <colgroup><col style="width:32px"><col style="width:${columnWidth-32-signatureWidth}px"><col style="width:${signatureWidth}px"></colgroup>
+ <thead><tr style="height:${rowHeight}px"><th style="${header}">م</th><th style="${header}">اسم الموظف</th><th style="${header}">التوقيع</th></tr></thead>
+ <tbody>${group.map((entry,i)=>`<tr style="height:${rowHeight}px;background:${i%2?'#f6f8f7':'#fff'}"><td style="${cell};font-size:11px">${++index}</td>
+ <td style="${cell};text-align:right;padding-right:7px;font-size:${entry.name.length>52?9:13}px">${esc(entry.name)}</td>
+ <td style="${cell};font-size:10px;line-height:1.02">${entry.signedAt?`<strong style="color:#174637">أقرّ بالاطلاع</strong><br><span style="font-size:9px;font-weight:400">${esc(stamp(entry.signedAt))}</span>`:'<span style="font-weight:400;color:#56645d">بانتظار التوقيع</span>'}</td></tr>`).join('')}</tbody>
  </table>`).join('')}</div>`;
 }
 async function captureCircular(host,markup){
@@ -140,7 +143,7 @@ async function buildCircularPDF(details,attachment,selected){
   <img alt="" src="${circularHeader}" style="position:absolute;top:0;right:0;width:100%;height:326px">
   <div style="position:absolute;right:74px;left:74px;top:219px;overflow-wrap:anywhere;font-size:${details.number.length+details.date.length+details.issuer.length>120?11:details.number.length+details.date.length+details.issuer.length>60?12:14}px">
   آمل بعد الاطلاع على التعميم المرفق رقم ( <bdi>${esc(details.number||'بدون')}</bdi> ) وتاريخ <bdi>${esc(details.date)}</bdi> &nbsp; الصادر من / <bdi>${esc(details.issuer||'…………')}</bdi></div>
-  <div style="position:absolute;right:74px;left:74px;top:258px;overflow-wrap:anywhere"><strong>بخصوص</strong> &nbsp; <bdi>${esc(details.subject)}</bdi></div>
+  <div style="position:absolute;right:74px;left:74px;top:254px;font-size:16px;line-height:1.24;overflow-wrap:anywhere"><strong>بخصوص</strong> &nbsp; <bdi>${esc(details.subject)}</bdi></div>
   <div style="position:absolute;left:${tableX}px;top:${tableY}px;width:${tableWidth}px">${circularTable(selected)}</div>
   <img alt="" src="${circularFooter}" style="position:absolute;top:${footerY}px;right:0;width:100%;height:99px">
   </section>`;
@@ -164,7 +167,10 @@ async function fillCircularSignatures(pdf,host,entries){
  const scaleX=page.getWidth()/width,scaleY=page.getHeight()/height;
  const markup=`<div style="width:${tableWidth}px;height:${tableHeight}px;background:#fff">${circularTable(entries)}</div>`;
  const image=await pdf.embedPng(await captureCircular(host,markup));
- page.drawImage(image,{x:tableX*scaleX,y:page.getHeight()-(tableY+tableHeight)*scaleY,width:tableWidth*scaleX,height:tableHeight*scaleY});
+ const y=page.getHeight()-(tableY+tableHeight)*scaleY;
+ // Earlier previews could overflow into the left margin under the site's global table styles.
+ page.drawRectangle({x:0,y,width:page.getWidth(),height:tableHeight*scaleY,color:PDFLib.rgb(1,1,1)});
+ page.drawImage(image,{x:tableX*scaleX,y,width:tableWidth*scaleX,height:tableHeight*scaleY});
 }
 function circularDetails(){
  const details=Object.fromEntries(['Subject','Number','Date','Issuer'].map(key=>[key.toLowerCase(),$('sigCircular'+key).value.trim()]));
