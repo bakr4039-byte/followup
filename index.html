@@ -35,7 +35,7 @@
 .board .cgrid .cbox{border-radius:18px}
 </style>
 <title>منصة متابعة الحصص عن بُعد</title>
-</head>
+<link rel="stylesheet" href="school-brand.css?v=logo-20261111-1"></head>
 <body>
 <div class="credit-fix">إعداد وتنفيذ / بكر الدوخي</div>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -373,7 +373,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <div class="seal" aria-hidden="true">ص</div>
+      <div class="seal school-brand-seal"><img class="school-brand-logo" src="assets/sahafa-school-logo.jpeg" alt="شعار مدارس الصحافة الأهلية" width="1320" height="1162"></div>
       <div>
         <h1>إدارة ثانوية الصحافة الأهلية</h1>
         <p id="weekSub">ثانوية الصحافة الأهلية</p>
@@ -573,7 +573,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
 
 <div class="gate" id="gate">
   <div class="gate-card">
-    <div class="brand"><div class="seal" aria-hidden="true">ص</div><div><h1>إدارة ثانوية الصحافة الأهلية</h1><p>ثانوية الصحافة الأهلية</p></div></div>
+    <div class="brand"><div class="seal school-brand-seal"><img class="school-brand-logo" src="assets/sahafa-school-logo.jpeg" alt="شعار مدارس الصحافة الأهلية" width="1320" height="1162"></div><div><h1>إدارة ثانوية الصحافة الأهلية</h1><p>ثانوية الصحافة الأهلية</p></div></div>
     <a class="btn" href="login.html">الدخول الموحد للمنسوبين</a>
     <div id="gateMsg" class="hint" style="text-align:center">جارٍ التحميل…</div>
     <form id="loginForm" hidden style="display:grid;gap:14px">
@@ -1120,7 +1120,7 @@ function weekPage(rows){const c=tStats(rows);const sups=(effSup()<0?[0,1,2,3]:[e
   <h2>حسب المسؤول</h2><table><thead><tr><th>المسؤول</th><th>الصفوف</th><th>الحصص</th><th>مرصودة</th><th>تمت</th><th>متأخرة</th><th>لم تُعقد</th><th>تقنية</th><th>نسبة الرصد</th><th>التقييم</th></tr></thead><tbody>${supRows}</tbody></table>
   <h2>سجل الحصص</h2><table><thead><tr><th>اليوم</th><th>الحصة</th><th>الصف</th><th>المادة</th><th>المعلم</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>التقييم</th><th>ملاحظات</th></tr></thead><tbody>${body}</tbody></table>
   <div class="sign"><div>المتابِع</div><div>وكيل الشؤون التعليمية</div><div>مدير المدرسة<br>حسن بن محمد العمري</div></div></section>`}
-function wrapDoc(title,body,autoPrint){return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;700&display=swap"><style>${PRINT_CSS}</style></head><body><div class="toolbar"><span>${esc(title)}</span><button onclick="window.print()">طباعة</button></div><div class="wrapper">${body}</div>${autoPrint?'<script>window.addEventListener("load",function(){setTimeout(function(){window.print()},500)})<\/script>':''}</body></html>`}
+function wrapDoc(title,body,autoPrint){return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;700&display=swap"><style>${PRINT_CSS}</style><link rel="stylesheet" href="school-brand.css?v=logo-20261111-1"></head><body><div class="toolbar"><span>${esc(title)}</span><button onclick="window.print()">طباعة</button></div><div class="wrapper">${body}</div>${autoPrint?'<script>window.addEventListener("load",function(){setTimeout(function(){window.print()},500)})<\/script>':''}</body></html>`}
 // scoped copy of the print styles for in-page PDF rendering
 const PDF_CSS=('.pdfdoc{font-family:"IBM Plex Sans Arabic",Tahoma,Arial,sans-serif;direction:rtl;color:#13231f;font-size:12.5px;line-height:1.5;background:#fff}.pdfdoc *{box-sizing:border-box}.pdfdoc .page{width:718px;background:#fff;padding:0 0 6px}.pdfdoc table{min-width:0;width:100%;table-layout:auto}.pdfdoc th,.pdfdoc td{white-space:normal;position:static}'+
   PRINT_CSS.split('\n').filter(l=>!/^(@page|\.page|\.toolbar|\.wrapper|@media)/.test(l)).join('\n').replace(/(^|})\s*([^{}@]+)\{/g,(m,a,sel)=>a+sel.split(',').map(x=>'.pdfdoc '+x.trim()).join(',')+'{'));
@@ -1709,7 +1709,7 @@ function showBanner(t){const b=$('banner');b.textContent=t;b.hidden=false}
 <script src="security-audit.js?v=login-20261014"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script src="document-signing.js?v=coordinator-20261110-2"></script><script src="employee-accounts.js?v=coordinator-20261110-2"></script><script src="assignment-signing.js?v=inline-coordinator-20261110-3"></script>
 <script src="recorder-accounts.js?v=20261108-1"></script>
 <script src="personnel-tasks-admin.js?v=bounded-save-20261110-1"></script>
-<script src="teacher-provision.js?v=coordinator-20261110-2"></script><script src="duty-fields.js?v=20261109-1"></script><script src="written-duties.js?v=coordinator-20261110-2"></script><script src="school-operations.js?v=approved-schedule-20261110-1"></script><link rel="stylesheet" href="school-navigation.css?v=20261109-1"><script src="school-navigation.js?v=manager-home-20261110-1"></script><script src="pending-assignments.js?v=linked-identities-20261109-1"></script></body>
+<script src="teacher-provision.js?v=coordinator-20261110-2"></script><script src="duty-fields.js?v=20261109-1"></script><script src="written-duties.js?v=coordinator-20261110-2"></script><script src="school-operations.js?v=approved-schedule-20261110-1"></script><link rel="stylesheet" href="school-navigation.css?v=20261109-1"><script src="school-navigation.js?v=logo-20261111-1"></script><script src="pending-assignments.js?v=linked-identities-20261109-1"></script></body>
 </html>
 
 
