@@ -235,6 +235,9 @@ tr.clickable:hover td{background:var(--surface-2)}
 .scrim{position:fixed;inset:0;background:rgba(5,20,17,.45);z-index:20}
 .drawer{position:fixed;top:0;bottom:0;left:0;width:min(440px,100%);background:var(--surface);z-index:21;box-shadow:0 0 40px rgba(0,0,0,.25);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 .secbox{border:1.5px solid var(--accent);border-radius:12px;padding:12px;background:var(--accent-soft);display:grid;gap:10px}.secbox.on{border-color:var(--ok);background:var(--ok-soft)}.secbox h3{margin:0}.secbox ol{margin:0;padding-inline-start:20px;display:grid;gap:4px;font-size:13.5px}.secbox pre{max-height:180px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:11px;direction:ltr;text-align:left;white-space:pre}.secbox .row2{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#drawer.embedded-lesson-drawer{top:var(--lesson-top);bottom:auto!important;height:var(--lesson-height)}
+#drawer .drawer-body{min-height:0}
+#drawer .drawer-foot{flex-shrink:0}
 .drawer.wide{width:min(820px,100%)}.drawer-body>*,.imap>*{min-width:0}
 .imap{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.imap select,.imap input{width:100%;border:1px solid var(--line);border-radius:8px;padding:7px 8px;background:var(--surface)}
 .ipv table{font-size:12.5px}.ipv td,.ipv th{padding:6px 8px}.ipv tr.off td{opacity:.5}.ipv .why{color:var(--muted);font-size:11.5px}.chk{display:flex;gap:6px;align-items:center;font-size:13px}
@@ -540,7 +543,7 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
   </div>
   <div class="drawer-foot">
     <button class="btn ghost" id="dClear">مسح الرصد</button>
-    <button class="btn ghost" id="dAttendance">حفظ الحضور والغياب فقط</button><button class="btn" id="dSave">حفظ المتابعة</button>
+    <button class="btn ghost" id="dAttendance">حفظ الحضور والغياب فقط</button><button class="btn" id="dSave">حفظ وتثبيت التقييم</button>
   </div>
 </aside>
 
@@ -1285,10 +1288,35 @@ async function autoSaveNotes(id){if(!onlineWeek(state.week,byId[id]?.day))return
   const data={teacher:s.teacher,week:state.week,sup:s.sup,day:s.day};fields.forEach(([k,el])=>data[k]=$(el).value.trim().slice(0,600));if(!isMon()&&!prev)data.status='';
   autoNote.busy=true;noteMsg('جارٍ حفظ الملاحظات…');
   try{await state.db.doc(logsCol(state.week)+'/'+id).set(data);const base=prev||{sup:s.sup,day:s.day,teacher:s.teacher,week:state.week,status:''};const p={...splitNotes(base)};fields.forEach(([k])=>p[k]=data[k]);state.logs[id]={...base,...p,notes:joinNotes(p).slice(0,2000)};if(state.open===id)noteMsg('✓ حُفظت الملاحظات تلقائياً وتظهر للمدير والمعلم')}
-  catch(e){console.error(e);if(state.open===id)noteMsg('تعذّر الحفظ التلقائي للملاحظات'+(e&&e.code?' ('+e.code+')':'')+'، اضغط «حفظ المتابعة»')}
+  catch(e){console.error(e);if(state.open===id)noteMsg('تعذّر الحفظ التلقائي للملاحظات'+(e&&e.code?' ('+e.code+')':'')+'، اضغط «حفظ وتثبيت التقييم»')}
   finally{autoNote.busy=false;if(autoNote.again){autoNote.again=false;if(state.open===id)autoSaveNotes(id)}}}
 function flushNotes(){if(autoNote.t){clearTimeout(autoNote.t);autoNote.t=null;autoSaveNotes(autoNote.id)}}
 ['nVC','nSup','nAdm'].forEach(x=>$(x).addEventListener('input',()=>{const id=state.open;if(!id)return;clearTimeout(autoNote.t);autoNote.id=id;noteMsg('سيتم الحفظ تلقائياً…');autoNote.t=setTimeout(()=>{autoNote.t=null;autoSaveNotes(id)},1200)}));
+// The personal schedule iframe is sized to its content, so its viewport can
+// extend beyond the visible part of the employee page.
+function fitEmbeddedLessonDrawer(){
+  const frame=window.frameElement;
+  if(!frame)return;
+  const drawer=$('drawer');
+  const update=()=>{
+    const frameTop=frame.getBoundingClientRect().top+frame.clientTop;
+    const top=Math.max(0,-frameTop);
+    const bottom=Math.min(window.innerHeight,window.parent.innerHeight-frameTop);
+    drawer.style.setProperty('--lesson-top',top+'px');
+    drawer.style.setProperty('--lesson-height',Math.max(0,bottom-top)+'px');
+  };
+  drawer.classList.add('embedded-lesson-drawer');
+  update();
+  window.parent.addEventListener('scroll',update,true);
+  window.parent.addEventListener('resize',update);
+  window.addEventListener('resize',update);
+  return ()=>{
+    window.parent.removeEventListener('scroll',update,true);
+    window.parent.removeEventListener('resize',update);
+    window.removeEventListener('resize',update);
+  };
+}
+let stopEmbeddedLessonFit;
 async function openDrawer(id){if(!onlineWeek(state.week,byId[id]?.day)){toast("جدول عن بُعد غير مفعّل لهذا الأسبوع");return;}flushNotes();noteMsg('');const s=byId[id];state.open=id;const l=state.logs[id]||{};state.draft={status:l.status||'',recorded:l.recorded||'',rating:l.rating||0,ratingMon:l.ratingMon||0,reason:reasonOf(l)};
   $('dTitle').textContent=s.subj;$('dSub').textContent=`${s.teacher} · ${CLS[s.cls]} · ${DAYS[s.day].n} ${DAYS[s.day].h}هـ · الحصة ${s.label} (${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}) · ${state.names[s.sup]}`;
   $('dLink').value=state.links[id]||'';paintJoin();$('dEntry').value=l.entry||'';$('dPresent').value=l.present??'';$('dAbsent').value=l.absent??'';{const p=splitNotes(l);$('nVC').value=p.notesVC;$('nSup').value=p.notesSup;$('nAdm').value=p.notesAdm;paintCombined()}
@@ -1298,8 +1326,11 @@ async function openDrawer(id){if(!onlineWeek(state.week,byId[id]?.day)){toast("�
   const ro=!state.db||!state.canWrite||notMine;
   const monOk=isMon()&&monTeachers(state.role).has(s.teacher);
   if(notMine&&state.role!=null)$('dWho').textContent=($('dWho').textContent?$('dWho').textContent+' · ':'')+(isMon()?(monOk?'صلاحيتك: تقييم المشرف وملاحظاته فقط':'هذا المعلم ليس ضمن معلميك (عرض فقط)'):'هذه الحصة من مسؤولية '+state.names[s.sup]+' (عرض فقط)');['dEntry','dPresent','dAbsent','nVC','nSup','dLink'].forEach(x=>$(x).disabled=ro);const admOk=!!state.db&&state.canWrite&&(state.role===-1||monOk);$('nAdm').disabled=!admOk;$('drawer').classList.toggle('monmode',isMon());$('drawer').classList.toggle('supmode',isSupRole(state.role)||isRep());{const vis=notePartsFor();NOTE_PARTS.forEach(([k,,el])=>$(el).closest('.field').classList.toggle('hidef',!vis.includes(k)))}$('dLinkSave').disabled=ro;$('dSave').disabled=ro&&!monOk;$('dAttendance').disabled=ro;$('dClear').disabled=state.role!==-1||!state.logs[id];
-  paintDraft();$('scrim').hidden=false;$('drawer').hidden=false;$('dClose').focus();}
-function closeDrawer(){flushNotes();$('scrim').hidden=true;$('drawer').hidden=true;state.open=null}
+  paintDraft();$('scrim').hidden=false;$('drawer').hidden=false;
+  stopEmbeddedLessonFit?.();
+  stopEmbeddedLessonFit=fitEmbeddedLessonDrawer();
+  $('dClose').focus({preventScroll:true});}
+function closeDrawer(){stopEmbeddedLessonFit?.();stopEmbeddedLessonFit=null;flushNotes();$('scrim').hidden=true;$('drawer').hidden=true;state.open=null}
 $('dClose').onclick=closeDrawer;$('scrim').onclick=closeDrawer;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();closeNames();closeImport();if(typeof closeQueue==='function')closeQueue()}});
 $('dStatus').onclick=e=>{const b=e.target.closest('[data-st]');if(!b)return;state.draft.status=b.dataset.st;paintDraft()};
