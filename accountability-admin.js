@@ -19,12 +19,7 @@
   const portal=(id,name)=>new URL(personalPage(name)+'#acc-'+id,location.href).href;
   const pdfLink=(id,name)=>new URL(personalPage(name)+'#acc-'+id+'-pdf',location.href).href;
   const ABSENCE_SUBJECT='غياب عن الدوام';
-  function defaultReplyDue(){
-    const day=new Date(A.riyadhISO()+'T12:00:00Z');
-    day.setUTCDate(day.getUTCDate()+7);
-    return day.toISOString().slice(0,10);
-  }
-  let list=[],stop=null,tab='log',scope='active';
+  let list=[],stop=null,tab='log',scope='active',showAfterReply=null;
 
   // ---------- markup ----------
   const css=document.createElement('style');css.textContent=`
@@ -43,7 +38,7 @@
   .acc-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:4px 12px;padding-bottom:12px}.acc-items label{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;line-height:1.6}
   .acc-card{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:8px;background:var(--surface)}
   .acc-card .top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}.acc-card h4{margin:0;font-size:15.5px}
-  .acc-st{font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px}.acc-st.sent{background:var(--warn-soft);color:var(--warn)}.acc-st.replied{background:var(--tech-soft);color:var(--tech)}.acc-st.decided{background:var(--ok-soft);color:var(--ok)}
+  .acc-st{font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px}.acc-st.sent,.acc-st.managerReply{background:var(--warn-soft);color:var(--warn)}.acc-st.replied{background:var(--tech-soft);color:var(--tech)}.acc-st.decided{background:var(--ok-soft);color:var(--ok)}
   .acc-card .muted{color:var(--muted);font-size:13px}.acc-reply{background:var(--surface-2);border-radius:10px;padding:8px 12px;white-space:pre-wrap;font-size:14px}
   .acc-acts{display:flex;flex-wrap:wrap;gap:6px}.acc-acts .btn{padding:7px 12px;font-size:13px}
   .acc-dec{display:grid;gap:8px;border-top:1px dashed var(--line);padding-top:8px}.acc-radios{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px}.acc-radios label{display:flex;gap:5px;align-items:center}
@@ -54,7 +49,7 @@
   const wrap=document.createElement('div');wrap.innerHTML=`<div class="scrim" id="acScrim" hidden></div>
   <aside class="drawer wide" id="acDrawer" hidden role="dialog" aria-modal="true" aria-labelledby="acTitle">
    <div class="drawer-head"><div class="row"><h2 id="acTitle">إدارة المساءلات</h2><button class="iconbtn" id="acClose">إغلاق</button></div>
-    <p>اختر نوع المساءلة والمنسوب. يُعبّئ المنسوب إفادته في حسابه، ويظهر الرد في السجل.</p>
+    <p>اختر نوع المساءلة والمنسوب. تُحفظ الإفادات والقرارات والأرشيف في السجل.</p>
     <div class="acc-tabs"><button data-acctab="new" aria-pressed="true">مساءلة جديدة</button><button data-acctab="log" aria-pressed="false">السجل <span id="acCount"></span></button></div></div>
    <div class="drawer-body" id="acNew">
     <div id="acEditBar" hidden style="background:var(--warn-soft);border-radius:10px;padding:8px 12px;font-weight:600;font-size:13.5px"></div>
@@ -79,7 +74,7 @@
     <div class="acc-acts"><button class="btn" id="acSave">حفظ وفتح واتساب للمنسوب</button><button class="btn ghost" id="acPreview">معاينة النموذج</button><button class="btn ghost" id="acBlankAbsence" hidden>تحميل نموذج غياب فارغ</button><button class="btn ghost" id="acCancelEdit" hidden>إلغاء التعديل</button></div>
     <div class="acc-prev" id="acPrev" hidden></div>
    </div>
-   <div class="drawer-body" id="acLog" hidden><div id="acStats" class="acc-grid"></div><div class="acc-tabs"><button id="acActive">تحتاج إجراء</button><button id="acArchive">الأرشيف</button></div><div class="acc-grid"><input id="acFrom" type="date" aria-label="من تاريخ"><input id="acTo" type="date" aria-label="إلى تاريخ"><select id="acType" aria-label="نوع المخالفة"><option value="">كل المخالفات</option></select><input id="acSearch" placeholder="بحث بالمعلم أو الرقم أو الموضوع" aria-label="بحث المساءلات"><select id="acFilter"><option value="">كل الحالات</option><option value="sent">بانتظار رد المعلم</option><option value="replied">بانتظار القرار</option><option value="decided">مكتملة</option><option value="archived">مغلقة ومؤرشفة</option><option value="deleted">المحذوفة</option></select></div><div id="acList" style="display:grid;gap:10px"></div></div>
+   <div class="drawer-body" id="acLog" hidden><div id="acStats" class="acc-grid"></div><div class="acc-tabs"><button id="acActive">تحتاج إجراء</button><button id="acArchive">الأرشيف</button></div><div class="acc-grid"><input id="acFrom" type="date" aria-label="من تاريخ"><input id="acTo" type="date" aria-label="إلى تاريخ"><select id="acType" aria-label="نوع المخالفة"><option value="">كل المخالفات</option></select><input id="acSearch" placeholder="بحث بالمعلم أو الرقم أو الموضوع" aria-label="بحث المساءلات"><select id="acFilter"><option value="">كل الحالات</option><option value="sent">بانتظار رد المعلم</option><option value="managerReply">بانتظار إفادة وتوقيع المدير</option><option value="replied">بانتظار القرار</option><option value="decided">مكتملة</option><option value="archived">مغلقة ومؤرشفة</option><option value="deleted">المحذوفة</option></select></div><div id="acList" style="display:grid;gap:10px"></div></div>
    <div class="drawer-foot"><span class="note" id="acMsg"></span></div>
   </aside>`;
   document.body.append(...wrap.children);
@@ -104,6 +99,7 @@
     if(absence)$a('acPreview').textContent='معاينة نموذج الغياب';
     else $a('acPreview').textContent='معاينة النموذج';
     $a('acPrev').hidden=true;
+    if(!editId)$a('acSave').textContent=absence?'حفظ مساءلة الغياب':'حفظ وفتح واتساب للمنسوب';
   }
   function draft(){const d={teacher:$a('acT').value,teacherFull:$a('acFull').value.trim()||$a('acT').value,date:$a('acDate').value,replyDue:list.find(a=>a.id===editId)?.replyDue||'',time:$a('acTime').value,monitor:$a('acMon').value,items:picked(),other:$a('acOther').value.trim(),details:$a('acDetails').value.trim(),teacherPhone:A.normPhone($a('acTPhone').value),replyPhone:A.ADMIN_PHONE};
     if(!absenceSelected())return d;
@@ -149,7 +145,7 @@
     catch(e){toast('تعذّر قراءة السجل المدني للمعاينة')}finally{button.disabled=false}
   };
   const tPhone=a=>A.normPhone(a.teacherPhone||phoneOf(a.teacher));
-  function teacherMsg(a,id){const ph=tPhone(a);if(A.isAbsence(a))return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`لديكم مساءلة غياب عن يوم ${A.dayName(a.date)} ${a.date}.`,'يرجى تعبئة إفادة الغياب في حسابكم على المنصة.',portal(id,a.teacher)].filter(Boolean).join('\n')};return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم مساءلة إدارية بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة الإفادة وإرسالها:',portal(id,a.teacher)].join('\n')}}
+  function teacherMsg(a,id){const ph=tPhone(a);return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم مساءلة إدارية بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة الإفادة وإرسالها:',portal(id,a.teacher)].join('\n')}}
   let editId=null;
   function resetForm(){$a('acAbsenceJob').value='';$a('acAbsenceSpecialty').value='';$a('acAbsenceJobNumber').value='';$a('acCats').querySelectorAll('input:checked').forEach(x=>x.checked=false);$a('acCats').dispatchEvent(new Event('change'));$a('acOther').value='';$a('acDetails').value='';renderKind()}
   function endEdit(){editId=null;$a('acKind').disabled=false;$a('acT').disabled=false;$a('acFull').disabled=false;$a('acEditBar').hidden=true;$a('acCancelEdit').hidden=true;$a('acSave').textContent='حفظ وفتح واتساب للمنسوب'}
@@ -160,51 +156,55 @@
   $a('acCancelEdit').onclick=()=>{endEdit();resetForm();$a('acMsg').textContent=''};
   $a('acSave').onclick=async()=>{if(!canCreate())return;if(window.AccountabilityRecorder&&editId)return;const d=draft();const msg=$a('acMsg');
     if(!d.teacher){msg.textContent='اختر المنسوب أولاً.';return}if(!d.items.length&&!d.other&&!d.details){msg.textContent='اكتب سبب المساءلة: اختر مخالفة أو اكتب مخالفة أخرى أو التفاصيل.';return}if(!d.date){msg.textContent=A.isAbsence(d)?'حدد تاريخ الغياب.':'حدد تاريخ المخالفة.';return}
-    if(A.isAbsence(d)&&!d.replyDue)d.replyDue=defaultReplyDue();
     if(editId&&list.find(a=>a.id===editId)?.archivedAt){msg.textContent='المساءلة مؤرشفة ولا يمكن تعديلها.';return}
     if(editId){const recordId=editId;$a('acSave').disabled=true;msg.textContent='جارٍ حفظ التعديل…';try{await loadCivilId(d);const {replyPhone,...upd}=d;await fs().collection(A.COL).doc(recordId).update({...upd,editedAt:firebase.firestore.FieldValue.serverTimestamp(),editedBy:(firebase.auth().currentUser||{}).uid||''});endEdit();resetForm();msg.textContent='تم حفظ التعديل.';toast('تم حفظ التعديل');setTab('log')}catch(e){console.error(e);msg.textContent='تعذّر حفظ التعديل، حاول مرة أخرى.'}finally{$a('acSave').disabled=false}return}
     // نفتح نافذة الواتساب فورًا (قبل انتظار الحفظ) حتى لا يحجبها المتصفح
-    const ph=d.teacherPhone;const win=ph?window.open('about:blank','_blank'):null;
+    const absence=A.isAbsence(d),ph=absence?'':d.teacherPhone;const win=ph?window.open('about:blank','_blank'):null;
     $a('acSave').disabled=true;msg.textContent='جارٍ الحفظ…';
-    try{await loadCivilId(d);const ref=fs().collection(A.COL).doc();await ref.set({...d,status:'sent',createdAt:firebase.firestore.FieldValue.serverTimestamp(),createdBy:state.uid||(firebase.auth().currentUser||{}).uid||''});
-      const m=teacherMsg(d,ref.id);if(win){win.location.href=A.waUrl(m.phone,m.text)}
-      msg.textContent=ph?'تم حفظ المساءلة وفتح الواتساب للمعلم.':'تم حفظ المساءلة. لا يوجد رقم جوال لهذا المعلم — اكتبه في خانة «جوال المعلم» في المرة القادمة أو أضفه من «تقارير المعلمين».';
+    try{await loadCivilId(d);const ref=fs().collection(A.COL).doc();await ref.set({...d,status:absence?A.MANAGER_PENDING:'sent',createdAt:firebase.firestore.FieldValue.serverTimestamp(),createdBy:state.uid||(firebase.auth().currentUser||{}).uid||''});
+      if(win){const m=teacherMsg(d,ref.id);win.location.href=A.waUrl(m.phone,m.text)}
+      msg.textContent=absence?'تم حفظ مساءلة الغياب. أدخل الإفادة ووقّعها من السجل.':ph?'تم حفظ المساءلة وفتح الواتساب للمعلم.':'تم حفظ المساءلة. لا يوجد رقم جوال لهذا المعلم — اكتبه في خانة «جوال المعلم» في المرة القادمة أو أضفه من «تقارير المعلمين».';
       toast('تم حفظ المساءلة');resetForm();if(A.isAbsence(d)){$a('acT').value='';$a('acT').onchange()}setTab('log')}
     catch(e){if(win)win.close();console.error(e);const em=e&&e.code==='permission-denied'?'لم تُحفظ المساءلة: قواعد الأمان الجديدة غير منشورة في Firebase بعد.\nمن الإعدادات ← القواعد انسخ القواعد، ثم الصقها في Firebase Console ← Firestore ← Rules واضغط Publish.':'تعذّر الحفظ، حاول مرة أخرى.';msg.textContent=em;alert(em)}
     finally{$a('acSave').disabled=false}};
 
   // ---------- log ----------
-  const overdue=a=>(a.status||'sent')==='sent'&&a.replyDue&&a.replyDue<A.riyadhISO();
+  const overdue=a=>A.statusFor(a)==='sent'&&a.replyDue&&a.replyDue<A.riyadhISO();
   const when=a=>a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():0;
-  function card(a){const st=a.status||'sent';const ph=tPhone(a);const act=+a.action||0;
+  function card(a){const st=A.statusFor(a);const absence=A.isAbsence(a);const ph=tPhone(a);const act=+a.action||0;
     return `<article class="acc-card" data-id="${esc(a.id)}"><div class="top"><h4>${esc(a.teacher)} · ${esc(a.id)}</h4><span class="acc-st ${esc(st)}">${a.archivedAt?'مغلقة ومؤرشفة':esc(A.STATUS[st]||st)}</span></div>
      <div class="muted">${esc(A.dayName(a.date))} ${esc(A.hijri(a.date))}هـ · ${esc(a.time||'')} · رصدها: ${esc(a.monitor||'—')} · جوال المعلم: <span dir="ltr">${ph?'+'+esc(ph):'غير مسجّل'}</span></div>
-     <ol class="acc-timeline"><li>إنشاء المساءلة: ${esc(A.isoOf(a.createdAt)||a.date||'—')} · ${esc(a.createdBy||a.monitor||'—')}</li><li>رد المعلم: ${esc(A.isoOf(a.replyAt)||(a.reply?'رد محفوظ · التاريخ غير مسجل':'بانتظار الرد'))} · ${esc(a.replyUid||a.teacher)}</li><li>قرار الإدارة: ${esc(A.isoOf(a.decidedAt)||(a.status==='decided'?'قرار محفوظ · التاريخ غير مسجل':'بانتظار القرار'))} · ${esc(a.decidedBy||'—')}</li><li>الإغلاق: ${esc(A.isoOf(a.archivedAt)||'لم تغلق بعد')} · ${esc(a.archivedBy||'—')}</li></ol>
-     ${a.replyDue?`<div>آخر موعد للرد: ${esc(a.replyDue)} ${overdue(a)?'· متأخرة':''}</div>`:''}
+     <ol class="acc-timeline"><li>إنشاء المساءلة: ${esc(A.isoOf(a.createdAt)||a.date||'—')} · ${esc(a.createdBy||a.monitor||'—')}</li><li>${A.managerReply(a)?'إفادة المدير':'الرد'}: ${esc(A.isoOf(a.replyAt)||(a.reply?'رد محفوظ · التاريخ غير مسجل':'بانتظار الرد'))} · ${esc(a.replyUid||a.teacher)}</li><li>قرار الإدارة: ${esc(A.isoOf(a.decidedAt)||(a.status==='decided'?'قرار محفوظ · التاريخ غير مسجل':'بانتظار القرار'))} · ${esc(a.decidedBy||'—')}</li><li>الإغلاق: ${esc(A.isoOf(a.archivedAt)||'لم تغلق بعد')} · ${esc(a.archivedBy||'—')}</li></ol>
+     ${!absence&&a.replyDue?`<div>آخر موعد للرد: ${esc(a.replyDue)} ${overdue(a)?'· متأخرة':''}</div>`:''}
      ${a.archivedAt?`<div class="acc-reply"><b>القرار النهائي:</b> ${esc(a.decision||'—')}<br>${esc(A.actionsFor(a)[(+a.action||0)-1]||'')} ${esc(a.amount||'')} ${esc(a.penalty||'')}</div>`:''}
      <div>${A.subjectText(a).map(x=>esc(x)).join('<br>')}</div>
-     ${a.reply?`<div><b style="font-size:13px">رد المعلم (${esc(A.hijri(A.isoOf(a.replyAt)))}هـ):</b><div class="acc-reply">${esc(A.replyText(a))}</div>${A.hasReplySignature(a)?'<div>التوقيع الإلكتروني: <b>'+esc(a.teacherFull||a.teacher)+'</b></div>':''}</div>`:''}
-     ${st!=='sent'&&st!=='deleted'&&!a.archivedAt?`<div class="acc-dec"><label class="field"><span style="font-size:13px;font-weight:600">قرار المسؤول المباشر</span><textarea class="acc-in" data-dec maxlength="${A.isAbsence(a)?240:600}">${esc(a.decision||'')}</textarea></label>
+     ${a.reply?`<div><b style="font-size:13px">${A.managerReply(a)?'إفادة مدير المدرسة':'رد المعلم'} (${esc(A.hijri(A.isoOf(a.replyAt)))}هـ):</b><div class="acc-reply">${esc(A.replyText(a))}</div>${A.replySigner(a)?'<div>التوقيع الإلكتروني: <b>'+esc(A.replySigner(a))+'</b></div>':''}</div>`:''}
+     ${A.waitingManager(a)?`<div class="acc-dec"><label class="field">إفادة الغياب<textarea class="acc-in" data-manager-reply maxlength="1500"></textarea></label>
+       <label><input type="checkbox" data-manager-sign> أوقّع باسم مدير المدرسة ${esc(A.PRINCIPAL)}</label>
+       <div class="acc-acts"><button class="btn" data-acc-manager-reply>حفظ الإفادة والتوقيع</button></div></div>`:''}
+     ${['replied','decided'].includes(st)&&!a.archivedAt?`<div class="acc-dec"><label class="field"><span style="font-size:13px;font-weight:600">قرار المسؤول المباشر</span><textarea class="acc-in" data-dec maxlength="${A.isAbsence(a)?240:600}">${esc(a.decision||'')}</textarea></label>
        <div class="acc-radios">${A.actionsFor(a).map((t,i)=>`<label><input type="radio" name="act-${esc(a.id)}" value="${i+1}" ${act===i+1?'checked':''}>${i+1}- ${esc(t)}</label>`).join('')}</div>
        ${A.isAbsence(a)?'':`<div class="acc-grid"><input class="acc-in" data-amount placeholder="مبلغ الحسم (للبند 4)" value="${esc(a.amount||'')}"><input class="acc-in" data-penalty placeholder="مع عقوبة (للبند 4)" value="${esc(a.penalty||'')}"></div>
        <label class="field">قرار المشرف العام (إن وجد)<textarea class="acc-in" data-general maxlength="600">${esc(a.generalDecision||'')}</textarea></label>`}<div class="acc-acts"><button class="btn" data-acc-dec>إرسال</button></div></div>`:''}
-     <div class="acc-acts">${st==='decided'&&!a.archivedAt?'<button class="btn" data-acc-archive>إغلاق المساءلة وأرشفتها</button>':''}${a.archivedAt?`<span>أغلقت: ${esc(A.isoOf(a.archivedAt))} · بواسطة ${esc(a.archivedBy||'—')}</span><button class="btn" data-acc-pdfview>عرض PDF النهائي</button>`:''}${ph?`<button class="btn ghost" data-acc-wa>واتساب للمعلم (رابط الرد)</button>`:'<span class="muted">لا يوجد رقم جوال للمعلم</span>'}<button class="btn ghost" data-acc-pdfwa>إرسال النموذج PDF واتساب</button><button class="btn ghost" data-acc-pdf>تحميل PDF</button><button class="btn ghost" data-acc-view>معاينة</button>${st==='deleted'?'<button class="btn ghost" data-acc-restore>استرجاع</button>':a.archivedAt?'':'<button class="btn ghost" data-acc-edit>تعديل</button><button class="btn ghost" data-acc-del style="color:var(--bad)">حذف</button>'}</div>
+     <div class="acc-acts">${st==='decided'&&!a.archivedAt?'<button class="btn" data-acc-archive>إغلاق المساءلة وأرشفتها</button>':''}${a.archivedAt?`<span>أغلقت: ${esc(A.isoOf(a.archivedAt))} · بواسطة ${esc(a.archivedBy||'—')}</span><button class="btn" data-acc-pdfview>عرض PDF النهائي</button>`:''}${absence?'':ph?`<button class="btn ghost" data-acc-wa>واتساب للمعلم (رابط الرد)</button>`:'<span class="muted">لا يوجد رقم جوال للمعلم</span>'}<button class="btn ghost" data-acc-pdfwa>إرسال النموذج PDF واتساب</button><button class="btn ghost" data-acc-pdf>تحميل PDF</button><button class="btn ghost" data-acc-view>معاينة</button>${st==='deleted'?'<button class="btn ghost" data-acc-restore>استرجاع</button>':a.archivedAt?'':'<button class="btn ghost" data-acc-edit>تعديل</button><button class="btn ghost" data-acc-del style="color:var(--bad)">حذف</button>'}</div>
      <div class="acc-prev" data-prev hidden></div></article>`}
   function paintList(){
     const q=$a('acSearch').value.trim().toLocaleLowerCase('ar'),f=$a('acFilter').value,from=$a('acFrom').value,to=$a('acTo').value,type=$a('acType').value;
     const live=list.filter(a=>a.status!=='deleted');
-    $a('acStats').innerHTML=[['إجمالي المساءلات',live.length,'all'],['بانتظار رد المعلم',live.filter(a=>(a.status||'sent')==='sent').length,'sent'],['بانتظار القرار',live.filter(a=>a.status==='replied').length,'replied'],['مغلقة ومؤرشفة',live.filter(a=>a.archivedAt).length,'archived']].map(([t,n,key])=>`<button type="button" class="acc-card" data-stat="${key}" aria-pressed="${String(key==='all'?f===''&&scope==='all':f===key)}" style="text-align:right;cursor:pointer;font:inherit;color:inherit"><b>${esc(t)}</b><strong>${n}</strong></button>`).join('');
+    $a('acStats').innerHTML=[['إجمالي المساءلات',live.length,'all'],['بانتظار رد المعلم',live.filter(a=>A.statusFor(a)==='sent').length,'sent'],['بانتظار إفادة المدير',live.filter(A.waitingManager).length,A.MANAGER_PENDING],['بانتظار القرار',live.filter(a=>a.status==='replied').length,'replied'],['مغلقة ومؤرشفة',live.filter(a=>a.archivedAt).length,'archived']].map(([t,n,key])=>`<button type="button" class="acc-card" data-stat="${key}" aria-pressed="${String(key==='all'?f===''&&scope==='all':f===key)}" style="text-align:right;cursor:pointer;font:inherit;color:inherit"><b>${esc(t)}</b><strong>${n}</strong></button>`).join('');
     $a('acActive').setAttribute('aria-pressed',String(scope==='active'));$a('acArchive').setAttribute('aria-pressed',String(scope==='archive'));
     const types=[...new Set(live.flatMap(a=>a.items||[]))];$a('acType').innerHTML='<option value="">كل المخالفات</option>'+types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');$a('acType').value=type;
-    const rows=list.filter(a=>f==='deleted'?a.status==='deleted':a.status!=='deleted'&&(f==='archived'?!!a.archivedAt:(scope==='all'?true:scope==='archive'?!!a.archivedAt:!a.archivedAt))&&(!f||f==='archived'||(a.status||'sent')===f)).filter(a=>(!q||[a.teacher,a.teacherFull,a.id,...A.subjectText(a)].join(' ').toLocaleLowerCase('ar').includes(q))&&(!from||a.date>=from)&&(!to||a.date<=to)&&(!type||(a.items||[]).includes(type))).sort((a,b)=>Number(!!overdue(b))-Number(!!overdue(a))||(b.date||'').localeCompare(a.date||'')||when(b)-when(a));
+    const rows=list.filter(a=>f==='deleted'?a.status==='deleted':a.status!=='deleted'&&(f==='archived'?!!a.archivedAt:(scope==='all'?true:scope==='archive'?!!a.archivedAt:!a.archivedAt))&&(!f||f==='archived'||A.statusFor(a)===f)).filter(a=>(!q||[a.teacher,a.teacherFull,a.id,...A.subjectText(a)].join(' ').toLocaleLowerCase('ar').includes(q))&&(!from||a.date>=from)&&(!to||a.date<=to)&&(!type||(a.items||[]).includes(type))).sort((a,b)=>Number(!!overdue(b))-Number(!!overdue(a))||(b.date||'').localeCompare(a.date||'')||when(b)-when(a));
     $a('acCount').textContent=`(${live.length})`;
-    $a('acList').innerHTML=`<p class="muted">${rows.length} مساءلة · المتأخرة أولًا ثم الأحدث</p><div style="overflow:auto"><table style="width:100%;border-collapse:collapse;text-align:right"><thead><tr><th>الرقم</th><th>المعلم</th><th>الموضوع</th><th>تاريخ الواقعة</th><th>تاريخ الإغلاق</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>${rows.map(a=>`<tr><td>${esc(a.id)}</td><td>${esc(a.teacher)}</td><td>${esc(A.subjectText(a).join('، '))}</td><td>${esc(a.date||'—')}</td><td>${esc(A.isoOf(a.archivedAt)||'—')}</td><td><span class="acc-st ${esc(a.status||'sent')}">${a.archivedAt?'مغلقة ومؤرشفة':esc(A.STATUS[a.status||'sent'])}${overdue(a)?' · متأخرة':''}</span></td><td><button class="btn ghost" data-open-record="${esc(a.id)}">فتح التفاصيل</button></td></tr>`).join('')}</tbody></table></div>${rows.length?'':'<p>لا توجد مساءلات مطابقة.</p>'}<div id="acSelected"></div>`;
+    $a('acList').innerHTML=`<p class="muted">${rows.length} مساءلة · المتأخرة أولًا ثم الأحدث</p><div style="overflow:auto"><table style="width:100%;border-collapse:collapse;text-align:right"><thead><tr><th>الرقم</th><th>المعلم</th><th>الموضوع</th><th>تاريخ الواقعة</th><th>تاريخ الإغلاق</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>${rows.map(a=>`<tr><td>${esc(a.id)}</td><td>${esc(a.teacher)}</td><td>${esc(A.subjectText(a).join('، '))}</td><td>${esc(a.date||'—')}</td><td>${esc(A.isoOf(a.archivedAt)||'—')}</td><td><span class="acc-st ${esc(A.statusFor(a))}">${a.archivedAt?'مغلقة ومؤرشفة':esc(A.STATUS[A.statusFor(a)])}${overdue(a)?' · متأخرة':''}</span></td><td><button class="btn ghost" data-open-record="${esc(a.id)}">فتح التفاصيل</button></td></tr>`).join('')}</tbody></table></div>${rows.length?'':'<p>لا توجد مساءلات مطابقة.</p>'}<div id="acSelected"></div>`;
 
+    const answered=showAfterReply&&rows.find(a=>a.id===showAfterReply&&a.status==='replied');
+    if(answered){showAfterReply=null;$a('acSelected').innerHTML=card(answered)}
   }
   ['acSearch','acFrom','acTo'].forEach(id=>$a(id).oninput=paintList);['acFilter','acType'].forEach(id=>$a(id).onchange=paintList);
   $a('acStats').addEventListener('click',e=>{const b=e.target.closest('[data-stat]');if(!b)return;const key=b.dataset.stat;scope=key==='all'?'all':key==='archived'?'archive':'active';$a('acFilter').value=key==='all'?'':key;$a('acSearch').value='';$a('acFrom').value='';$a('acTo').value='';$a('acType').value='';paintList()});
   $a('acActive').onclick=()=>{scope='active';$a('acFilter').value='';paintList()};$a('acArchive').onclick=()=>{scope='archive';$a('acFilter').value='';paintList()};
-  function listen(){if(standalone||stop)return;stop=fs().collection(A.COL).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+(d.data().decidedAt&&d.data().decidedAt.seconds||'')}));paintList()},e=>{stop=null;$a('acMsg').textContent=e&&e.code==='permission-denied'?'لا توجد صلاحية لقراءة المساءلات — انشر قواعد الأمان المحدّثة في Firebase.':'تعذّر تحميل المساءلات.'})}
+  function listen(){if(window.AccountabilityRecorder||stop)return;stop=fs().collection(A.COL).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+(d.data().decidedAt&&d.data().decidedAt.seconds||'')}));paintList()},e=>{stop=null;$a('acMsg').textContent=e&&e.code==='permission-denied'?'لا توجد صلاحية لقراءة المساءلات — انشر قواعد الأمان المحدّثة في Firebase.':'تعذّر تحميل المساءلات.'})}
   $a('acList').addEventListener('click',async e=>{if(window.AccountabilityRecorder)return;const b=e.target.closest('button');if(!b)return;if(b.dataset.openRecord){const record=list.find(a=>a.id===b.dataset.openRecord);if(record){$a('acSelected').innerHTML=card(record);$a('acSelected').scrollIntoView({behavior:'smooth',block:'start'})}return}const el=b.closest('[data-id]');const a=list.find(x=>x.id===el.dataset.id);if(!a)return;
     if(b.hasAttribute('data-acc-archive')){
       if(!confirm('إغلاق المساءلة وحفظ نسخة PDF نهائية؟ لن يمكن تعديل النسخة المغلقة.'))return;
@@ -216,6 +216,24 @@
     }
     else if(b.hasAttribute('data-acc-pdfview')){try{await A.viewPdf(a)}catch(err){toast('تعذر عرض PDF')}}
     else if(a.archivedAt&&(b.hasAttribute('data-acc-edit')||b.hasAttribute('data-acc-dec')||b.hasAttribute('data-acc-del'))){toast('المساءلة مغلقة ومحفوظة');return}
+    else if(b.hasAttribute('data-acc-manager-reply')){
+      if(state.role!==-1||!A.waitingManager(a))return;
+      const user=firebase.auth().currentUser,reply=el.querySelector('[data-manager-reply]').value.trim();
+      if(!user||reply.length<3||reply.length>1500){toast('أدخل إفادة الغياب من 3 إلى 1500 حرف.');return}
+      if(!el.querySelector('[data-manager-sign]').checked){toast('اعتمد التوقيع قبل حفظ الإفادة.');return}
+      b.disabled=true;showAfterReply=a.id;
+      if($a('acFilter').value===A.MANAGER_PENDING)$a('acFilter').value='';
+      try{
+        const db=fs(),ref=db.collection(A.COL).doc(a.id);
+        await db.runTransaction(async tx=>{
+          const current=(await tx.get(ref)).data();
+          if(!current||!A.waitingManager(current))throw Error('state-changed');
+          tx.update(ref,{reply,replyUid:user.uid,replySigner:A.PRINCIPAL,replyAt:firebase.firestore.FieldValue.serverTimestamp(),status:'replied'});
+        });
+        toast('تم حفظ الإفادة وتوقيع المدير. يمكنك الآن تسجيل القرار.');
+      }catch(e){showAfterReply=null;toast(e.message==='state-changed'?'تغيّرت حالة المساءلة. أعد فتحها من السجل.':'تعذّر حفظ الإفادة والتوقيع.')}
+      finally{b.disabled=false}
+    }
     else if(b.hasAttribute('data-acc-wa')){const m=teacherMsg(a,a.id);window.open(A.waUrl(m.phone,m.text),'_blank','noopener')}
     else if(b.hasAttribute('data-acc-pdf')){b.disabled=true;try{A.download(await A.pdfFile(a))}catch(err){toast('تعذّر إنشاء PDF')}finally{b.disabled=false}}
     else if(b.hasAttribute('data-acc-pdfwa')){const ph=tPhone(a);
@@ -224,17 +242,17 @@
       else{toast('لا يوجد رقم جوال لهذا المعلم — أضفه من «تعديل» أو «تقارير المعلمين».')}}
     else if(b.hasAttribute('data-acc-edit')){startEdit(a)}
     else if(b.hasAttribute('data-acc-del')){if(!confirm(`حذف مساءلة ${a.teacher} بتاريخ ${A.hijri(a.date)}هـ؟\nستختفي من السجل ومن حساب المعلم، ويمكن استرجاعها من «المحذوفة».`))return;b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({prevStatus:a.status||'sent',status:'deleted',deletedAt:firebase.firestore.FieldValue.serverTimestamp(),deletedBy:(firebase.auth().currentUser||{}).uid||''});if(editId===a.id){endEdit();resetForm()}toast('تم حذف المساءلة')}catch(err){b.disabled=false;toast('تعذّر الحذف')}}
-    else if(b.hasAttribute('data-acc-restore')){b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({status:a.prevStatus||'sent'});toast('تم استرجاع المساءلة')}catch(err){b.disabled=false;toast('تعذّر الاسترجاع')}}
+    else if(b.hasAttribute('data-acc-restore')){b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({status:A.statusFor({...a,status:a.prevStatus||'sent'})});toast('تم استرجاع المساءلة')}catch(err){b.disabled=false;toast('تعذّر الاسترجاع')}}
     else if(b.hasAttribute('data-acc-view')){const p=el.querySelector('[data-prev]');if(!p.hidden){p.hidden=true;return}previewPaper(p,a)}
     else if(b.hasAttribute('data-acc-dec')){const dec=el.querySelector('[data-dec]').value.trim();const r=el.querySelector('input[type=radio]:checked');if(!dec&&!r){toast('اكتب القرار أو اختر الإجراء');return}
       b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({decision:dec,generalDecision:el.querySelector('[data-general]')?.value.trim()||'',action:r?+r.value:0,amount:el.querySelector('[data-amount]')?.value.trim()||'',penalty:el.querySelector('[data-penalty]')?.value.trim()||'',status:'decided',decidedAt:firebase.firestore.FieldValue.serverTimestamp(),decidedBy:(firebase.auth().currentUser||{}).uid||''});toast('تم إرسال القرار')}catch(err){toast('تعذّر إرسال القرار')}finally{b.disabled=false}}});
 
   // ---------- drawer ----------
-  function setTab(t){if(standalone)t='new';tab=t;document.querySelectorAll('[data-acctab]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.acctab===t)));$a('acNew').hidden=t!=='new';$a('acLog').hidden=t!=='log';if(t==='log')paintList()}
+  function setTab(t){if(window.AccountabilityRecorder)t='new';tab=t;document.querySelectorAll('[data-acctab]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.acctab===t)));$a('acNew').hidden=t!=='new';$a('acLog').hidden=t!=='log';if(t==='log')paintList()}
   document.querySelectorAll('[data-acctab]').forEach(x=>x.onclick=()=>setTab(x.dataset.acctab));
-  function openAcc(){if(!canCreate())return;paintForm();setTab(standalone?'new':'log');if(!standalone)listen();$a('acMsg').textContent='';$a('acScrim').hidden=false;$a('acDrawer').hidden=false;$a('acClose').focus({preventScroll:true})}
+  function openAcc(){if(!canCreate())return;paintForm();setTab(standalone?'new':'log');listen();$a('acMsg').textContent='';$a('acScrim').hidden=false;$a('acDrawer').hidden=false;$a('acClose').focus({preventScroll:true})}
   function closeAcc(){$a('acScrim').hidden=true;$a('acDrawer').hidden=true}
-  if(standalone){$a('acTitle').textContent='مساءلة جديدة';document.querySelector('[data-acctab="new"]').parentElement.hidden=true;$a('acDrawer').querySelector('.drawer-head p').textContent='أنشئ مساءلة جديدة هنا. تُحفظ تلقائيًا في سجل حساب مدير المدرسة لمتابعة الرد والقرار والأرشفة.';$a('acDrawer').setAttribute('role','main');$a('acDrawer').removeAttribute('aria-modal');$a('acClose').textContent='العودة للمنصة'}
+  if(standalone){$a('acTitle').textContent='مساءلة جديدة';document.querySelector('[data-acctab="new"]').parentElement.hidden=!!window.AccountabilityRecorder;$a('acDrawer').querySelector('.drawer-head p').textContent='أنشئ مساءلة جديدة هنا. تُحفظ تلقائيًا في سجل حساب مدير المدرسة لمتابعة الرد والقرار والأرشفة.';$a('acDrawer').setAttribute('role','main');$a('acDrawer').removeAttribute('aria-modal');$a('acClose').textContent='العودة للمنصة'}
   btn.onclick=()=>openAcc();$a('acClose').onclick=()=>{if(standalone){const url=new URL(location.href);url.searchParams.delete('view');location.href=url.href}else closeAcc()};$a('acScrim').onclick=closeAcc;
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!standalone)closeAcc()});
   // إظهار الزر للمدير فقط + إيقاف الاستماع عند تغيّر الحساب

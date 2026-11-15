@@ -19,9 +19,13 @@
   const SIGNED_REPLY='\n\n[إقرار وتوقيع إلكتروني]';
   const replyText=a=>isAbsence(a)&&a.reply?.endsWith(SIGNED_REPLY)?a.reply.slice(0,-SIGNED_REPLY.length):a.reply||'';
   const hasReplySignature=a=>isAbsence(a)&&!!a.replyUid&&a.reply?.endsWith(SIGNED_REPLY);
-  const signReply=t=>t+SIGNED_REPLY;
+  const MANAGER_PENDING='managerReply';
+  const waitingManager=a=>isAbsence(a)&&!a.archivedAt&&!a.reply&&[MANAGER_PENDING,'sent'].includes(a.status||'sent');
+  const statusFor=a=>waitingManager(a)?MANAGER_PENDING:a.status||'sent';
+  const replySigner=a=>a.replyUid&&isAbsence(a)&&a.replySigner===PRINCIPAL?PRINCIPAL:hasReplySignature(a)?a.teacherFull||a.teacher:'';
+  const managerReply=a=>!!a.replySigner&&replySigner(a)===PRINCIPAL;
   const actionsFor=a=>isAbsence(a)?ABSENCE_ACTIONS:ACTIONS;
-  const STATUS={sent:'بانتظار رد المعلم',replied:'ردّ المعلم · بانتظار القرار',decided:'مكتملة',deleted:'محذوفة'};
+  const STATUS={managerReply:'بانتظار إفادة وتوقيع المدير',sent:'بانتظار رد المعلم',replied:'ردّ المعلم · بانتظار القرار',decided:'مكتملة',deleted:'محذوفة'};
   const PRINCIPAL='حسن بن محمد العمري',GENERAL='أ / خالد عبدالله الصالح';
   const DAYN=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 
@@ -85,8 +89,8 @@
       <section class="ab-section"><h2 class="ab-heading">إفادة المنسوب</h2>
       <p>المكرم مدير المدرسة / ${PRINCIPAL}</p>
       ${writing(replyText(a))}
-      <p>وسأقدّم ما يؤيد عذري خلال أسبوع من تاريخ الطلب.</p>
-      <div class="ac-sig"><span>الاسم / ${name}</span><span>التوقيع / ${hasReplySignature(a)?'<b class="ab-stamp">'+name+'</b>':''}</span><span>التاريخ / ${date(isoOf(a.replyAt))}</span></div></section>
+      ${managerReply(a)?'<p>أثبت مدير المدرسة هذه الإفادة من حسابه.</p>':'<p>وسأقدّم ما يؤيد عذري خلال أسبوع من تاريخ الطلب.</p>'}
+      <div class="ac-sig"><span>الاسم / ${name}</span><span>التوقيع / ${replySigner(a)?'<b class="ab-stamp">'+esc(replySigner(a))+'</b>':''}</span><span>التاريخ / ${date(isoOf(a.replyAt))}</span></div></section>
       <section class="ab-section"><h2 class="ab-heading">إجراء مدير المدرسة</h2>
       <div class="ab-actions">${ABSENCE_ACTIONS.map((label,i)=>`<span><i class="ac-bx">${Number(a.action)===i+1?'✓':''}</i>${esc(label)}</span>`).join('')}</div>
       ${a.decision?'<p>'+text(a.decision)+'</p>':''}
@@ -182,5 +186,5 @@
     const canonical=v=>v instanceof Date?v.toISOString():Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
     return JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
   }
-  root.ACC={sameRecord,archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,actionsFor,isAbsence,replyText,hasReplySignature,signReply,replyLimit:1500-SIGNED_REPLY.length,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
+  root.ACC={sameRecord,archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,actionsFor,isAbsence,replyText,hasReplySignature,replySigner,managerReply,waitingManager,statusFor,MANAGER_PENDING,PRINCIPAL,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
 })(window);
