@@ -18,7 +18,8 @@
     return {civilId: pick(source?.ids), specialty: pick(source?.specialties)};
   }
 
-  let snapshot = {}, onsiteTeachers = [], selected = '', group = 'teacher', uid = '', stop;
+  let snapshot = {}, onsiteTeachers = [], accounts = [], removed = {}, selected = '', group = 'all', uid = '', stop, accountBusy = false;
+  const accountLog = () => firebase.firestore().doc('config/removedPersonnelLogins');
   const get = name => manager() ? read(name, snapshot) : {};
   root.StaffSettings = {get, async load(name) {
     return manager() ? read(name, (await config().get()).data()) : {};
@@ -26,7 +27,7 @@
 
   const roster = () => {
     const names = new Map();
-    for (const name of [...F.S.map(lesson => lesson.teacher), ...onsiteTeachers]) {
+    for (const name of [...F.S.map(lesson => lesson.teacher), ...onsiteTeachers, ...accounts.filter(a => a.kind === 'teacher').map(a => a.scheduleName || a.name)]) {
       const aliases = keysFor(name);
       const person = root.DepartmentPersonnel.admins.find(p => aliases.includes(p.name));
       const key = normalize(person?.name || name);
@@ -36,7 +37,7 @@
   };
   const button = document.createElement('button');
   button.id = 'vStaffSettings';
-  button.textContent = 'المنسوبون والطلاب';
+  button.textContent = 'إدارة المنسوبين';
   button.hidden = true;
   $('vTeachers')?.after(button);
   const style = document.createElement('style');
@@ -51,7 +52,7 @@
     #staffSettings input{width:100%;box-sizing:border-box}#staffSettings label{display:grid;gap:4px}
     #ssGrid{display:grid;grid-template-columns:minmax(170px,1fr) minmax(210px,1.45fr);gap:14px;align-items:start}
     #ssPeople{display:grid;gap:6px;max-height:43vh;overflow:auto;padding:2px}#ssPeople button{text-align:start}
-    #ssProfile{display:grid;gap:12px;padding:15px;background:white;border:1px solid #d5e5dd;border-radius:12px}
+    #ssProfile{display:grid;gap:14px;padding:18px;background:white;border:1px solid #d5e5dd;border-radius:14px}#ssProfile form{display:grid;gap:10px}#ssAccountArea{border-top:1px solid #d5e5dd;padding-top:12px;display:grid;gap:9px}#ssAccountArea h4{margin:0}#ssAccountList{display:grid;gap:8px}#ssAccountList article{display:grid;gap:7px;border-radius:10px;background:#f3f8f5;padding:10px}#staffSettings button[data-ss-action=remove]{color:#962525;border-color:#e6c0c0}#ssAccountForm{padding:10px;background:#f5f8f6;border-radius:10px}#staffSettings button:disabled{opacity:.6}
     #ssRole,#ssMessage{margin:0;font-size:13px;color:#455f55}#ssMessage:empty{display:none}
     @media(max-width:560px){#ssGrid{grid-template-columns:1fr}#ssPeople{max-height:25vh}#staffSettings main,#staffSettings header{padding:14px}}
   `;
@@ -60,23 +61,33 @@
   dialog.id = 'staffSettings';
   dialog.setAttribute('aria-labelledby', 'ssTitle');
   dialog.innerHTML = `
-    <header><h2 id="ssTitle">إعدادات المنسوبين والطلاب</h2><button type="button" id="ssClose" autofocus>إغلاق</button></header>
+    <header><h2 id="ssTitle">إدارة المنسوبين</h2><button type="button" id="ssClose" autofocus>إغلاق</button></header>
     <main>
-      <nav aria-label="فئات المنسوبين"><button type="button" data-ss-group="teacher">المعلمون</button><button type="button" data-ss-group="admin">الإداريون والمشرفون</button></nav>
+      <nav aria-label="فئات المنسوبين"><button type="button" data-ss-group="all">الكل</button><button type="button" data-ss-group="teacher">المعلمون</button><button type="button" data-ss-group="admin">الإداريون والمشرفون</button></nav>
       <div class="ss-links"><button type="button" id="ssStudents">الطلاب حسب الفصل</button><button type="button" id="ssAccounts">الحسابات والصلاحيات</button></div>
       <label>بحث بالاسم<input type="search" id="ssSearch" autocomplete="off"></label>
       <div id="ssGrid"><div id="ssPeople" aria-label="قائمة المنسوبين"></div>
-      <form id="ssProfile" hidden><h3 id="ssName"></h3><p id="ssRole"></p>
+      <section id="ssProfile" hidden><div><h3 id="ssName"></h3><p id="ssRole"></p></div><form id="ssDetailsForm">
       <label>رقم السجل المدني<input id="ssCivil" inputmode="numeric" autocomplete="off" maxlength="10" dir="ltr"></label>
       <label>التخصص<input id="ssSpecialty" maxlength="100" autocomplete="off"></label>
-      <button id="ssSave" type="submit">حفظ بيانات المنسوب</button></form></div>
+      <button id="ssSave" type="submit">حفظ بيانات المنسوب</button></form>
+      <section id="ssAccountArea" aria-labelledby="ssAccountTitle">
+        <h4 id="ssAccountTitle">حساب الدخول</h4><div id="ssAccountList"></div>
+        <form id="ssAccountForm" hidden>
+          <strong id="ssActionTitle"></strong>
+          <label>كلمة المرور الحالية<input type="password" id="ssCurrentPassword" autocomplete="current-password" required></label>
+          <label id="ssNewField">كلمة المرور الجديدة<input type="password" id="ssNewPassword" autocomplete="new-password" minlength="6" maxlength="128"></label>
+          <label id="ssDeleteConfirm" hidden><span><input type="checkbox" id="ssDeleteCheck" style="width:auto"> أؤكد حذف حساب الدخول المحدد</span></label>
+          <div class="ss-links"><button type="submit" id="ssAccountSave">تنفيذ</button><button type="button" id="ssAccountCancel">إلغاء</button></div>
+        </form>
+      </section></section></div>
       <p id="ssMessage" role="status"></p>
     </main>`;
   document.body.append(dialog);
   const message = text => { $('ssMessage').textContent = text; };
   function paintPeople() {
     const query = normalize($('ssSearch').value);
-    const people = roster().filter(p => (p.kind === group || p.kind === 'both') && (!query || normalize(p.name).includes(query) || normalize(p.personnel?.name || '').includes(query)));
+    const people = roster().filter(p => (group === 'all' || p.kind === group || p.kind === 'both') && (!query || normalize(p.name).includes(query) || normalize(p.personnel?.name || '').includes(query)));
     dialog.querySelectorAll('[data-ss-group]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ssGroup === group)));
     $('ssPeople').innerHTML = people.map(p => `<button type="button" data-ss-name="${esc(p.name)}" aria-pressed="${p.name === selected}">${esc(group === 'admin' ? p.personnel.name : p.name)}</button>`).join('') || '<p>لا توجد أسماء مطابقة.</p>';
   }
@@ -90,25 +101,36 @@
     $('ssCivil').value = fields.civilId || '';
     $('ssSpecialty').value = fields.specialty || '';
     $('ssProfile').hidden = false;
+    resetAccountForm();
+    paintAccounts();
     paintPeople();
   }
   async function open(name) {
     if (!manager()) return;
     const currentUid = manager().uid;
+    if(accountBusy)return;
+    resetAccountForm();
     selected = '';
     $('ssProfile').hidden = true;
     $('ssSearch').value = '';
-    group = roster().find(p => p.name === name)?.kind === 'admin' ? 'admin' : 'teacher';
+    group = roster().find(p => p.name === name)?.kind === 'admin' ? 'admin' : 'all';
     if (!dialog.open) dialog.showModal();
     $('ssPeople').textContent = 'جارٍ تحميل البيانات…';
     try {
-      const [directory, onsite] = await Promise.all([
+      const [directory, onsite, teachers, employees, log] = await Promise.all([
         config().get(),
-        firebase.firestore().doc('config/subs-onsite-data').get().catch(() => null)
+        firebase.firestore().doc('config/subs-onsite-data').get().catch(() => null),
+        firebase.firestore().collection('teacherProfiles').get().catch(() => null),
+        firebase.firestore().collection('employeeProfiles').get().catch(() => null),
+        accountLog().get().catch(() => null)
       ]);
       const data = directory.data() || {};
       if (!dialog.open || manager()?.uid !== currentUid) return;
       snapshot = data;
+      accountsAvailable = !!(teachers && employees && log);
+      const fromProfiles = (result, kind) => (result?.docs || []).map(doc => ({...doc.data(), uid:doc.id, kind}));
+      accounts = [...fromProfiles(teachers,'teacher'), ...fromProfiles(employees,'employee')];
+      removed = log?.data()?.accounts || {};
       onsiteTeachers = (onsite?.data()?.lessons || []).map(lesson => lesson.scheduleName).filter(Boolean);
       message('');
       paintPeople();
@@ -120,6 +142,8 @@
   dialog.addEventListener('close', () => {
     selected = '';
     $('ssCivil').value = $('ssSpecialty').value = '';
+    resetAccountForm();
+    $('ssAccountList').textContent='';
     $('ssProfile').hidden = true;
   });
   $('ssStudents').onclick = () => {
@@ -133,7 +157,8 @@
   $('ssSearch').oninput = paintPeople;
   dialog.querySelector('nav').onclick = event => {
     const choice = event.target.closest('[data-ss-group]');
-    if (!choice) return;
+    if (!choice || accountBusy) return;
+    resetAccountForm();
     group = choice.dataset.ssGroup;
     $('ssSearch').value = '';
     $('ssProfile').hidden = true;
@@ -142,9 +167,9 @@
   };
   $('ssPeople').onclick = event => {
     const choice = event.target.closest('[data-ss-name]');
-    if (choice) showPerson(choice.dataset.ssName);
+    if (choice && !accountBusy) showPerson(choice.dataset.ssName);
   };
-  $('ssProfile').onsubmit = async event => {
+  $('ssDetailsForm').onsubmit = async event => {
     event.preventDefault();
     const actor = manager(), name = selected;
     if (!actor || !name) return;
@@ -172,6 +197,100 @@
     } catch { message('تعذّر حفظ بيانات المنسوب. حاول مرة أخرى.'); }
     finally { save.disabled = false; }
   };
+  let accountAction = null, accountsAvailable = false;
+  function resetAccountForm(){
+    accountAction = null;
+    $('ssAccountForm').reset();
+    $('ssAccountForm').hidden = true;
+  }
+  function accountsFor(name){
+    const aliases = keysFor(name).map(normalize);
+    return accounts.filter(a => [a.name,a.scheduleName].some(candidate => candidate && aliases.includes(normalize(candidate))));
+  }
+  function paintAccounts(){
+    if (!accountsAvailable) { $('ssAccountList').textContent = 'تعذّر تحميل حسابات الدخول. أعد فتح الإعدادات للمحاولة.'; return; }
+    const options = accountsFor(selected);
+    $('ssAccountList').innerHTML = options.map(a => {
+      const type = a.kind === 'employee' ? 'حساب إداري' : 'حساب معلم';
+      const deleted = !!removed[a.uid], disabled = a.active !== true || a.loginDisabled === true;
+      const status = deleted ? 'حُذف حساب الدخول' : disabled ? 'دخول موقوف' : 'دخول مفعّل';
+      return `<article><div><b>${type}</b> · ${status}${a.phone?' · <bdi>'+esc(a.phone)+'</bdi>':''}</div>
+        ${deleted||!a.email?'':`<div class="ss-links"><button type="button" data-ss-account="${esc(a.uid)}" data-ss-action="password">تغيير كلمة المرور</button><button type="button" data-ss-account="${esc(a.uid)}" data-ss-action="remove">حذف حساب الدخول</button></div>`}</article>`;
+    }).join('') || '<p>لا يوجد حساب دخول مرتبط بهذا الاسم.</p>';
+  }
+  $('ssAccountList').onclick = event => {
+    const action = event.target.closest('[data-ss-account]');
+    if (!action || accountBusy || !manager()) return;
+    const account = accountsFor(selected).find(a => a.uid === action.dataset.ssAccount);
+    if (!account || removed[account.uid]) return;
+    resetAccountForm();
+    accountAction = {account, type:action.dataset.ssAction};
+    const deleting = accountAction.type === 'remove';
+    $('ssActionTitle').textContent = deleting ? 'حذف حساب الدخول مع الاحتفاظ بالسجلات والتقارير' : 'تعيين كلمة مرور جديدة للحساب المحدد';
+    $('ssNewField').hidden = deleting;
+    $('ssNewPassword').required = !deleting;
+    $('ssDeleteConfirm').hidden = !deleting;
+    $('ssDeleteCheck').required = deleting;
+    $('ssAccountSave').textContent = deleting ? 'تأكيد حذف حساب الدخول' : 'حفظ كلمة المرور الجديدة';
+    $('ssAccountForm').hidden = false;
+    $('ssCurrentPassword').focus();
+    message('');
+  };
+  $('ssAccountCancel').onclick = () => { if (!accountBusy) resetAccountForm(); };
+  $('ssAccountForm').onsubmit = async event => {
+    event.preventDefault();
+    const actor = manager(), action = accountAction;
+    if (!actor || !action || accountBusy) return;
+    const {account, type} = action, deleting = type === 'remove';
+    const current = $('ssCurrentPassword').value, replacement = $('ssNewPassword').value;
+    if (!current || (deleting ? !$('ssDeleteCheck').checked : replacement.length < 6)) return;
+    const suffix = account.kind === 'employee' ? '@employees.alsahafa-followup.invalid' : '@teachers.alsahafa-followup.invalid';
+    if (actor.uid === account.uid || !account.email?.endsWith(suffix)) { message('تعذّر التحقق من الحساب الشخصي المحدد.'); return; }
+    accountBusy = true;
+    $('ssAccountSave').disabled = $('ssAccountCancel').disabled = true;
+    $('ssCurrentPassword').value = $('ssNewPassword').value = '';
+    let secondary, deletedAuth = false;
+    try {
+      const db = firebase.firestore();
+      const staff = await db.doc('staffAccess/'+account.uid).get();
+      if (staff.exists) { message('هذا الحساب مرتبط بدور إداري مستقل. افتح الحسابات والصلاحيات لإدارته.'); return; }
+      let app = firebase.apps.find(item => item.name === 'personnel-credential-management');
+      if (!app) {
+        app = firebase.initializeApp(firebase.app().options, 'personnel-credential-management');
+        root.FollowupAppCheck.activate(app);
+      }
+      secondary = app.auth();
+      await secondary.setPersistence(firebase.auth.Auth.Persistence.NONE);
+      const result = await secondary.signInWithEmailAndPassword(account.email, current);
+      if (result.user.uid !== account.uid || manager()?.uid !== actor.uid || !dialog.open || action !== accountAction) throw Error('account-mismatch');
+      if (deleting) {
+        await result.user.delete();
+        deletedAuth = true;
+        const ref = accountLog(), stamp = firebase.firestore.FieldValue.serverTimestamp();
+        await ref.set({accounts:{[account.uid]:{kind:account.kind,deletedAt:stamp,deletedBy:actor.uid}}},{merge:true});
+        removed[account.uid] = true;
+        paintAccounts();
+        message('تم حذف حساب الدخول. السجلات والتقارير محفوظة.');
+      } else {
+        await result.user.updatePassword(replacement);
+        message('تم تحديث كلمة مرور الحساب المحدد.');
+      }
+      resetAccountForm();
+    } catch (error) {
+      if (deletedAuth) {
+        removed[account.uid] = true;paintAccounts();resetAccountForm();
+        message('حُذف حساب الدخول، وتعذّر تسجيل حالة الحذف في الإعدادات.');
+      } else if (['auth/wrong-password','auth/invalid-credential','auth/invalid-login-credentials','auth/user-not-found'].includes(error.code)) {
+        message('لم تُقبل كلمة المرور الحالية للحساب المحدد.');
+      } else {
+        message(error.code === 'auth/weak-password' ? 'اختر كلمة مرور أقوى.' : 'تعذّر تنفيذ الإجراء للحساب المحدد.');
+      }
+    } finally {
+      if (secondary?.currentUser) await secondary.signOut().catch(() => {});
+      accountBusy = false;
+      $('ssAccountSave').disabled = $('ssAccountCancel').disabled = false;
+    }
+  };
   setInterval(() => {
     const current = manager()?.uid || '';
     button.hidden = !current;
@@ -179,7 +298,7 @@
     uid = current;
     stop?.();
     stop = null;
-    snapshot = {};onsiteTeachers = [];
+    snapshot = {};onsiteTeachers = [];accounts = [];removed = {};accountsAvailable=false;
     if (!uid) { if (dialog.open) dialog.close(); return; }
     const listeningUid = uid;
     stop = config().onSnapshot(doc => { if (listeningUid === uid) snapshot = doc.data() || {}; }, () => {});
