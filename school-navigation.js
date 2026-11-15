@@ -29,6 +29,7 @@ if(!root.document||new URLSearchParams(location.search).get('embedded')==='1')re
 const $=id=>document.getElementById(id),personal=!!root.TeacherPortal||!!root.EmployeePortal,recorder=!!root.AccountabilityRecorder;
 const style=document.createElement('style');style.id='schoolSidebarStyle';style.textContent=`
 :root{--school-sidebar-width:278px}
+#schoolGroup-admin .school-nav-links>button:not(#vStaffSettings){display:none!important}
 body.school-sidebar-page{background:#f3f6f8}
 .school-sidebar-page>.wrap,.school-sidebar-page>.shell{max-width:none;margin-inline-start:var(--school-sidebar-width);padding:28px 32px 70px;min-width:0}
 .school-sidebar{position:fixed;inset-block:0;inset-inline-start:0;width:var(--school-sidebar-width);box-sizing:border-box;background:#123e36;color:#fff;z-index:80;display:flex;flex-direction:column;box-shadow:-5px 0 28px #123e3612;font-family:inherit;direction:rtl}
