@@ -22,9 +22,9 @@
   const fullName=a=>a.teacherFull||(typeof profile!=='undefined'&&profile&&profile.name)||a.teacher;
   function item(a){const st=a.status||'sent';const act=+a.action||0;const absence=A.isAbsence(a);
     return `<article class="acc-item ${st==='sent'&&!a.archivedAt?'need':''} ${a.id===target?'hl':''}" id="acc-${esc(a.id)}"><div class="top"><h4>${absence?'مساءلة غياب':'مساءلة'} · ${esc(A.dayName(a.date))} ${esc(A.hijri(a.date))}هـ</h4><span class="acc-st ${esc(st)}">${a.archivedAt?'مغلقة ومؤرشفة':st==='sent'?'مطلوب ردك':st==='replied'?'تم إرسال ردك · قيد المراجعة':'تم اتخاذ القرار'}</span></div>
-     <div class="acc-box">رقم المساءلة: ${esc(a.id)} · تاريخ الواقعة: ${esc(a.date||'—')} · تاريخ الإغلاق: ${esc(A.isoOf(a.archivedAt)||'لم تغلق بعد')}${a.replyDue?' · آخر موعد للإفادة: '+esc(a.replyDue):''}</div><div><b>أرجو بيان سبب ما يلي:</b><ul>${A.subjectText(a).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
-     ${st==='sent'&&!a.archivedAt?`<label><b>${absence?'إفادة الغياب':'السبب / إجابتك'}</b><textarea data-reply maxlength="1500" placeholder="${absence?'اكتب سبب الغياب هنا…':'اكتب سبب المخالفة هنا…'}" ></textarea></label><div class="actions"><button class="btn primary" data-send>إرسال الرد</button></div>`
-       :`<div><b>إجابتك:</b><div class="acc-box">${esc(a.reply||'')}</div></div>`}
+     <div class="acc-box">رقم المساءلة: ${esc(a.id)} · تاريخ الواقعة: ${esc(a.date||'—')} · تاريخ الإغلاق: ${esc(A.isoOf(a.archivedAt)||'لم تغلق بعد')}${!absence&&a.replyDue?' · آخر موعد للإفادة: '+esc(a.replyDue):''}</div><div><b>أرجو بيان سبب ما يلي:</b><ul>${A.subjectText(a).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+     ${st==='sent'&&!a.archivedAt?`<label><b>${absence?'إفادة الغياب':'السبب / إجابتك'}</b><textarea data-reply maxlength="${absence?A.replyLimit:1500}" placeholder="${absence?'اكتب سبب الغياب هنا…':'اكتب سبب المخالفة هنا…'}" ></textarea></label>${absence?`<label><input type="checkbox" data-sign-reply> أوقّع على إفادة الغياب باسمي ${esc(fullName(a))}</label>`:''}<div class="actions"><button class="btn primary" data-send>${absence?'توقيع وإرسال الإفادة':'إرسال الرد'}</button></div>`
+       :`<div><b>إجابتك:</b><div class="acc-box">${esc(A.replyText(a))}</div>${A.hasReplySignature(a)?'<div>التوقيع الإلكتروني: <b>'+esc(fullName(a))+'</b></div>':''}</div>`}
      ${st==='decided'?`<div><b>قرار الإدارة:</b><div class="acc-box">${esc(a.decision||'—')}${act?`\nالإجراء: ${esc(A.actionsFor(a)[act-1])}`:''}</div></div>`:''}
      <div class="actions">${a.archivedAt?'<button class="btn" data-view>عرض PDF النهائي</button>':''}${st!=='sent'?'<button class="btn primary" data-wa>إرسال المساءلة PDF واتساب للإدارة</button>':''}<button class="btn" data-pdf>تحميل نموذج المساءلة PDF</button></div></article>`}
   function render(){sec.hidden=!uid;if(!uid){sec.innerHTML='';return}const need=list.filter(a=>!a.archivedAt&&(a.status||'sent')==='sent').length;
@@ -35,14 +35,16 @@
     if(target){const el=document.getElementById('acc-'+target);if(el&&!render.done){render.done=true;setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'center'}),300);
       // رابط «-pdf» من واتساب الإدارة: نحمّل نموذج المساءلة تلقائيًا مرة واحدة
       if(wantPdf){const a=list.find(x=>x.id===target);if(a)A.pdfFile({...a,teacherFull:fullName(a)}).then(f=>{A.download(f);toast('تم تحميل نموذج المساءلة PDF — إن لم يظهر اضغط «تحميل نموذج المساءلة PDF».')}).catch(()=>{})}}}}
-  function waText(a){return [`السلام عليكم ورحمة الله`,`ردّ المعلم ${fullName(a)} على المساءلة بتاريخ ${A.hijri(a.date)}هـ:`,'',a.reply||''].join('\n')}
+  function waText(a){return [`السلام عليكم ورحمة الله`,`ردّ المعلم ${fullName(a)} على المساءلة بتاريخ ${A.hijri(a.date)}هـ:`,'',A.replyText(a)].join('\n')}
   sec.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const el=b.closest('.acc-item');const a=list.find(x=>'acc-'+x.id===el.id);if(!a)return;
     if(b.hasAttribute('data-view')){try{await A.viewPdf(a)}catch(err){toast('تعذر عرض PDF')}}
     else if(b.hasAttribute('data-send')){if(a.archivedAt)return;const t=el.querySelector('[data-reply]').value.trim();if(t.length<3){toast('اكتب السبب أولاً.');return}
+      const absence=A.isAbsence(a);
+      if(absence&&!el.querySelector('[data-sign-reply]').checked){toast('أقرّ بالتوقيع على الإفادة قبل إرسالها.');return}
       if(!confirm('سيتم إرسال ردك للإدارة ولا يمكن تعديله بعد الإرسال. متابعة؟'))return;
       b.disabled=true;b.textContent='جارٍ الإرسال…';
-      try{await rawDb.collection(A.COL).doc(a.id).update({reply:t,replyAt:firebase.firestore.FieldValue.serverTimestamp(),replyUid:uid,...(auth.currentUser?.managerAccess?{replyActorUid:auth.currentUser.actorUid}:{}),status:'replied'})}
-      catch(err){console.error(err);b.disabled=false;b.textContent='إرسال الرد';toast('تعذّر إرسال الرد، حاول مرة أخرى.')}}
+      try{await rawDb.collection(A.COL).doc(a.id).update({reply:absence?A.signReply(t):t,replyAt:firebase.firestore.FieldValue.serverTimestamp(),replyUid:uid,...(auth.currentUser?.managerAccess?{replyActorUid:auth.currentUser.actorUid}:{}),status:'replied'})}
+      catch(err){console.error(err);b.disabled=false;b.textContent=absence?'توقيع وإرسال الإفادة':'إرسال الرد';toast('تعذّر إرسال الرد، حاول مرة أخرى.')}}
     else if(b.hasAttribute('data-pdf')){b.disabled=true;try{A.download(await A.pdfFile({...a,teacherFull:fullName(a)}))}catch(err){toast('تعذّر إنشاء PDF.')}finally{b.disabled=false}}
     else if(b.hasAttribute('data-wa')){A.sharePdfWa({...a,teacherFull:fullName(a)},A.ADMIN_PHONE,waText(a),b,toast)}});
   function waitProfile(user,tries=0){if(auth.currentUser!==user)return;if(typeof profile!=='undefined'&&profile&&profile.scheduleName){listen(profile.scheduleName);return}if(tries<60)setTimeout(()=>waitProfile(user,tries+1),250)}
