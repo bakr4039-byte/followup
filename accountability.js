@@ -14,6 +14,9 @@
   const TIMES=['المناوبة الصباحية','الحصة الأولى','الحصة الثانية','فسحة ( أول وثاني ثانوي )','الحصة الثالثة','فسحة ( ثالث ثانوي )','الحصة الرابعة','الحصة الخامسة','الحصة السادسة','إشراف الصلاة','الحصة السابعة','المناوبة المسائية','أخرى'];
   const MONITORS=['المدير / حسن بن محمد العمري','الوكيل / عادل عبد الرحيم','الوكيل / حسين القحطاني','الوكيل / عبد المجيد العمري','الأستاذ / محمد الأحمري','الأستاذ / على نعمان','الأستاذ / بكر الدوخي','الأستاذ / إبراهيم المشرقي','الأستاذ / محمود هلال','الأستاذ / محمد جوده','الأستاذ / السيد عبد المجيد'];
   const ACTIONS=['التنبيه','لفت نظر','إنـــــذار','الحسم من الراتب','الحفظ','إنذار بالفصل'];
+  const ABSENCE_ACTIONS=['احتساب إجازة مرضية بعد التحقق من التقرير','قبول العذر واحتسابه من رصيد الإجازة الاضطرارية','اعتماد الحسم لعدم قبول العذر','دورة تدريبية','تكليف','أخرى'];
+  const isAbsence=a=>a.kind==='absence';
+  const actionsFor=a=>isAbsence(a)?ABSENCE_ACTIONS:ACTIONS;
   const STATUS={sent:'بانتظار رد المعلم',replied:'ردّ المعلم · بانتظار القرار',decided:'مكتملة',deleted:'محذوفة'};
   const PRINCIPAL='حسن بن محمد العمري',GENERAL='أ / خالد عبدالله الصالح';
   const DAYN=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
@@ -48,8 +51,44 @@
   .accp .ac-sec{border-top:1.5px solid #000;padding-top:4px;margin-top:4px}
   .accp .ac-acts{display:grid;grid-template-columns:repeat(3,1fr);font-size:14px;font-weight:600;gap:4px 10px;margin:6px 0}
   .accp .ac-acts span{display:flex;align-items:center;gap:6px}.accp .ac-bx{display:inline-block;width:14px;height:14px;border:1.5px solid #000;text-align:center;line-height:11px;font-size:13px;color:#0b2a6b;font-weight:700}
+  .accp .ab-title{margin:14px 0 10px;text-align:center}.accp .ab-title h1{margin:0;font-size:25px}.accp .ab-title small{font-size:12px;color:#273d41}
+  .accp .ab-table{width:100%;border-collapse:collapse;table-layout:fixed;text-align:center;font-size:13px}.accp .ab-table th,.accp .ab-table td{border:1px solid #aabbb7;padding:5px;overflow-wrap:anywhere}.accp .ab-table th,.accp .ab-heading{background:#e8f1ed}
+  .accp .ab-section{margin-top:10px;font-size:14px}.accp .ab-heading{margin:0 0 5px;padding:4px 8px;font-size:15px}.accp .ab-section p{margin:4px 0}
+  .accp .ab-writing{border:1px solid #c2cec9;min-height:88px;padding:5px 8px;overflow-wrap:anywhere;color:#173d62;font-size:13px;line-height:1.5}
+  .accp .ab-writing.empty{background:repeating-linear-gradient(to bottom,#fff 0,#fff 25px,#aabbb7 26px,#fff 27px)}
+  .accp .ab-actions{display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;margin:7px 0;font-size:13px}.accp .ab-actions span{display:flex;align-items:center;gap:6px}.accp .ab-actions i{flex:none}
+  .accp .ab-note{margin-top:auto;border-top:1px solid #9badab;padding-top:6px;font-size:12px}
   .accp .ac-copy{margin-top:auto;font-size:13px;font-weight:600;border-top:1.5px solid #000;padding-top:4px}.accp .ac-copy div{display:flex;justify-content:space-around;margin-top:6px}`;
+  function absenceHTML(a,header){
+    const name=esc(a.teacherFull||a.teacher)||'……………………';
+    const date=d=>d?'<bdi>'+esc(d)+'</bdi>':'………………';
+    const text=v=>esc(String(v||'').trim().replace(/\s+/g,' '));
+    const writing=v=>'<div class="ab-writing'+(v?'':' empty')+'">'+text(v)+'</div>';
+    return `<div class="accp"><div class="ac-frame">
+      <div class="ac-head"><img src="${esc(header)}" alt="" crossorigin="anonymous"></div>
+      <div class="ab-title"><h1>مساءلة غياب</h1><small>نموذج 20 · F-14-04 | ثانوية الصحافة الأهلية ـ القسم الثانوي</small></div>
+      <table class="ab-table"><colgroup><col style="width:26%"><col style="width:25%"><col style="width:15%"><col style="width:13%"><col style="width:13%"><col style="width:8%"></colgroup>
+      <thead><tr><th>الاسم</th><th>الوظيفة</th><th>التخصص</th><th>تاريخ الغياب</th><th>الموافق</th><th>اليوم</th></tr></thead>
+      <tbody><tr><td>${name}</td><td>${esc(a.absenceJob)||'—'}</td><td>${esc(a.absenceSpecialty)||'—'}</td><td>${date(a.date)}</td><td>${a.date?date(hijri(a.date))+' هـ':'…………'}</td><td>${esc(dayName(a.date))||'—'}</td></tr></tbody></table>
+      <section class="ab-section"><h2 class="ab-heading">طلب الإفادة</h2>
+      <p>المكرم / ${name}، وفقه الله</p>
+      <p>السلام عليكم ورحمة الله وبركاته، وبعد</p>
+      <p>تبيّن من متابعة سجل الدوام غيابكم في التاريخ الموضح أعلاه. يرجى الإفادة عن سبب الغياب وتقديم ما يؤيد العذر ${a.replyDue?'بحلول '+date(a.replyDue):'خلال أسبوع من تاريخ الطلب'}.</p>
+      ${a.details?'<p>'+text(a.details)+'</p>':''}
+      <div class="ac-sig"><span>الرئيس المباشر / ${esc(a.monitor||PRINCIPAL)}</span><span>التوقيع /</span><span>التاريخ / ${date(isoOf(a.createdAt))}</span></div></section>
+      <section class="ab-section"><h2 class="ab-heading">إفادة المنسوب</h2>
+      <p>المكرم مدير المدرسة / ${PRINCIPAL}</p>
+      ${writing(a.reply)}
+      <div class="ac-sig"><span>الاسم / ${name}</span><span>التوقيع / ${a.reply?'تم الرد إلكترونيًا':''}</span><span>التاريخ / ${date(isoOf(a.replyAt))}</span></div></section>
+      <section class="ab-section"><h2 class="ab-heading">إجراء مدير المدرسة</h2>
+      <div class="ab-actions">${ABSENCE_ACTIONS.map((label,i)=>`<span><i class="ac-bx">${Number(a.action)===i+1?'✓':''}</i>${esc(label)}</span>`).join('')}</div>
+      ${a.decision?'<p>'+text(a.decision)+'</p>':''}
+      <div class="ac-sig"><span>مدير المدرسة / ${PRINCIPAL}</span><span>التوقيع /</span><span>التاريخ / ${date(isoOf(a.decidedAt))}</span></div></section>
+      <div class="ab-note">يوضح المنسوب سبب غيابه ويقدّم ما يؤيد العذر خلال المهلة المحددة. يستكمل الرئيس المباشر الاستمارة ويعتمد مدير المدرسة الإجراء.</div>
+    </div></div>`;
+  }
   function formHTML(a,opt={}){const header=opt.headerSrc||new URL('acc-header.jpg',document.baseURI).href;
+    if(isAbsence(a))return absenceHTML(a,header);
     const h=d=>d?`<span dir="rtl">${hijri(d)} هـ</span>`:'&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;/ 1448 هـ';
     const act=+a.action||0;const box=i=>`<span class="ac-bx">${act===i?'✓':''}</span>`;
     const amount=act===4?`( ${esc(a.amount||'……')} ) ريال مع عقوبة ${esc(a.penalty||'………')}`:'(………) ريال مع عقوبة ………';
@@ -81,7 +120,7 @@
       return pdf.output('blob')}
     finally{el.innerHTML=''}}
 
-  const fileName=a=>('مساءلة-'+(a.teacher||'')+'-'+(a.date||'')+'-'+(a.id||'')).replace(/\s+/g,'-')+'.pdf';
+  const fileName=a=>((isAbsence(a)?'مساءلة-غياب-':'مساءلة-')+(a.teacher||'')+'-'+(a.date||'')+'-'+(a.id||'')).replace(/\s+/g,'-')+'.pdf';
   let pdfQueue=Promise.resolve();
   // Files marked نموذج- use the corrected one-page renderer. Earlier saved PDFs remain untouched;
   // their display copy is rebuilt from the immutable record to match the official preview.
@@ -136,5 +175,5 @@
     const canonical=v=>v instanceof Date?v.toISOString():Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
     return JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
   }
-  root.ACC={sameRecord,archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
+  root.ACC={sameRecord,archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,actionsFor,isAbsence,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
 })(window);
