@@ -107,6 +107,7 @@
       <div class="ac-head"><img src="${esc(header)}" alt="" crossorigin="anonymous"></div>
       <div class="ac-ttl"><span></span><h1>مساءلة</h1><span class="ac-code">رمز النموذج : ( و.م.ع.ن – 02 – 08 )</span></div>
       <div class="ac-to"><span>المكرم / المعلم : <b style="color:#0b2a6b">${esc(a.teacherFull||a.teacher)}</b></span><span>سلمه الله</span></div>
+           ${a.personnelSpecialty||a.personnelCivilId?`<div class="ab-identity">${a.personnelSpecialty?`<span>التخصص <b>${esc(a.personnelSpecialty)}</b></span>`:''}${a.personnelCivilId?`<span>السجل المدني <bdi>${esc(a.personnelCivilId)}</bdi></span>`:''}</div>`:''}
       <div class="ac-h">أرجو بيان سبب ما يلي : -</div>${lines(subjectText(a),5,6)}
       <div class="ac-sig"><span>مدير المدرسة / ${PRINCIPAL}</span><span>التوقيع /</span><span>بتاريخ : <b>${h(isoOf(a.createdAt)||a.date)}</b></span></div>
       <div class="ac-sec"><div class="ac-h">* إجابة المعلم : -</div>${lines(a.reply||'',4,6)}

@@ -4,7 +4,7 @@ const groups=[
  {key:'day',title:'اليوم الدراسي',note:'تنظيم اليوم والبيئة المدرسية',ids:['vSchedule','vSchoolDuty','vSubs','vSchoolSchedule']},
  {key:'followup',title:'المتابعة والتقارير',note:'متابعة التنفيذ وتحسين الأداء',ids:['vReport','vBoard','vStaff','vAcc']},
  {key:'people',title:'شؤون المنسوبين',note:'الدليل والتكليفات والاعتمادات',ids:['vTeachers','vAssignments','vCoordinatorPage','vSignatures']},
- {key:'admin',title:'الإدارة والإعدادات',note:'الحسابات والصلاحيات وحماية المنصة',ids:['vEmployeeAccounts','namesBtn','pwBtn','securityAuditBtn','securityLoginBtn']}
+ {key:'admin',title:'الإدارة والإعدادات',note:'الحسابات والصلاحيات وحماية المنصة',ids:['vStaffSettings','vSchoolStudents','vEmployeeAccounts','namesBtn','pwBtn','securityAuditBtn','securityLoginBtn']}
 ];
 const labels={vSchoolSchedule:'الجداول والفصول',vEmployeeAccounts:'الحسابات والصلاحيات',namesBtn:'إعدادات المدرسة',pwBtn:'كلمة مروري',securityLoginBtn:'أمان الدخول',vTeachers:'دليل المنسوبين',vBoard:'مؤشرات المدرسة',vStaff:'متابعة المسؤولين والمشرفين',vSignatures:'التوقيعات والإقرارات'};
 const $=id=>document.getElementById(id),personal=!!root.TeacherPortal||!!root.EmployeePortal;let queued=false;
@@ -100,7 +100,7 @@ const overlay=document.createElement('div');overlay.className='school-sidebar-ov
 document.body.append(side,toggle,overlay);
 const media=root.matchMedia('(max-width:1000px)'),links=side.querySelector('.school-sidebar-links'),session=side.querySelector('.school-sidebar-session');
 let queued=false,lastFocus=null,selected=personal?(root.EmployeePortal?'followup':'schedule'):(new URLSearchParams(location.search).has('view')?'native':'home');
-const sectionMap={vCoordinatorPage:'assignments',vAssignments:'assignments',vSignatures:'signatures',vSchoolDuty:'duty',vSchoolSchedule:'duty',vAcc:'accountability',vEmployeeAccounts:'accounts'};
+const sectionMap={vCoordinatorPage:'assignments',vAssignments:'assignments',vSignatures:'signatures',vSchoolDuty:'duty',vSchoolSchedule:'duty',vSchoolStudents:'duty',vAcc:'accountability',vEmployeeAccounts:'accounts'};
 const nativeIds=['vSchedule','vReport','vTeachers','vBoard','vStaff'];
 const selectionStyle=document.createElement('style');document.head.append(selectionStyle);
 function selectSection(key){

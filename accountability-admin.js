@@ -109,7 +109,7 @@
   function fillAbsenceJob(name){
     const person=window.DepartmentPersonnel?.admins.find(p=>p.name===name);
     $a('acAbsenceJob').value=person?person.title.slice(0,120):S.some(s=>s.teacher===name)?'معلم':'';
-    $a('acAbsenceSpecialty').value='';$a('acAbsenceJobNumber').value='';
+    $a('acAbsenceSpecialty').value=window.StaffSettings?.get(name).specialty||'';$a('acAbsenceJobNumber').value='';
   }
   $a('acKind').onchange=()=>{
     if(absenceSelected())fillAbsenceJob($a('acT').value);
@@ -123,12 +123,16 @@
   document.addEventListener('accountability-contacts-ready',e=>{const selected=$a('acT').value,previous=e.detail?.previous||{};const refresh=!$a('acTPhone').value||$a('acTPhone').value===(previous[selected]||'');paintForm();if(refresh&&selected)$a('acTPhone').value=phoneOf(selected)});
   $a('acDate').oninput=paintHijri;
   $a('acCats').addEventListener('change',()=>A.CATS.forEach((c,ci)=>{const n=$a('acCats').querySelectorAll(`input[data-acc^="${ci}-"]:checked`).length;const el=$a('acCats').querySelector(`[data-cnt="${ci}"]`);if(el)el.textContent=n?`(${n})`:''}));
-  async function loadCivilId(d){
-    if(!A.isAbsence(d)||!d.teacher||state.role!==-1)return;
-    const saved=await fs().doc('config/teacherCivilIds').get();
-    const current=list.find(a=>a.id===editId&&a.teacher===d.teacher);
-    const value=saved.data()?.ids?.[d.teacher]||current?.absenceCivilId||'';
-    d.absenceCivilId=/^\d{10}$/.test(value)?value:'';
+  async function loadPersonnel(d){
+    if(!d.teacher||state.role!==-1||!window.StaffSettings)return;
+    const {civilId,specialty}=await window.StaffSettings.load(d.teacher);
+    if(A.isAbsence(d)){
+      d.absenceCivilId=civilId||'';
+      d.absenceSpecialty=d.absenceSpecialty||specialty||'';
+    }else{
+      d.personnelCivilId=civilId||'';
+      d.personnelSpecialty=specialty||'';
+    }
   }
   function previewPaper(p,d){
     p.innerHTML=`<style>${A.CSS}</style>`+A.formHTML(d);
@@ -141,8 +145,8 @@
   $a('acPreview').onclick=async()=>{
     const p=$a('acPrev'),button=$a('acPreview');if(!p.hidden){renderKind();return}
     const d=draft();button.disabled=true;
-    try{await loadCivilId(d);previewPaper(p,d);button.textContent='إخفاء المعاينة';p.scrollIntoView({behavior:'smooth',block:'nearest'})}
-    catch(e){toast('تعذّر قراءة السجل المدني للمعاينة')}finally{button.disabled=false}
+    try{await loadPersonnel(d);previewPaper(p,d);button.textContent='إخفاء المعاينة';p.scrollIntoView({behavior:'smooth',block:'nearest'})}
+    catch(e){toast('تعذّر تحميل بيانات المنسوب للمعاينة')}finally{button.disabled=false}
   };
   const tPhone=a=>A.normPhone(a.teacherPhone||phoneOf(a.teacher));
   function teacherMsg(a,id){const ph=tPhone(a);return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم مساءلة إدارية بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة الإفادة وإرسالها:',portal(id,a.teacher)].join('\n')}}
@@ -157,11 +161,11 @@
   $a('acSave').onclick=async()=>{if(!canCreate())return;if(window.AccountabilityRecorder&&editId)return;const d=draft();const msg=$a('acMsg');
     if(!d.teacher){msg.textContent='اختر المنسوب أولاً.';return}if(!d.items.length&&!d.other&&!d.details){msg.textContent='اكتب سبب المساءلة: اختر مخالفة أو اكتب مخالفة أخرى أو التفاصيل.';return}if(!d.date){msg.textContent=A.isAbsence(d)?'حدد تاريخ الغياب.':'حدد تاريخ المخالفة.';return}
     if(editId&&list.find(a=>a.id===editId)?.archivedAt){msg.textContent='المساءلة مؤرشفة ولا يمكن تعديلها.';return}
-    if(editId){const recordId=editId;$a('acSave').disabled=true;msg.textContent='جارٍ حفظ التعديل…';try{await loadCivilId(d);const {replyPhone,...upd}=d;await fs().collection(A.COL).doc(recordId).update({...upd,editedAt:firebase.firestore.FieldValue.serverTimestamp(),editedBy:(firebase.auth().currentUser||{}).uid||''});endEdit();resetForm();msg.textContent='تم حفظ التعديل.';toast('تم حفظ التعديل');setTab('log')}catch(e){console.error(e);msg.textContent='تعذّر حفظ التعديل، حاول مرة أخرى.'}finally{$a('acSave').disabled=false}return}
+    if(editId){const recordId=editId;$a('acSave').disabled=true;msg.textContent='جارٍ حفظ التعديل…';try{await loadPersonnel(d);const {replyPhone,...upd}=d;await fs().collection(A.COL).doc(recordId).update({...upd,editedAt:firebase.firestore.FieldValue.serverTimestamp(),editedBy:(firebase.auth().currentUser||{}).uid||''});endEdit();resetForm();msg.textContent='تم حفظ التعديل.';toast('تم حفظ التعديل');setTab('log')}catch(e){console.error(e);msg.textContent='تعذّر حفظ التعديل، حاول مرة أخرى.'}finally{$a('acSave').disabled=false}return}
     // نفتح نافذة الواتساب فورًا (قبل انتظار الحفظ) حتى لا يحجبها المتصفح
     const absence=A.isAbsence(d),ph=absence?'':d.teacherPhone;const win=ph?window.open('about:blank','_blank'):null;
     $a('acSave').disabled=true;msg.textContent='جارٍ الحفظ…';
-    try{await loadCivilId(d);const ref=fs().collection(A.COL).doc();await ref.set({...d,status:absence?A.MANAGER_PENDING:'sent',createdAt:firebase.firestore.FieldValue.serverTimestamp(),createdBy:state.uid||(firebase.auth().currentUser||{}).uid||''});
+    try{await loadPersonnel(d);const ref=fs().collection(A.COL).doc();await ref.set({...d,status:absence?A.MANAGER_PENDING:'sent',createdAt:firebase.firestore.FieldValue.serverTimestamp(),createdBy:state.uid||(firebase.auth().currentUser||{}).uid||''});
       if(win){const m=teacherMsg(d,ref.id);win.location.href=A.waUrl(m.phone,m.text)}
       msg.textContent=absence?'تم حفظ مساءلة الغياب. أدخل الإفادة ووقّعها من السجل.':ph?'تم حفظ المساءلة وفتح الواتساب للمعلم.':'تم حفظ المساءلة. لا يوجد رقم جوال لهذا المعلم — اكتبه في خانة «جوال المعلم» في المرة القادمة أو أضفه من «تقارير المعلمين».';
       toast('تم حفظ المساءلة');resetForm();if(A.isAbsence(d)){$a('acT').value='';$a('acT').onchange()}setTab('log')}

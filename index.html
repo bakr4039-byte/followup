@@ -705,7 +705,7 @@ window.FIREBASE_CONFIG = {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="department-personnel.js?v=linked-identities-20261109-1"></script>
-<script src="accountability.js?v=absence-20261115-3"></script>
+<script src="accountability.js?v=personnel-1"></script>
 <script>
 (function(){
 // ---------- weeks ----------
@@ -998,41 +998,23 @@ $('tRepeat').onclick=()=>{state.repeatOnly=!state.repeatOnly;$('tRepeat').setAtt
 $('tRepMin').onchange=renderTeachers;
 $('letPrint').onclick=()=>printLetters('print');$('letPdf').onclick=()=>printLetters('pdf');
 function personnelCard(t){return `<article class="tcard teacher-card" aria-pressed="${state.teacher===t.name}"><div class="row"><b>${esc(t.name)}</b><span class="tag">إداري / إشرافي</span></div><p class="subjs">${esc(t.personnel.title)}</p><p class="note">${esc(t.personnel.group)}</p><p class="teacher-phone">${state.phones[t.name]?'الجوال متوفر ✓':'الجوال غير مسجل'}</p><div class="teacher-actions"><button class="btn" data-teacher="${esc(t.name)}">عرض الملف</button></div></article>`}
-function personnelPage(t){return `<section class="page">${printHeader('ملف منسوب القسم الثانوي','ثانوية الصحافة الأهلية')}<div class="info"><div><span>الاسم</span><b>${esc(t.name)}</b></div><div><span>الصفة</span><b>${esc(t.personnel.title)}</b></div><div><span>القسم</span><b>${esc(t.personnel.group)}</b></div><div><span>الجوال</span><b>${esc(state.phones[t.name]||'غير مسجل')}</b></div></div></section>`}
-function civilIdField(){
-  if(state.role!==-1||!state.isEditor||!state.db)return '';
-  return '<div class="wa"><label for="tCivilId">رقم السجل المدني</label><input id="tCivilId" type="text" inputmode="numeric" autocomplete="off" maxlength="10" disabled><button class="btn ghost" id="tCivilSave" disabled>حفظ السجل المدني</button></div>';
+function personnelPage(t,includeCivil=false){return `<section class="page">${printHeader('ملف منسوب القسم الثانوي','ثانوية الصحافة الأهلية')}<div class="info"><div><span>الاسم</span><b>${esc(t.name)}</b></div>${personnelReportFields(t.name,includeCivil)}<div><span>الصفة</span><b>${esc(t.personnel.title)}</b></div><div><span>القسم</span><b>${esc(t.personnel.group)}</b></div><div><span>الجوال</span><b>${esc(state.phones[t.name]||'غير مسجل')}</b></div></div></section>`}
+function staffSettingsField(){
+  return state.role===-1?'<div class="wa"><button class="btn ghost" id="tStaffSettings">السجل المدني والتخصص</button></div>':'';
 }
-async function bindCivilId(name){
-  const input=$('tCivilId'),button=$('tCivilSave');
-  if(!input||!button)return;
-  const db=firebase.firestore(),ref=db.doc('config/teacherCivilIds');
-  try{
-    const data=(await ref.get()).data();
-    if(!input.isConnected)return;
-    input.value=data?.ids?.[name]||'';
-    input.disabled=false;button.disabled=false;
-  }catch(e){if(input.isConnected)toast('تعذّر قراءة السجل المدني');return}
-  button.onclick=async()=>{
-    if(state.role!==-1)return;
-    const value=input.value.trim().replace(/[٠-٩۰-۹]/g,c=>String(c.charCodeAt(0)-(c<='٩'?1632:1776)));
-    if(value&&!/^\d{10}$/.test(value)){toast('أدخل رقم السجل المدني مكوّنًا من 10 أرقام');return}
-    button.disabled=true;input.disabled=true;
-    try{
-      await db.runTransaction(async tx=>{
-        const snap=await tx.get(ref),ids={...snap.data()?.ids};
-        if(value)ids[name]=value;else delete ids[name];
-        tx.set(ref,{ids});
-      });
-      input.value=value;toast('تم حفظ السجل المدني');
-    }catch(e){toast('تعذّر حفظ السجل المدني')}
-    finally{input.disabled=false;button.disabled=false}
-  };
+function bindStaffSettings(name){
+  const button=$('tStaffSettings');
+  if(button)button.onclick=()=>window.StaffSettings.open(name);
+}
+function personnelReportFields(name,includeCivil){
+  const data=window.StaffSettings?.get(name)||{};
+  const field=(label,value)=>value?`<div><span>${label}</span><b>${esc(value)}</b></div>`:'';
+  return field('التخصص',data.specialty)+(includeCivil?field('السجل المدني',data.civilId):'');
 }
 function renderPersonnelProfile(t,box){const edit=state.role===-1&&state.isEditor&&state.db;
  box.innerHTML=`<div class="tdetail-head"><div><h2>${esc(t.name)}</h2><p>${esc(t.personnel.title)}</p><p class="note">${esc(t.personnel.group)}</p></div><div class="filters">${state.downloads?'<button class="btn" id="pPdf">تحميل الملف PDF</button><button class="btn ghost" id="pPrint">طباعة</button>':''}${state.role===-1?`<button class="btn ghost" data-document-person="${esc(t.name)}">التوقيعات والإقرارات</button>`:''}<button class="btn ghost" id="pClose">إغلاق</button></div></div><div class="wa"><label for="pPhone">جوال المنسوب</label><input type="tel" id="pPhone" inputmode="tel" placeholder="05xxxxxxxx" value="${esc(state.phones[t.name]||'')}" ${edit?'':'disabled'}>${edit?'<button class="btn" id="pSavePhone">حفظ الرقم</button>':''}${normPhone(state.phones[t.name])?`<a class="wabtn" href="https://wa.me/${esc(normPhone(state.phones[t.name]))}" target="_blank" rel="noopener">واتساب</a>`:''}</div>`;
- box.insertAdjacentHTML('beforeend',civilIdField());bindCivilId(t.name);
- $('pClose').onclick=()=>{state.teacher=null;renderTeachers()};if($('pPdf')){$('pPdf').onclick=()=>exportDoc('pdf','ملف المنسوب '+t.name,[personnelPage(t)]);$('pPrint').onclick=()=>exportDoc('print','ملف المنسوب '+t.name,[personnelPage(t)])}
+ box.insertAdjacentHTML('beforeend',staffSettingsField());bindStaffSettings(t.name);
+ $('pClose').onclick=()=>{state.teacher=null;renderTeachers()};if($('pPdf')){$('pPdf').onclick=()=>exportDoc('pdf','ملف المنسوب '+t.name,[personnelPage(t,true)]);$('pPrint').onclick=()=>exportDoc('print','ملف المنسوب '+t.name,[personnelPage(t,true)])}
  if($('pSavePhone'))$('pSavePhone').onclick=async()=>{const raw=$('pPhone').value.trim();if(raw&&!normPhone(raw)){toast('رقم الجوال غير صحيح');return}const phones={...state.phones};if(raw)phones[t.name]=raw.slice(0,20);else delete phones[t.name];try{await state.db.doc('config/phones').set({phones});state.phones=phones;toast('تم حفظ الرقم');renderTeachers()}catch(e){toast('تعذر حفظ الرقم')}};
 }
 function renderTeachers(){const normal=s=>String(s).normalize('NFKC').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/\s/g,'');const q=normal($('tSearch').value);const all=window.DepartmentPersonnel.members(teachersIn(scope().filter(inRange)));const noted=new Set(teachersIn(scope().filter(s=>inRange(s)&&noteOf(s))).map(t=>t.name));const reps=new Set(all.filter(t=>incOf(t).length>=repMin()).map(t=>t.name));const list=all.filter(t=>($('tPersonnel').value!=='teachers'||t.ss.length>0)&&($('tPersonnel').value!=='admins'||!!t.personnel)&&(!q||normal(t.name+' '+subjOf(t.ss)+' '+(t.personnel?.title||'')+' '+(t.personnel?.group||'')).includes(q))&&(!state.notesOnly||noted.has(t.name))&&(!state.repeatOnly||reps.has(t.name))&&(!$('tOnlyPending').checked||tStats(t.ss).pending>0));
@@ -1046,10 +1028,10 @@ function renderTeachers(){const normal=s=>String(s).normalize('NFKC').replace(/[
   <div class="wa"><label for="tPhone">جوال المعلم</label><input id="tPhone" type="tel" inputmode="tel" placeholder="05xxxxxxxx" value="${esc(state.phones[sel.name]||'')}" ${state.role===-1&&state.isEditor&&state.db?'':'disabled'}>${state.role===-1&&state.isEditor&&state.db?'<button class="btn ghost" id="tPhoneSave">حفظ الرقم</button>':''}<button type="button" class="wabtn" id="tWa" data-wapdf="${esc(sel.name)}" aria-disabled="${waLink(sel)?'false':'true'}" ${waLink(sel)?'':'disabled'}>إرسال التقرير PDF بالواتساب</button><span class="note" id="tWaNote">${waLink(sel)?'يُرسَل التقرير كملف PDF بنفس شكل الطباعة. تظهر قائمة المشاركة ومعها الملف، فاختر واتساب ثم المعلم (في الكمبيوتر يلزم تثبيت تطبيق واتساب لويندوز).':(state.role===-1&&state.isEditor?'أضف رقم الجوال ثم احفظه لتفعيل الإرسال.':'لم يُضف رقم جوال لهذا المعلم بعد (يضيفه المدير).')}</span></div>
   <div class="tstats"><div class="tstat"><span>عدد الحصص</span><b class="num">${c.total}</b></div><div class="tstat s-done"><span>تمت في وقتها</span><b class="num">${c.done}</b></div><div class="tstat s-late"><span>بدأت متأخرة</span><b class="num">${c.late}</b></div><div class="tstat s-absent"><span>لم تُعقد</span><b class="num">${c.absent}</b></div><div class="tstat s-tech"><span>مشكلة تقنية</span><b class="num">${c.tech}</b></div><div class="tstat"><span>لم تُرصد</span><b class="num">${c.pending}</b></div><div class="tstat"><span>متوسط التقييم</span><b class="num">${fmtAvg(c.avg)}</b></div><div class="tstat"><span>نسبة حضور الطلاب</span><b class="num">${c.att==null?'—':c.att+'%'}</b></div></div>
   <div class="scroll"><table><thead><tr><th>اليوم</th><th>الحصة</th><th>الوقت</th><th>الصف / المسار</th><th>المادة</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>تسجيل</th><th>تقييم</th><th>ملاحظات</th></tr></thead><tbody>${sel.ss.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr class="clickable" data-open="${s.id}"><td>${DAYS[s.day].n}</td><td>${s.label}</td><td class="num">${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td><span class="status ${st?st.c:''}">${st?st.t:'لم تُرصد'}</span>${rsnHTML(l)}</td><td class="num">${esc(l.entry||'')}</td><td class="num">${esc(l.present??'')}</td><td class="num">${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${starTxt(l)}</td><td class="wrap">${esc(notesFor(l))}</td></tr>`}).join('')}</tbody></table></div>`;
-  box.querySelector('.tstats').insertAdjacentHTML('beforebegin',civilIdField());bindCivilId(sel.name);
+  box.querySelector('.tstats').insertAdjacentHTML('beforebegin',staffSettingsField());bindStaffSettings(sel.name);
   box.querySelector('.tstats').insertAdjacentHTML('afterend',chartsBlock(sel.ss,PAL_SCREEN,{cls:'t4',only:['donut','days','att','rating','reasons']}));
   if($('tLetter'))$('tLetter').onclick=()=>printLetters('print',[sel]);
-  if($('tPdf')){$('tPdf').onclick=()=>exportDoc('pdf','تقرير المعلم '+sel.name,[teacherPage(sel)]);$('tPrint').onclick=()=>exportDoc('print','تقرير المعلم '+sel.name,[teacherPage(sel)])}$('tClose').onclick=()=>{state.teacher=null;renderTeachers()};
+  if($('tPdf')){$('tPdf').onclick=()=>exportDoc('pdf','تقرير المعلم '+sel.name,[teacherPage(sel,true)]);$('tPrint').onclick=()=>exportDoc('print','تقرير المعلم '+sel.name,[teacherPage(sel,true)])}$('tClose').onclick=()=>{state.teacher=null;renderTeachers()};
   const ps=$('tPhoneSave');if(ps)ps.onclick=async()=>{const raw=$('tPhone').value.trim();if(raw&&!normPhone(raw)){toast('رقم غير صحيح، اكتبه مثل 0551234567');return}
     const phones={...state.phones};if(raw)phones[sel.name]=raw.slice(0,20);else delete phones[sel.name];
     try{await state.db.doc('config/phones').set({phones});state.phones=phones;toast('تم حفظ الرقم');renderTeachers()}catch(e){toast('تعذّر حفظ الرقم')}};}
@@ -1129,10 +1111,10 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid 
 @media print{.toolbar{display:none}.wrapper{padding:0;max-width:none}}`;
 const stCls={done:'ok',late:'late',absent:'bad',tech:'tech'};
 function printHeader(title,sub){return `<div class="hdr"><div class="org">المملكة العربية السعودية<br>وزارة التعليم<br>الإدارة العامة للتعليم بمنطقة الرياض<br>مدارس الصحافة الأهلية – القسم الثانوي</div><div class="ttl"><h1>${esc(title)}</h1><p>${esc(sub)}</p><p>${rangeText()}</p></div></div>`}
-function teacherPage(t){const c=tStats(t.ss);const sups=[...new Set(t.ss.map(s=>state.names[s.sup]))].join('، ');
+function teacherPage(t,includeCivil=false){const c=tStats(t.ss);const sups=[...new Set(t.ss.map(s=>state.names[s.sup]))].join('، ');
   const rows=t.ss.map(s=>{const l=state.logs[s.id]||{};const st=ST[l.status];return `<tr><td>${DAYS[s.day].n}<br><small>${DAYS[s.day].h}هـ</small></td><td>${s.label}<br><small>${SLOTS[s.slot][1]} – ${SLOTS[s.slot][2]}</small></td><td>${CLS[s.cls]}</td><td>${esc(s.subj)}</td><td class="${st?stCls[l.status]:'idle'}">${st?st.t:'لم تُرصد'}${reasonOf(l)?'<br><small style="color:#667;font-weight:400">'+esc(REASONS[reasonOf(l)].t)+'</small>':''}</td><td>${esc(l.entry||'')}</td><td>${esc(l.present??'')}</td><td>${esc(l.absent??'')}</td><td>${l.recorded==='yes'?'نعم':l.recorded==='no'?'لا':''}</td><td>${rateOf(l)?fmtR(rateOf(l))+' / 5':''}</td><td>${esc(notesFor(l))}</td></tr>`}).join('');
   return `<section class="page">${printHeader('تقرير متابعة الحصص عن بُعد','ثانوية الصحافة الأهلية')}
-  <div class="info"><div><span>اسم المعلم</span><b>${esc(t.name)}</b></div><div><span>المواد</span><b>${esc(subjOf(t.ss))}</b></div><div><span>الصفوف / المسارات</span><b>${esc(clsOf(t.ss))}</b></div><div><span>المتابِع</span><b>${esc(sups)}</b></div><div><span>نسبة الانعقاد من المرصود</span><b>${c.logged?pct(c.held,c.logged)+'%':'—'}</b></div><div><span>نسبة تسجيل الحصص</span><b>${c.rec==null?'—':c.rec+'%'}</b></div></div>
+  <div class="info"><div><span>اسم المعلم</span><b>${esc(t.name)}</b></div>${personnelReportFields(t.name,includeCivil)}<div><span>المواد</span><b>${esc(subjOf(t.ss))}</b></div><div><span>الصفوف / المسارات</span><b>${esc(clsOf(t.ss))}</b></div><div><span>المتابِع</span><b>${esc(sups)}</b></div><div><span>نسبة الانعقاد من المرصود</span><b>${c.logged?pct(c.held,c.logged)+'%':'—'}</b></div><div><span>نسبة تسجيل الحصص</span><b>${c.rec==null?'—':c.rec+'%'}</b></div></div>
   <div class="stats"><div><span>الحصص</span><b>${c.total}</b></div><div><span>تمت في وقتها</span><b class="ok">${c.done}</b></div><div><span>متأخرة</span><b class="late">${c.late}</b></div><div><span>لم تُعقد</span><b class="bad">${c.absent}</b></div><div><span>مشكلة تقنية</span><b class="tech">${c.tech}</b></div><div><span>لم تُرصد</span><b>${c.pending}</b></div><div><span>متوسط التقييم</span><b>${fmtAvg(c.avg)}</b></div><div><span>حضور الطلاب</span><b>${c.att==null?'—':c.att+'%'}</b></div></div>
   ${chartsBlock(t.ss,PAL_PRINT,{only:['donut','days'],donutPx:120,colH:160})}
   <table><thead><tr><th>اليوم</th><th>الحصة</th><th>الصف</th><th>المادة</th><th>الحالة</th><th>دخول المعلم</th><th>حضور</th><th>غياب</th><th>تسجيل</th><th>التقييم</th><th>ملاحظات المتابعة</th></tr></thead><tbody>${rows}</tbody></table>
@@ -1798,11 +1780,12 @@ function showBanner(t){const b=$('banner');b.textContent=t;b.hidden=false}
 })();
 </script>
 
-<script src="accountability-admin.js?v=absence-20261115-3"></script>
+<script src="staff-settings.js?v=personnel-1"></script>
+<script src="accountability-admin.js?v=personnel-1"></script>
 <script src="security-audit.js?v=login-20261014"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script src="document-signing.js?v=circular-signature-20261111-1"></script><script src="employee-accounts.js?v=coordinator-20261110-2"></script><script src="assignment-signing.js?v=inline-coordinator-20261110-3"></script>
 <script src="recorder-accounts.js?v=20261108-1"></script>
 <script src="personnel-tasks-admin.js?v=bounded-save-20261110-1"></script>
-<script src="teacher-provision.js?v=coordinator-20261110-2"></script><script src="duty-fields.js?v=20261109-1"></script><script src="written-duties.js?v=coordinator-20261110-2"></script><script src="school-operations.js?v=approved-schedule-20261110-1"></script><link rel="stylesheet" href="school-navigation.css?v=20261109-1"><script src="school-navigation.js?v=logo-20261111-1"></script><script src="pending-assignments.js?v=linked-identities-20261109-1"></script></body>
+<script src="teacher-provision.js?v=coordinator-20261110-2"></script><script src="duty-fields.js?v=20261109-1"></script><script src="written-duties.js?v=coordinator-20261110-2"></script><script src="school-operations.js?v=personnel-1"></script><link rel="stylesheet" href="school-navigation.css?v=20261109-1"><script src="school-navigation.js?v=personnel-1"></script><script src="pending-assignments.js?v=linked-identities-20261109-1"></script></body>
 </html>
 
 
