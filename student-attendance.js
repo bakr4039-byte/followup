@@ -23,6 +23,16 @@
     return schedule.filter(row=>row.day===day&&row.slot===period-1&&groups.includes(row.cls))
       .map(row=>({...row,teacher:substitutes[row.id]?.t||row.orig||row.teacher}));
   }
+  const titleWords=value=>normalize(digits(value)).replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+  function titleSlot(title){
+    const text=titleWords(title);
+    const match=/(?:^|\s)الحص[هة]\s+((?:ال)?(?:اولي|ثاني[ةه]|ثالث[ةه]|رابع[ةه]|خامس[ةه]|سادس[ةه]|سابع[ةه])|[1-7])(?=\s|$)/.exec(text);
+    if(!match)return {period:0,subject:''};
+    const ordinal=match[1].replace(/^ال/,'').replace(/ه$/,'ة');
+    const period=Number(ordinal)||['اولي','ثانية','ثالثة','رابعة','خامسة','سادسة','سابعة'].indexOf(ordinal)+1;
+    const prefix=text.slice(0,match.index).trim();
+    return {period,subject:!prefix||/^x$/i.test(prefix)?text.slice(match.index+match[0].length).trim():''};
+  }
   function matchReport(sheet,classId,students,date){
     const expected=['اسم الطالب','الفصل','الحالة','وقت الحضور'].map(normalize);
     const headerIndex=sheet.findIndex(row=>expected.slice(0,3).every(key=>row.some(cell=>normalize(cell)===key)));
@@ -131,7 +141,7 @@
     }
     return {classes,classIds:[...classIds],students,archived,stats};
   }
-  if(typeof module!=='undefined')module.exports={reportClass,matchReport,guardianLink,remoteSessions,rosterPlan,studentTotals,lessonTotals};
+  if(typeof module!=='undefined')module.exports={reportClass,matchReport,guardianLink,remoteSessions,rosterPlan,studentTotals,lessonTotals,titleSlot};
   if(!root.document||!root.firebase?.apps.length)return;
 
   const db=firebase.firestore(),auth=firebase.auth(),app=root.__FUACC;
@@ -580,7 +590,7 @@
     const reset=()=>{save.hidden=true;matched=[];output.textContent='';};
     input.oninput=reset;
     const lock=value=>{working=value;input.disabled=preview.disabled=save.disabled=value;};
-    const words=value=>normalize(value).replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+    const words=titleWords;
     const squash=value=>words(value).replace(/\s+/g,'');
     const aliases={
       'محمود عبود':['محمود محمد الرفاعي','محمود الرفاعي'],
@@ -589,7 +599,7 @@
       'تامر شعيشع':['تامر محمد محمد السيد']
     };
     const subjectAliases={'لفظي':['قدرات لفظية','القدرات اللفظية'],'كمي':['قدرات كمية','القدرات الكمية'],'كفايات':['الكفايات اللغوية'],'انجليزي':['اللغة الإنجليزية']};
-    function evidence(title,lesson){
+    function evidence(title,subjectOnly,lesson){
       const raw=squash(title);
       const teacher=lesson.teacher;
       const people=[teacher,root.StaffSettings?.displayName(teacher),...(aliases[teacher]||[])].filter(Boolean);
@@ -597,7 +607,10 @@
         const tokens=words(name).split(' ').filter(word=>word.length>1);
         return tokens.length>=2&&(raw.includes(tokens.join(''))||tokens.every(word=>words(title).split(' ').includes(word)));
       });
-      return teacherHit&&[lesson.subj,...(subjectAliases[lesson.subj]||[])].some(subject=>squash(subject).length>=2&&raw.includes(squash(subject)));
+      const subjects=[lesson.subj,...(subjectAliases[lesson.subj]||[])];
+      if(teacherHit)return subjects.some(subject=>squash(subject).length>=2&&raw.includes(squash(subject)));
+      const courseKey=value=>words(value).replace(/\s+[1-3]$/,'').split(' ').map(word=>word.replace(/^ال/,'')).join('');
+      return Boolean(subjectOnly)&&subjects.some(subject=>courseKey(subjectOnly)===courseKey(subject));
     }
     preview.onclick=async()=>{
       if(working||!manager())return;
@@ -608,10 +621,9 @@
         const registry=(await db.doc('config/onsite-classes').get()).data()?.classes||{};
         const rosters=new Map(),weeks=new Map(),pending=new Map(),conflicts=new Set();
         let review=0,missing=0;
-        for(const [date,time,title,rows] of source){
+        for(const [date,,title,rows] of source){
           if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>today()||!Array.isArray(rows)||typeof title!=='string'){review++;continue;}
-          const hm=String(time).match(/^(\d{1,2}:\d{2})/)?.[1]?.replace(/^0/,'');
-          const period=navigation.slots.findIndex(slot=>slot[1].replace(/^0/,'')===hm)+1;
+          const {period,subject}=titleSlot(title);
           const day=new Date(date+'T00:00:00Z');
           if(!period||!Number.isFinite(day.getTime())||day.getUTCDay()>4){review++;continue;}
           day.setUTCDate(day.getUTCDate()-day.getUTCDay());
@@ -628,7 +640,7 @@
           for(const [id,entries] of groups){
             const c=registry[id];
             if(!c){review++;continue;}
-            const sessions=remoteSessions(app.S,date,c.grade,period,weeks.get(week)).filter(lesson=>evidence(title,lesson));
+            const sessions=remoteSessions(app.S,date,c.grade,period,weeks.get(week)).filter(lesson=>evidence(title,subject,lesson));
             if(sessions.length!==1){review++;continue;}
             if(!rosters.has(id))rosters.set(id,(await db.doc('config/onsite-students-'+id).get()).data()?.students||[]);
             const roster=rosters.get(id).map(student=>({id:student.id,name:student.name,status:'unmarked',entry:''}));
@@ -638,8 +650,17 @@
             missing+=result.unresolved.length;
             if(!result.matched.size){review++;continue;}
             const key=date+'_'+id+'_p'+period;
-            if(pending.has(key)||conflicts.has(key)){pending.delete(key);conflicts.add(key);review++;continue;}
             const lesson=sessions[0];
+            const previous=pending.get(key);
+            if(previous||conflicts.has(key)){
+              const duplicate=previous?.teacher===lesson.teacher&&previous.subject===lesson.subj&&
+                previous.marks.size===result.matched.size&&[...result.matched].every(([studentId,mark])=>{
+                  const prior=previous.marks.get(studentId);
+                  return prior?.status===mark.status&&prior.entry===mark.entry;
+                });
+              if(!duplicate){pending.delete(key);conflicts.add(key);review++;}
+              continue;
+            }
             pending.set(key,{key,date,classId:id,classLabel:classLabel(c),period,teacher:lesson.teacher,subject:lesson.subj,roster,marks:result.matched});
           }
         }
