@@ -153,8 +153,8 @@
   const view=document.createElement('section');
   view.id='studentAttendance';view.hidden=true;view.setAttribute('aria-labelledby','saTitle');
   view.innerHTML='<header><h2 id="saTitle" tabindex="-1">سجل حضور الطلاب</h2><button type="button" id="saClose">العودة</button></header>'+
-    '<form id="saFilters"><label>الفترة<select id="saDateMode"><option value="today">اليوم</option><option value="range">من تاريخ إلى تاريخ</option></select></label>'+
-    '<label id="saFromLabel" hidden>من تاريخ<input type="date" id="saFrom"></label><label id="saToLabel" hidden>إلى تاريخ<input type="date" id="saTo"></label>'+
+    '<form id="saFilters"><label>من تاريخ<input type="date" id="saFrom" required></label>'+
+    '<label>إلى تاريخ<input type="date" id="saTo" required></label>'+
     '<label>الصف<select id="saGrade"><option value="">كل الصفوف</option>'+grades.slice(1).map((grade,i)=>'<option value="'+(i+1)+'">'+grade+' بالكامل</option>').join('')+'</select></label>'+
     '<label>الشعبة<select id="saClass"><option value="">كل الشعب</option></select></label>'+
     '<label>الحصة<select id="saPeriod"><option value="">جميع الحصص</option>'+periods.map((period,i)=>'<option value="'+(i+1)+'">'+period+'</option>').join('')+'</select></label>'+
@@ -255,10 +255,6 @@
     }catch(err){if(token===sequence){status(message(err));context=null;}}
     finally{setBusy(false);}
   };
-  $('saDateMode').onchange=()=>{
-    const range=$('saDateMode').value==='range';
-    for(const id of ['saFrom','saTo']){$(id+'Label').hidden=!range;$(id).required=range;}
-  };
   $('saGrade').onchange=()=>refreshClasses(classes);
   $('saFilters').onsubmit=event=>{event.preventDefault();if(!busy)load();};
   function schoolDates(from,to){
@@ -350,14 +346,21 @@
     return '<details'+($('saClass').value||$('saGrade').value?' open':'')+'><summary>'+escape(c.label)+' · '+matrix.size+' طالبًا</summary>'+
       (rows?'<div class="sa-grid"><table><thead><tr><th scope="col">اسم الطالب</th>'+columnsHead+'</tr></thead><tbody>'+rows+'</tbody></table></div>':'<p>لا توجد أسماء طلاب لهذه الشعبة.</p>')+'</details>';
   }
+  function dailyClasses(book,date,items,columns){
+    const daily=book.records.filter(record=>record.date===date);
+    return items.filter(c=>context.edit||daily.some(record=>record.classId===c.id))
+      .map(c=>classSheet(c,daily.filter(record=>record.classId===c.id),date,columns)).join('')||
+      '<p>لا توجد سجلات مطابقة لهذا التاريخ.</p>';
+  }
   function paintSheet(keepEditor=false){
     const book=activeSheet;if(!book)return;
-    const date=$('saSheetDate').value;
     if(!keepEditor){$('saBody').textContent='';draft=null;}
-    const wholeRange=date==='range';
-    const all=wholeRange?book.records:book.records.filter(record=>record.date===date);
+    const opened=new Set([...$('saSheet').querySelectorAll('details[data-sa-day][open]')].map(row=>row.dataset.saDay));
     const byClass=new Map();
-    for(const record of all){if(!byClass.has(record.classId))byClass.set(record.classId,[]);byClass.get(record.classId).push(record);}
+    for(const record of book.records){
+      if(!byClass.has(record.classId))byClass.set(record.classId,[]);
+      byClass.get(record.classId).push(record);
+    }
     const items=book.items.filter(c=>context.edit||byClass.has(c.id)).map(c=>{
       const records=byClass.get(c.id)||[];
       const roster=book.rosters.get(c.id)||[];
@@ -365,14 +368,23 @@
       return {...c,roster,count:students.size};
     });
     const columns=book.period?scheduleColumns.filter(col=>col.period===book.period):scheduleColumns;
-    const title=wholeRange?'من '+book.from+' إلى '+book.to:date;
-    $('saSheet').innerHTML=items.length?'<h3>'+ (wholeRange?'إجمالي الفصول للفترة':'ملخص الفصول')+'</h3>'+
+    const title='من '+book.from+' إلى '+book.to;
+    const names=book.dates.length===1?dailyClasses(book,book.dates[0],items,columns):
+      book.dates.filter(date=>context.edit||book.records.some(record=>record.date===date)).map(date=>
+        '<details data-sa-day="'+date+'"'+(opened.has(date)?' open':'')+'><summary>'+date+'</summary><div></div></details>').join('');
+    $('saSheet').innerHTML=items.length?'<h3>إجمالي الفصول للفترة</h3>'+
       '<p>ح: حاضر · غ: غائب · ت: متأخر. الأعداد تجمع حالات الطلاب في الحصص المرصودة.</p>'+
-      scheduleTable(title,items,all,columns)+
-      (wholeRange?(context.edit?'<p>اختر يومًا من القائمة لفتح سجل الأسماء ورصد الحصة.</p>':''):
-        '<h3>سجل الطلاب بالأسماء</h3>'+
-        (context.edit?'<p>اضغط عنوان الحصة داخل الشعبة لتسجيل الحضور أو استيراد كشف فيوكلاس.</p>':'')+
-        items.map(c=>classSheet(c,byClass.get(c.id)||[],date,columns)).join('')):'<p>لا توجد سجلات مطابقة للعرض المحدد.</p>';
+      scheduleTable(title,items,book.records,columns)+'<h3>سجل الطلاب بالأسماء</h3>'+
+      (context.edit?'<p>افتح الحصة داخل الشعبة لتسجيل الحضور أو استيراد كشف فيوكلاس.</p>':'')+
+      names:'<p>لا توجد سجلات مطابقة في الفترة المحددة.</p>';
+    for(const day of $('saSheet').querySelectorAll('details[data-sa-day]')){
+      const fill=()=>{
+        const content=day.lastElementChild;
+        if(day.open&&!content.hasChildNodes())content.innerHTML=dailyClasses(book,day.dataset.saDay,items,columns);
+      };
+      day.addEventListener('toggle',fill);
+      fill();
+    }
     const records=studentTotals(book.records);
     $('saPeriodTotals').innerHTML=records.length?'<details><summary>إجمالي حضور الطلاب وغيابهم للفترة المحددة</summary><div class="sa-grid"><table>'+
       '<thead><tr><th>اسم الطالب</th><th>الفصل</th><th>حاضر</th><th>غائب</th><th>غير مرصود</th></tr></thead><tbody>'+
@@ -396,7 +408,7 @@
   };
   async function load(){
     if(!context||context.uid!==auth.currentUser?.uid)return;
-    const mode=$('saDateMode').value,from=mode==='today'?today():$('saFrom').value,to=mode==='today'?today():$('saTo').value;
+    const from=$('saFrom').value,to=$('saTo').value;
     if(!from||!to||from>to||to>today()){status('اختر فترة صحيحة حتى تاريخ اليوم.');return;}
     const period=Number($('saPeriod').value),grade=Number($('saGrade').value),classId=$('saClass').value;
     clear();
@@ -420,11 +432,8 @@
         items.forEach((c,index)=>rosters.set(c.id,(snapshots[index].data()?.students||[]).map(s=>({id:s.id,name:s.name}))));
       }
       if(token!==sequence)return;
-      activeSheet={records:selected,items,rosters,period,from,to};
-      $('saResults').innerHTML='<div class="sa-actions" style="margin-top:12px"><label>عرض السجل<select id="saSheetDate">'+(from!==to?'<option value="range">إجمالي الفترة</option>':'')+dateList.map(date=>'<option>'+date+'</option>').join('')+'</select></label></div><div id="saSheet"></div><div id="saPeriodTotals"></div>';
-      const datesWithRecords=[...new Set(selected.map(r=>r.date))].filter(date=>dateList.includes(date)).sort();
-      $('saSheetDate').value=from!==to?'range':datesWithRecords.at(-1)||dateList.at(-1);
-      $('saSheetDate').onchange=()=>paintSheet();
+      activeSheet={records:selected,items,rosters,period,from,to,dates:dateList};
+      $('saResults').innerHTML='<div id="saSheet"></div><div id="saPeriodTotals"></div>';
       paintSheet();
       status('');
     }catch(err){if(token===sequence)status(message(err));}
