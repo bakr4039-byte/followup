@@ -7,11 +7,21 @@
   const grades=['','الأول الثانوي','الثاني الثانوي','الثالث الثانوي'];
   function reportClass(value){
     const code=digits(value).trim();
+    const id=/^([123])(\d{2})$/.exec(code);
+    if(id&&Number(id[2])>0)return 'g'+id[1]+'-s'+Number(id[2]);
     const short=/^([123])\s*[ث/]\s*([1-9]\d?)$/.exec(code);
     if(short)return 'g'+short[1]+'-s'+short[2];
     const full=/^(.*?)[\s–-]+([123])(\d{2})$/.exec(code);
     if(!full||normalize(full[1])!==normalize(grades[Number(full[2])])||Number(full[3])===0)return '';
     return 'g'+full[2]+'-s'+Number(full[3]);
+  }
+  function remoteSessions(schedule,date,grade,period,substitutes={}){
+    const sunday=new Date(date+'T00:00:00Z');
+    const day=sunday.getUTCDay();
+    if(!Number.isFinite(day)||day>4)return [];
+    const groups=grade===3?['c3','ba','cs']:['c'+grade];
+    return schedule.filter(row=>row.day===day&&row.slot===period-1&&groups.includes(row.cls))
+      .map(row=>({...row,teacher:substitutes[row.id]?.t||row.orig||row.teacher}));
   }
   function matchReport(sheet,classId,students,date){
     const expected=['اسم الطالب','الفصل','الحالة','وقت الحضور'].map(normalize);
@@ -49,7 +59,51 @@
     const international=/^05\d{8}$/.test(plain)?'966'+plain.slice(1):plain;
     return /^9665\d{8}$/.test(international)?'https://wa.me/'+international+'?text='+encodeURIComponent(message):'';
   }
-  if(typeof module!=='undefined')module.exports={reportClass,matchReport,guardianLink};
+  function rosterPlan(classMap,previous,source,makeId){
+    const old=Object.entries(previous).flatMap(([classId,data])=>(data.students||[]).map(student=>({classId,student})));
+    const byIdentity=new Map(),byName=new Map(),incomingNames=new Map(),seen=new Set(),claimed=new Set();
+    const index=(map,key,entry)=>{if(key)map.set(key,map.has(key)?null:entry);};
+    for(const entry of old){
+      index(byIdentity,String(entry.student.civilId||''),entry);
+      index(byName,normalize(entry.student.name),entry);
+    }
+    for(const row of source)index(incomingNames,normalize(row.name),row);
+    const classIds=new Set(Object.keys(classMap));
+    const classes={...classMap},students={},stats={created:0,moved:0,renamed:0,archived:0,ids:0,phones:0};
+    for(const row of source){
+      const key=normalize(row.name),id=digits(row.civilId).trim(),classId=reportClass(row.section);
+      if(!key||row.name.length>150||!classId||id&&!/^\d{10}$/.test(id)||row.guardianPhone&&!guardianLink(row.guardianPhone,''))throw Error('أحد السجلات يحتوي اسمًا أو شعبة أو رقمًا غير صالح.');
+      const unique=id||classId+'|'+key;
+      if(seen.has(unique))throw Error('بيانات المصدر تتضمن سجلاً مكررًا. راجع الملف قبل الاعتماد.');
+      seen.add(unique);
+      classIds.add(classId);
+      if(!classes[classId]){
+        const [,grade,section]=/^g([123])-s(\d+)$/.exec(classId);
+        classes[classId]={id:classId,grade:Number(grade),section:Number(section),label:grade+'/'+section,active:true};
+      }
+      const matched=(id&&byIdentity.get(id))||(incomingNames.get(key)&&byName.get(key));
+      const entry=matched&&!claimed.has(matched.student.id)?matched:null;
+      if(entry){
+        claimed.add(entry.student.id);
+        if(entry.classId!==classId)stats.moved++;
+        if(entry.student.name!==row.name)stats.renamed++;
+      }else stats.created++;
+      const student={...entry?.student,id:entry?.student.id||makeId(),name:row.name};
+      if(id)student.civilId=id;
+      if(row.guardianPhone)student.guardianPhone=row.guardianPhone;
+      if(student.civilId)stats.ids++;
+      if(student.guardianPhone)stats.phones++;
+      (students[classId]||=[]).push(student);
+    }
+    const archived={};
+    for(const {classId,student} of old){
+      if(claimed.has(student.id))continue;
+      (archived[classId]||=[]).push(student);
+      stats.archived++;
+    }
+    return {classes,classIds:[...classIds],students,archived,stats};
+  }
+  if(typeof module!=='undefined')module.exports={reportClass,matchReport,guardianLink,remoteSessions,rosterPlan};
   if(!root.document||!root.firebase?.apps.length)return;
 
   const db=firebase.firestore(),auth=firebase.auth(),app=root.__FUACC;
@@ -76,6 +130,7 @@
   const style=document.createElement('style');
   style.textContent='#studentAttendance{direction:rtl;width:min(880px,calc(100vw - 28px));max-height:85vh;border:1px solid #b8d6ce;border-radius:16px;padding:20px;color:#173f36;background:#fff}#studentAttendance::backdrop{background:#173f3666}#studentAttendance header,#saFilters,#saManagerFilters,#studentAttendance .sa-actions{display:flex;align-items:end;gap:10px;flex-wrap:wrap}#studentAttendance header{justify-content:space-between}#studentAttendance h2{margin:0}#studentAttendance label{display:grid;gap:4px}#studentAttendance button,#studentAttendance input,#studentAttendance select{font:inherit;padding:7px 9px;border:1px solid #a5c5ba;border-radius:8px;background:#fff;color:inherit}#studentAttendance table{width:100%;border-collapse:collapse;margin-block:12px}#studentAttendance th,#studentAttendance td{padding:8px;border-bottom:1px solid #dbe8e4;text-align:start}#studentAttendance details{padding:10px;border:1px solid #dbe8e4;border-radius:8px;margin-block:8px}#studentAttendance button:disabled{opacity:.55}#studentAttendance #saSave{background:#17624d;color:#fff}';
   document.head.append(style);
+  if(app)mountRosterSync();
   let classes=[], context=null, sequence=0, busy=false, draft=null;
   const status=message=>{$('saStatus').textContent=message;};
   const message=err=>err?.code==='permission-denied'?'حسابك لا يملك صلاحية الوصول إلى هذا السجل.':err?.message||'تعذّر تحميل سجل الحضور.';
@@ -187,7 +242,10 @@
       const c=classes.find(item=>item.id===$('saClass')?.value),period=Number($('saPeriod')?.value);
       if(!c||!period)throw Error('اختر الفصل والحصة.');
       const ref=db.doc('studentAttendance/'+date+'_'+c.id+'_p'+period);
-      const [roster,previous]=await Promise.all([db.doc('config/onsite-students-'+c.id).get(),ref.get()]);
+      const sunday=new Date(date+'T00:00:00Z');
+      sunday.setUTCDate(sunday.getUTCDate()-sunday.getUTCDay());
+      const week=sunday.toISOString().slice(0,10);
+      const [roster,previous,subs]=await Promise.all([db.doc('config/onsite-students-'+c.id).get(),ref.get(),db.doc('config/subs-'+week).get()]);
       if(token!==sequence)return;
       const old=previous.data()||{}, ready=new Map((old.students||[]).map(row=>[row.id,row]));
       const phones=new Map();
@@ -195,7 +253,9 @@
         phones.set(student.id,student.guardianPhone||'');
         if(!ready.has(student.id))ready.set(student.id,{id:student.id,name:student.name,status:'unmarked',entry:''});
       }
-      draft={ref,date,c,period,phones,students:[...ready.values()],teacher:old.teacher||'',subject:old.subject||'',revision:old.revision||0};
+      const sessions=remoteSessions(app.S,date,c.grade,period,subs.data()?.map);
+      if(!sessions.length)throw Error('لا توجد حصة مطابقة في جدول المنصة عن بُعد لهذا اليوم والفصل.');
+      draft={ref,date,c,period,phones,sessions,students:[...ready.values()],teacher:old.teacher||'',subject:old.subject||'',revision:old.revision||0};
       renderEditor();
       status(draft.students.length?'':'لا توجد أسماء طلاب لهذا الفصل.');
     }catch(err){if(token===sequence)status(message(err));}
@@ -203,10 +263,12 @@
   }
   function renderEditor(){
     const current=draft;
-    const teachers=[...new Set([...app.S.map(lesson=>lesson.teacher),current.teacher].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar'));
-    $('saBody').innerHTML='<form id="saEdit"><div class="sa-actions"><label>المعلم<select id="saTeacher" required><option value="">اختر المعلم</option>'+
-      teachers.map(name=>'<option '+(name===current.teacher?'selected ':'')+'value="'+escape(name)+'">'+escape(root.StaffSettings?.displayName(name)||name)+'</option>').join('')+
-      '</select></label><label>المادة<input required maxlength="100" id="saSubject" value="'+escape(current.subject)+'"></label></div>'+
+    const groups={c1:'الأول الثانوي',c2:'الثاني الثانوي',c3:'الثالث الثانوي',ba:'إدارة الأعمال',cs:'الحاسب والهندسة'};
+    const fromRecord=current.sessions.find(lesson=>lesson.teacher===current.teacher&&lesson.subj===current.subject);
+    const selected=fromRecord?.id||(current.sessions.length===1?current.sessions[0].id:'');
+    $('saBody').innerHTML='<form id="saEdit"><label>الحصة حسب جدول عن بُعد<select id="saSession" required><option value="">اختر الحصة أو المسار</option>'+
+      current.sessions.map(lesson=>'<option '+(lesson.id===selected?'selected ':'')+'value="'+escape(lesson.id)+'">'+escape(groups[lesson.cls]+' · '+lesson.subj+' · '+(root.StaffSettings?.displayName(lesson.teacher)||lesson.teacher))+'</option>').join('')+
+      '</select></label>'+
       '<div class="sa-actions"><label>كشف الحضور من فيوكلاس<input type="file" accept=".xlsx,.xls,.csv" id="saReport"></label><button type="button" id="saPreview">معاينة كشف الحضور</button></div>'+
       '<div id="saReportPreview"></div><p id="saTotals">'+escape(summary(current.students))+'</p><table><thead><tr><th>الطالب</th><th>الحالة</th><th>وقت الحضور</th></tr></thead><tbody id="saStudents"></tbody></table>'+
       '<div class="sa-actions"><button id="saSave" type="submit">حفظ الحضور والغياب</button><button id="saNotice" type="button">تجهيز إشعارات الغياب</button></div></form><div id="saNotices"></div>';
@@ -223,7 +285,7 @@
       row.status=event.target.value;if(row.status!=='present')row.entry='';
       dirty();paintRows();
     };
-    $('saTeacher').onchange=dirty;$('saSubject').oninput=dirty;
+    $('saSession').onchange=dirty;
     $('saReport').onchange=()=>{$('saReportPreview').textContent='';};
     $('saPreview').onclick=async()=>{
       const file=$('saReport').files[0];
@@ -253,8 +315,9 @@
     $('saEdit').onsubmit=async event=>{
       event.preventDefault();
       if(!manager()||busy||draft!==current||!current.students.length)return;
-      const teacher=$('saTeacher').value,subject=$('saSubject').value.trim(),uid=auth.currentUser.uid;
-      if(!teachers.includes(teacher)||!subject)return;
+      const lesson=current.sessions.find(item=>item.id===$('saSession').value),uid=auth.currentUser.uid;
+      if(!lesson)return;
+      const teacher=lesson.teacher,subject=lesson.subj;
       setBusy(true);
       try{
         await db.runTransaction(async tx=>{
@@ -278,5 +341,84 @@
         }).join('')+'</ul>':'<p>لا يوجد طلاب غائبون في الحصة.</p>');
     };
     paintRows();
+  }
+  function mountRosterSync(){
+    const sync=document.createElement('button');
+    sync.type='button';sync.className='btn ghost';sync.hidden=true;
+    sync.textContent='مطابقة قوائم فيوكلاس';
+    (document.querySelector('#schoolGroup-people .school-nav-links')||document.querySelector('.views'))?.append(sync);
+    const panel=document.createElement('dialog');
+    panel.id='viewClassRosterSync';
+    panel.style.cssText='direction:rtl;width:min(750px,calc(100vw - 30px));max-height:85vh;border-radius:14px;padding:20px';
+    panel.innerHTML='<h2>مطابقة قوائم فيوكلاس</h2><p>الصق الأعمدة بالترتيب: الاسم، رمز الشعبة، السجل المدني، جوال ولي الأمر. اترك الخانات غير المتاحة فارغة.</p>'+
+      '<textarea aria-label="قائمة طلاب فيوكلاس" rows="6" style="width:100%"></textarea><p role="status"></p>'+
+      '<button type="button" data-vc-preview>معاينة المطابقة</button> <button type="button" data-vc-save hidden>اعتماد المطابقة</button> <button type="button" data-vc-close>إغلاق</button>';
+    document.body.append(panel);
+    const input=panel.querySelector('textarea'),status=panel.querySelector('[role=status]');
+    const preview=panel.querySelector('[data-vc-preview]'),save=panel.querySelector('[data-vc-save]');
+    const classesRef=db.doc('config/onsite-classes'),ref=id=>db.doc('config/onsite-students-'+id);
+    let prepared=null,doing=false;
+    setInterval(()=>{
+      sync.hidden=!manager();
+      if(!manager()&&panel.open)panel.close();
+    },500);
+    sync.onclick=()=>{if(manager()&&!doing)panel.showModal();};
+    panel.querySelector('[data-vc-close]').onclick=()=>{if(!doing)panel.close();};
+    panel.addEventListener('cancel',event=>{if(doing)event.preventDefault();});
+    const clear=()=>{prepared=null;save.hidden=true;status.textContent='';};
+    input.oninput=clear;
+    panel.addEventListener('close',()=>{input.value='';clear();});
+    async function compute(get,source){
+      const registry=(await get(classesRef)).data()?.classes||{};
+      const ids=[...new Set([...Object.keys(registry),...source.map(row=>reportClass(row.section))])];
+      if(ids.some(id=>!id)||ids.length>100)throw Error('راجع رموز الشعب في الكشف.');
+      const docs=await Promise.all(ids.map(id=>get(ref(id))));
+      const old=Object.fromEntries(ids.map((id,i)=>[id,docs[i].data()||{}]));
+      const fingerprint=JSON.stringify([registry,old]);
+      return {old,fingerprint,...rosterPlan(registry,old,source,()=>crypto.randomUUID())};
+    }
+    const lock=value=>{doing=value;input.disabled=preview.disabled=save.disabled=value;};
+    preview.onclick=async()=>{
+      if(!manager()||doing)return;
+      clear();lock(true);
+      try{
+        const source=input.value.split(/\r?\n/).filter(line=>line.trim()).map(line=>{
+          const [name='',section='',civilId='',guardianPhone='']=line.split('\t').map(value=>value.trim());
+          return {name,section,civilId,guardianPhone};
+        });
+        if(!source.length||source.length>1500)throw Error('أدخل كشف فيوكلاس الكامل.');
+        const plan=await compute(ref=>ref.get(),source);
+        if(!panel.open||!manager())return;
+        const count=Object.keys(plan.students).length,s=plan.stats;
+        prepared={source,fingerprint:plan.fingerprint};
+        status.textContent=source.length+' طالبًا في '+count+' شعبة. جديد '+s.created+'، منتقل '+s.moved+'، اسم محدّث '+s.renamed+'، سيُحفظ في الأرشيف '+s.archived+'، سجل مدني '+s.ids+'، جوال ولي أمر '+s.phones+'.';
+        save.hidden=false;
+      }catch(error){if(panel.open)status.textContent=error.message;}
+      finally{lock(false);}
+    };
+    save.onclick=async()=>{
+      if(!prepared||doing||!manager())return;
+      const {source,fingerprint}=prepared,uid=auth.currentUser.uid;
+      lock(true);
+      try{
+        await db.runTransaction(async tx=>{
+          const plan=await compute(ref=>tx.get(ref),source);
+          if(plan.fingerprint!==fingerprint)throw Error('تغيرت البيانات بعد المعاينة. أعد المعاينة.');
+          const stamp=firebase.firestore.FieldValue.serverTimestamp();
+          const changes={updatedBy:uid,updatedAt:stamp};
+          tx.set(classesRef,{classes:plan.classes,...changes},{merge:true});
+          for(const classId of plan.classIds){
+            const additions=plan.archived[classId]||[];
+            const archivedStudents=[...(plan.old[classId]?.archivedStudents||[]),...additions];
+            const students=plan.students[classId]||[];
+            if(!students.length&&!plan.old[classId]?.students?.length)continue;
+            tx.set(ref(classId),{classId,students,archivedStudents,...changes},{merge:true});
+          }
+        });
+        input.value='';clear();
+        status.textContent='تمت مطابقة '+source.length+' طالبًا وحفظ بياناتهم.';
+      }catch(error){status.textContent=error.message;}
+      finally{lock(false);}
+    };
   }
 })(typeof window==='undefined'?globalThis:window);
