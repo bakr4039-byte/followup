@@ -655,8 +655,8 @@
       const uid=auth.currentUser.uid;
       let saved=0,unchanged=0,failed=0,protectedMarks=0;
       try{
-        for(const item of matched){
-          if(!manager()||auth.currentUser?.uid!==uid)break;
+        async function persist(item){
+          if(!manager()||auth.currentUser?.uid!==uid)return;
           const ref=db.doc('studentAttendance/'+item.key);
           try{
             const result=await db.runTransaction(async tx=>{
@@ -685,6 +685,10 @@
             protectedMarks+=result.conflicts;
           }catch{failed++;}
           output.textContent='حُفظ '+saved+' · دون تغيير '+unchanged+' · تعذّر '+failed+' · تعارضات محفوظة '+protectedMarks;
+        }
+        for(let i=0;i<matched.length;i+=10){
+          if(!manager()||auth.currentUser?.uid!==uid)break;
+          await Promise.all(matched.slice(i,i+10).map(persist));
         }
         save.hidden=true;
       }finally{lock(false);}
