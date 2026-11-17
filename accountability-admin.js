@@ -10,7 +10,7 @@
   // الأسماء الكاملة كما في نموذج رصد المخالفات (تُقترح تلقائيًا عند اختيار المعلم)
   const FULL=['وليد احمد حمود حامد الحداد','تركي إبراهيم شقير','مولي الطيب مولي الطيب','موسي حمد العطو','محمود محمد حمادة عبود','محمد محمود احمد زيد','محمد عبد الرحمن عبدالرحيم احمد','محمد صادق أحمد الشيمي','محمد ذواب فلاج العضيله المطيري','محمد السيد السيد الطاووس','محمد الحصري','مجاهد عبده مصلح الهجوة','ماهر راكان حميد أباظة','فيصل بشير محمد غريب','عبدالمجيد صالح محمد العمري','عبدالحكيم احمد محمد قاسم','عبدالتواب خليفة محمد احمد','عبد العزيز محمد عبد العزيز الشهري','عبد الرحمن احمد مصلع جذمي','عامر مجممي','عادل محمد محمد قايد','سعد عبد الله عايض القرني','حسين سعد حسين القحطاني','حسان طه صالح محمد','تامر محمد محمد السيد','ايهاب ابراهيم الشافعي','الصادق ابراهيم عبداللطيف عبدالله','احمد حمدي عبدالسلام طلبة','أحمد نجيب عبد السلام فهمي','أحمد عبد الحافظ','أحمد سمير منصور سعد','خالد محمد الشتوي','محمد سفر عايض الاحمري','على نعمان','محمد فكري','بكر الدوخي','صابر محمد','أحمد حفني'];
   const norm=s=>String(s||'').replace(/[أإآا]/g,'ا').replace(/[ىي]/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,'').replace(/^عبد/,'عبد');
-  function fullOf(short){const person=window.DepartmentPersonnel?.admins.find(p=>p.name===short);if(person)return person.name;const parts=String(short).split(/\s+/).map(norm).filter(Boolean);const hit=FULL.find(f=>{const n=norm(f);return parts.every(p=>n.includes(p))});return hit||short}
+  function fullOf(short){const configured=window.StaffSettings?.get(short).fullName;if(configured)return configured;const person=window.DepartmentPersonnel?.admins.find(p=>p.name===short);if(person)return person.name;const parts=String(short).split(/\s+/).map(norm).filter(Boolean);const hit=FULL.find(f=>{const n=norm(f);return parts.every(p=>n.includes(p))});return hit||short}
   const teachers=()=>[...new Set([...S.map(s=>s.teacher),...Object.keys(state.phones||{}),...(window.DepartmentPersonnel?.admins||[]).map(p=>p.name)])].sort((a,b)=>a.localeCompare(b,'ar'));
   const fs=()=>firebase.firestore();
   const LS='acc-reply-phone';
@@ -125,7 +125,8 @@
   $a('acCats').addEventListener('change',()=>A.CATS.forEach((c,ci)=>{const n=$a('acCats').querySelectorAll(`input[data-acc^="${ci}-"]:checked`).length;const el=$a('acCats').querySelector(`[data-cnt="${ci}"]`);if(el)el.textContent=n?`(${n})`:''}));
   async function loadPersonnel(d){
     if(!d.teacher||state.role!==-1||!window.StaffSettings)return;
-    const {civilId,specialty}=await window.StaffSettings.load(d.teacher);
+    const {civilId,specialty,fullName}=await window.StaffSettings.load(d.teacher);
+    if(!editId && fullName && (!$a('acFull').value.trim() || d.teacherFull===fullOf(d.teacher))) d.teacherFull=fullName;
     if(A.isAbsence(d)){
       d.absenceCivilId=civilId||'';
       d.absenceSpecialty=d.absenceSpecialty||specialty||'';
