@@ -2,7 +2,7 @@
 (function(root){'use strict';if(!root.document)return;document.body.classList.add('school-ui');
 const groups=[
  {key:'day',title:'اليوم الدراسي',note:'تنظيم اليوم والبيئة المدرسية',ids:['vSchedule','vSchoolDuty','vSubs','vSchoolSchedule']},
- {key:'followup',title:'المتابعة والتقارير',note:'متابعة التنفيذ وتحسين الأداء',ids:['vReport','vBoard','vStaff','vAcc']},
+ {key:'followup',title:'المتابعة والتقارير',note:'متابعة التنفيذ وتحسين الأداء',ids:['vReport','vBoard','vStaff','vStudentAttendance','vAcc']},
  {key:'people',title:'شؤون المنسوبين',note:'الدليل والتكليفات والاعتمادات',ids:['vTeachers','vAssignments','vCoordinatorPage','vSignatures']},
  {key:'admin',title:'الإدارة والإعدادات',note:'الحسابات والصلاحيات وحماية المنصة',ids:['vStaffSettings','vSchoolStudents','vEmployeeAccounts','namesBtn','pwBtn','securityAuditBtn','securityLoginBtn']}
 ];
@@ -102,14 +102,14 @@ document.body.append(side,toggle,overlay);
 const media=root.matchMedia('(max-width:1000px)'),links=side.querySelector('.school-sidebar-links'),session=side.querySelector('.school-sidebar-session');
 let queued=false,lastFocus=null,selected=personal?(root.EmployeePortal?'followup':'schedule'):(new URLSearchParams(location.search).has('view')?'native':'home');
 const sectionMap={vCoordinatorPage:'assignments',vAssignments:'assignments',vSignatures:'signatures',vSchoolDuty:'duty',vSchoolSchedule:'duty',vSchoolStudents:'duty',vAcc:'accountability',vEmployeeAccounts:'accounts'};
-const nativeIds=['vSchedule','vReport','vTeachers','vBoard','vStaff'];
+const nativeIds=['vSchedule','vReport','vTeachers','vBoard','vStaff','vStudentAttendance'];
 const selectionStyle=document.createElement('style');document.head.append(selectionStyle);
 function selectSection(key){
 selected=key;
 let css='.school-sidebar-page #schoolWorkspace>.school-workspace-section{display:none!important}';
 if(key!=='native'){
 css+='.school-sidebar-page #schoolSection-'+key+':not([hidden]){display:block!important}';
-if(!personal)css+='.school-sidebar-page #scheduleView,.school-sidebar-page #reportView,.school-sidebar-page #teachersView,.school-sidebar-page #boardView,.school-sidebar-page #staffView,.school-sidebar-page #overviewSummary,.school-sidebar-page .wrap>.nav,.school-sidebar-page #dueBar{display:none!important}';
+if(!personal)css+='.school-sidebar-page #scheduleView,.school-sidebar-page #reportView,.school-sidebar-page #teachersView,.school-sidebar-page #boardView,.school-sidebar-page #staffView,.school-sidebar-page #studentAttendance,.school-sidebar-page #overviewSummary,.school-sidebar-page .wrap>.nav,.school-sidebar-page #dueBar{display:none!important}';
 }
 if(key==='home')css+='.school-sidebar-page #banner,.school-sidebar-page .wrap>.foot,.school-sidebar-page>.credit{display:none!important}';
 css+='.school-sidebar-page #schoolWorkspace>details>summary{pointer-events:none;list-style:none}.school-sidebar-page #schoolWorkspace>details>summary::marker{content:""}';
