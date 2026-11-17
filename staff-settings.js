@@ -1,4 +1,4 @@
-/* Manager-only personnel records. Keep both fields in the private configuration document. */
+/* Manager-only personnel records keyed by the existing schedule or personnel name. */
 (function (root) {
   'use strict';
   const F = root.__FUACC;
@@ -15,13 +15,14 @@
   function read(name, source) {
     const keys = keysFor(name);
     const pick = map => keys.map(key => Object.hasOwn(map || {}, key) ? map[key] : '').find(Boolean) || '';
-    return {civilId: pick(source?.ids), specialty: pick(source?.specialties)};
+    return {civilId: pick(source?.ids), specialty: pick(source?.specialties), fullName: pick(source?.fullNames)};
   }
 
   let snapshot = {}, onsiteTeachers = [], accounts = [], removed = {}, selected = '', group = 'all', uid = '', stop, accountBusy = false;
   const accountLog = () => firebase.firestore().doc('config/removedPersonnelLogins');
   const get = name => manager() ? read(name, snapshot) : {};
-  root.StaffSettings = {get, async load(name) {
+  const displayName = (name, fallback = name) => get(name).fullName || fallback;
+  root.StaffSettings = {get, displayName, async load(name) {
     return manager() ? read(name, (await config().get()).data()) : {};
   }, open};
 
@@ -54,6 +55,7 @@
     #ssPeople{display:grid;gap:6px;max-height:43vh;overflow:auto;padding:2px}#ssPeople button{text-align:start}
     #staffSettings details summary{cursor:pointer;padding:8px 0}#staffSettings details[open]{flex-basis:100%}#ssProfile{display:grid;gap:14px;padding:18px;background:white;border:1px solid #d5e5dd;border-radius:14px}#ssProfile form{display:grid;gap:10px}#ssAccountArea{border-top:1px solid #d5e5dd;padding-top:12px;display:grid;gap:9px}#ssAccountArea h4{margin:0}#ssAccountList{display:grid;gap:8px}#ssAccountList article{display:grid;gap:7px;border-radius:10px;background:#f3f8f5;padding:10px}#staffSettings button[data-ss-action=remove]{color:#962525;border-color:#e6c0c0}#ssAccountForm{padding:10px;background:#f5f8f6;border-radius:10px}#staffSettings button:disabled{opacity:.6}
     #ssRole,#ssMessage{margin:0;font-size:13px;color:#455f55}#ssMessage:empty{display:none}
+    #ssNameForm[hidden],#ssEditName[hidden]{display:none}
     @media(max-width:560px){#ssGrid{grid-template-columns:1fr}#ssPeople{max-height:25vh}#staffSettings main,#staffSettings header{padding:14px}}
   `;
   document.head.append(style);
@@ -70,7 +72,12 @@
       </div></details></div>
       <label>بحث بالاسم<input type="search" id="ssSearch" autocomplete="off"></label>
       <div id="ssGrid"><div id="ssPeople" aria-label="قائمة المنسوبين"></div>
-      <section id="ssProfile" hidden><div><h3 id="ssName"></h3><p id="ssRole"></p></div><form id="ssDetailsForm">
+      <section id="ssProfile" hidden aria-labelledby="ssName"><div><h3 id="ssName"></h3><p id="ssRole"></p></div>
+      <div><button type="button" id="ssEditName">تعديل الاسم</button></div>
+      <form id="ssNameForm" hidden>
+        <label>الاسم الكامل<input id="ssFullName" required maxlength="120" autocomplete="off"></label>
+        <div class="ss-links"><button type="submit" id="ssSaveName">حفظ الاسم</button><button type="button" id="ssCancelName">إلغاء</button></div>
+      </form><form id="ssDetailsForm">
       <label>رقم السجل المدني<input id="ssCivil" inputmode="numeric" autocomplete="off" maxlength="10" dir="ltr"></label>
       <label>التخصص<input id="ssSpecialty" maxlength="100" autocomplete="off"></label>
       <button id="ssSave" type="submit">حفظ بيانات المنسوب</button></form>
@@ -90,24 +97,72 @@
   const message = text => { $('ssMessage').textContent = text; };
   function paintPeople() {
     const query = normalize($('ssSearch').value);
-    const people = roster().filter(p => (group === 'all' || p.kind === group || p.kind === 'both') && (!query || normalize(p.name).includes(query) || normalize(p.personnel?.name || '').includes(query)));
+    const people = roster().filter(p => (group === 'all' || p.kind === group || p.kind === 'both') &&
+      [p.name, p.personnel?.name, get(p.name).fullName].some(name => !query || normalize(name || '').includes(query)));
     dialog.querySelectorAll('[data-ss-group]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ssGroup === group)));
-    $('ssPeople').innerHTML = people.map(p => `<button type="button" data-ss-name="${esc(p.name)}" aria-pressed="${p.name === selected}">${esc(group === 'admin' ? p.personnel.name : p.name)}</button>`).join('') || '<p>لا توجد أسماء مطابقة.</p>';
+    $('ssPeople').innerHTML = people.map(p => `<button type="button" data-ss-name="${esc(p.name)}" aria-pressed="${p.name === selected}">${esc(displayName(p.name, group === 'admin' ? p.personnel.name : p.name))}</button>`).join('') || '<p>لا توجد أسماء مطابقة.</p>';
   }
   function showPerson(name) {
     const p = roster().find(person => person.name === name || normalize(person.personnel?.name || '') === normalize(name));
     if (!p) return;
     selected = p.name;
     const fields = get(selected);
-    $('ssName').textContent = p.personnel?.name || selected;
+    $('ssName').textContent = displayName(selected, p.personnel?.name || selected);
     $('ssRole').textContent = p.personnel?.title || 'معلم';
     $('ssCivil').value = fields.civilId || '';
     $('ssSpecialty').value = fields.specialty || '';
     $('ssProfile').hidden = false;
+    resetNameForm();
     resetAccountForm();
     paintAccounts();
     paintPeople();
   }
+  function resetNameForm() {
+    $('ssNameForm').hidden = true;
+    $('ssEditName').hidden = false;
+    $('ssNameForm').reset();
+  }
+  $('ssEditName').onclick = () => {
+    $('ssFullName').value = $('ssName').textContent;
+    $('ssEditName').hidden = true;
+    $('ssNameForm').hidden = false;
+    $('ssFullName').focus();
+    message('');
+  };
+  $('ssCancelName').onclick = () => {
+    resetNameForm();
+    $('ssEditName').focus();
+  };
+  $('ssNameForm').onsubmit = async event => {
+    event.preventDefault();
+    const actor = manager(), name = selected, save = $('ssSaveName');
+    if (!actor || !name || save.disabled) return;
+    const fullName = $('ssFullName').value.trim().replace(/\s+/g, ' ');
+    if (fullName.split(' ').length < 3) { message('أدخل الاسم الثلاثي أو الرباعي كما هو في السجل.'); return; }
+    save.disabled = true;
+    try {
+      const ref = config();
+      const written = await firebase.firestore().runTransaction(async tx => {
+        const current = (await tx.get(ref)).data() || {};
+        const fullNames = {...current.fullNames};
+        for (const key of keysFor(name)) delete fullNames[key];
+        fullNames[name] = fullName;
+        tx.set(ref, {fullNames}, {mergeFields: ['fullNames']});
+        return {...current, fullNames};
+      });
+      if (manager()?.uid !== actor.uid) return;
+      snapshot = written;
+      paintPeople();
+      if (dialog.open && selected === name) {
+        $('ssName').textContent = fullName;
+        resetNameForm();
+        $('ssEditName').focus();
+        message('تم حفظ الاسم.');
+      }
+      document.dispatchEvent(new Event('staff-name-updated'));
+    } catch { message('تعذّر حفظ الاسم. حاول مرة أخرى.'); }
+    finally { save.disabled = false; }
+  };
   async function open(name) {
     if (!manager()) return;
     const currentUid = manager().uid;
@@ -145,6 +200,7 @@
   dialog.addEventListener('close', () => {
     selected = '';
     $('ssCivil').value = $('ssSpecialty').value = '';
+    resetNameForm();
     resetAccountForm();
     $('ssAccountList').textContent='';
     $('ssProfile').hidden = true;
@@ -196,7 +252,7 @@
         if (civilId) ids[name] = civilId;
         if (specialty) specialties[name] = specialty;
         tx.set(ref, {ids, specialties}, {mergeFields: ['ids', 'specialties']});
-        return {ids, specialties};
+        return {...current, ids, specialties};
       });
       if (manager()?.uid === actor.uid) {
         snapshot = written;
