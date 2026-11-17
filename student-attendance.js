@@ -177,7 +177,10 @@
     #studentAttendance button{cursor:pointer}
     #studentAttendance input[type=file]{max-width:100%}
     #studentAttendance .sa-grid{overflow:auto;margin-block:12px}
-    #studentAttendance table{width:100%;border-collapse:collapse;white-space:nowrap}
+    #studentAttendance table{width:100%;min-width:0;border-collapse:collapse;white-space:nowrap}
+    #studentAttendance .sa-period-metrics{font-size:12px;line-height:1.45}
+    #studentAttendance .sa-period-metrics small,#studentAttendance th small{display:block;color:#60716b;font-weight:400}
+    #studentAttendance th small{direction:ltr}
     #studentAttendance th,#studentAttendance td{padding:7px;border:1px solid #a9bcb6;text-align:center}
     #studentAttendance thead{background:#e8f2ed}
     #studentAttendance .sa-total{background:#edf5f0;font-weight:700}
@@ -281,9 +284,10 @@
     }
     return records;
   }
-  const workbookColumns=[
-    {period:1},{period:2},{period:3},{label:'الفسحة'},{period:4},{period:5},{period:6},{label:'الصلاة'},{period:7},{label:'الحصة الثامنة'}
-  ].map(column=>({...column,label:column.label||'الحصة '+periods[column.period-1]}));
+  const scheduleSlots=navigation?.slots||(typeof SLOTS!=='undefined'?SLOTS:[]);
+  const scheduleColumns=(scheduleSlots.length?scheduleSlots:periods.map(period=>[period])).map(([name,start,end],index)=>({
+    period:index+1,label:'الحصة '+name,time:start&&end?start+' – '+end:''
+  }));
   function periodMetrics(record){
     if(!record)return null;
     const values=counts(record.students),total=record.students.length;
@@ -303,26 +307,29 @@
       late:total.late===null||item.late===null?null:total.late+item.late
     }),{present:0,absent:0,total:0,late:0});
   }
-  function workbookTable(date,items,records,columns){
-    const metrics=new Map(records.map(record=>[record.classId+'|'+record.period,periodMetrics(record)]));
-    const valuesFor=c=>columns.map(col=>col.period?metrics.get(c.id+'|'+col.period):null);
-    const percent=value=>value.total?Math.round(value.present*100/value.total)+'%':'—';
-    const metricCell=value=>value?'<td>'+value.present+'</td><td>'+value.absent+'</td><td>'+percent(value)+'</td><td>'+(value.late??'—')+'</td>':'<td>—</td>'.repeat(4);
-    const end=value=>value?'<td>'+value.absent+'</td><td>'+percent(value)+'</td><td>'+(value.late??'—')+'</td>':'<td>—</td>'.repeat(3);
-    const heading=columns.map(col=>'<th scope="colgroup" colspan="4">'+col.label+'</th>').join('');
-    const headers=columns.map(()=>'<th title="حاضر">ح</th><th title="غائب">غ</th><th title="نسبة الحضور">م%</th><th title="متأخر">ت</th>').join('');
-    const row=(label,count,values,total=false)=>'<tr'+(total?' class="sa-total"':'')+'><th scope="row">'+escape(label)+'</th><td>'+count+'</td>'+values.map(metricCell).join('')+end(combineMetrics(values))+'</tr>';
+  function scheduleTable(title,items,records,columns){
+    const metrics=new Map();
+    for(const record of records){
+      const key=record.classId+'|'+record.period;
+      metrics.set(key,combineMetrics([metrics.get(key),periodMetrics(record)]));
+    }
+    const valuesFor=c=>columns.map(col=>metrics.get(c.id+'|'+col.period));
+    const metricCell=value=>value?'<td class="sa-period-metrics"><b>ح '+value.present+' · غ '+value.absent+'</b>'+
+      '<small>'+(value.total?Math.round(value.present*100/value.total)+'%':'—')+(value.late==null?'':' · ت '+value.late)+'</small></td>':'<td>—</td>';
+    const row=(label,count,values,total=false)=>'<tr'+(total?' class="sa-total"':'')+'><th scope="row">'+escape(label)+'</th><td>'+count+'</td>'+
+      values.map(metricCell).join('')+metricCell(combineMetrics(values))+'</tr>';
     const body=grades.slice(1).map((label,i)=>{
       const group=items.filter(c=>c.grade===i+1);
       if(!group.length)return '';
       const rows=group.map(c=>row(c.label,c.count,valuesFor(c))).join('');
-      if(group.length===1&&$('saClass').value)return rows;
+      if(group.length===1)return rows;
       const subtotals=columns.map((_,position)=>combineMetrics(group.map(c=>valuesFor(c)[position])));
       return rows+row(label,group.reduce((sum,c)=>sum+c.count,0),subtotals,true);
     }).join('');
-    return '<div class="sa-grid"><table aria-label="ملخص حضور الفصول"><thead><tr><th colspan="'+(columns.length*4+5)+'">'+escape(date)+'</th></tr>'+
-      '<tr><th rowspan="2">الفصل</th><th rowspan="2">عدد الطلاب</th>'+heading+'<th scope="colgroup" colspan="3">المجموع</th></tr>'+
-      '<tr>'+headers+'<th>غ</th><th>م%</th><th>ت</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+    const heading=columns.map(col=>'<th scope="col">'+escape(col.label)+(col.time?'<small>'+escape(col.time)+'</small>':'')+'</th>').join('');
+    return '<div class="sa-grid"><table aria-label="ملخص حضور الفصول"><caption>'+escape(title)+'</caption><thead>'+
+      '<tr><th scope="col">الفصل</th><th scope="col">عدد الطلاب</th>'+heading+'<th scope="col">المجموع</th></tr>'+
+      '</thead><tbody>'+body+'</tbody></table></div>';
   }
   function classSheet(c,records,date,columns){
     const matrix=new Map(c.roster.map(student=>[student.id,{name:student.name,status:new Map()}]));
@@ -347,7 +354,8 @@
     const book=activeSheet;if(!book)return;
     const date=$('saSheetDate').value;
     if(!keepEditor){$('saBody').textContent='';draft=null;}
-    const all=book.records.filter(record=>record.date===date);
+    const wholeRange=date==='range';
+    const all=wholeRange?book.records:book.records.filter(record=>record.date===date);
     const byClass=new Map();
     for(const record of all){if(!byClass.has(record.classId))byClass.set(record.classId,[]);byClass.get(record.classId).push(record);}
     const items=book.items.filter(c=>context.edit||byClass.has(c.id)).map(c=>{
@@ -356,12 +364,15 @@
       const students=new Set([...roster.map(s=>s.id),...records.flatMap(r=>r.students.map(s=>s.id))]);
       return {...c,roster,count:students.size};
     });
-    const selected=book.period;
-    const columns=selected?workbookColumns.filter(col=>col.period===selected):workbookColumns;
-    $('saSheet').innerHTML=items.length?'<h3>ملخص الفصول</h3>'+
-      workbookTable(date,items,all,columns)+'<h3>سجل الطلاب بالأسماء</h3>'+
-      (context.edit?'<p>اضغط عنوان الحصة داخل الشعبة لتسجيل الحضور أو استيراد كشف فيوكلاس.</p>':'')+
-      items.map(c=>classSheet(c,byClass.get(c.id)||[],date,columns.filter(col=>col.period))).join(''):'<p>لا توجد سجلات مطابقة في هذا اليوم.</p>';
+    const columns=book.period?scheduleColumns.filter(col=>col.period===book.period):scheduleColumns;
+    const title=wholeRange?'من '+book.from+' إلى '+book.to:date;
+    $('saSheet').innerHTML=items.length?'<h3>'+ (wholeRange?'إجمالي الفصول للفترة':'ملخص الفصول')+'</h3>'+
+      '<p>ح: حاضر · غ: غائب · ت: متأخر. الأعداد تجمع حالات الطلاب في الحصص المرصودة.</p>'+
+      scheduleTable(title,items,all,columns)+
+      (wholeRange?(context.edit?'<p>اختر يومًا من القائمة لفتح سجل الأسماء ورصد الحصة.</p>':''):
+        '<h3>سجل الطلاب بالأسماء</h3>'+
+        (context.edit?'<p>اضغط عنوان الحصة داخل الشعبة لتسجيل الحضور أو استيراد كشف فيوكلاس.</p>':'')+
+        items.map(c=>classSheet(c,byClass.get(c.id)||[],date,columns)).join('')):'<p>لا توجد سجلات مطابقة للعرض المحدد.</p>';
     const records=studentTotals(book.records);
     $('saPeriodTotals').innerHTML=records.length?'<details><summary>إجمالي حضور الطلاب وغيابهم للفترة المحددة</summary><div class="sa-grid"><table>'+
       '<thead><tr><th>اسم الطالب</th><th>الفصل</th><th>حاضر</th><th>غائب</th><th>غير مرصود</th></tr></thead><tbody>'+
@@ -409,10 +420,10 @@
         items.forEach((c,index)=>rosters.set(c.id,(snapshots[index].data()?.students||[]).map(s=>({id:s.id,name:s.name}))));
       }
       if(token!==sequence)return;
-      activeSheet={records:selected,items,rosters,period};
-      $('saResults').innerHTML='<div class="sa-actions" style="margin-top:12px"><label>يوم السجل<select id="saSheetDate">'+dateList.map(date=>'<option>'+date+'</option>').join('')+'</select></label></div><div id="saSheet"></div><div id="saPeriodTotals"></div>';
+      activeSheet={records:selected,items,rosters,period,from,to};
+      $('saResults').innerHTML='<div class="sa-actions" style="margin-top:12px"><label>عرض السجل<select id="saSheetDate">'+(from!==to?'<option value="range">إجمالي الفترة</option>':'')+dateList.map(date=>'<option>'+date+'</option>').join('')+'</select></label></div><div id="saSheet"></div><div id="saPeriodTotals"></div>';
       const datesWithRecords=[...new Set(selected.map(r=>r.date))].filter(date=>dateList.includes(date)).sort();
-      $('saSheetDate').value=datesWithRecords.at(-1)||dateList.at(-1);
+      $('saSheetDate').value=from!==to?'range':datesWithRecords.at(-1)||dateList.at(-1);
       $('saSheetDate').onchange=()=>paintSheet();
       paintSheet();
       status('');
