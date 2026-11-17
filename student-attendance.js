@@ -59,6 +59,29 @@
     const international=/^05\d{8}$/.test(plain)?'966'+plain.slice(1):plain;
     return /^9665\d{8}$/.test(international)?'https://wa.me/'+international+'?text='+encodeURIComponent(message):'';
   }
+  function studentTotals(records){
+    const students=new Map();
+    for(const record of [...records].sort((a,b)=>String(a.date).localeCompare(String(b.date)))){
+      for(const row of record.students){
+        if(!Object.hasOwn(labels,row.status))continue;
+        if(!students.has(row.id))students.set(row.id,{name:row.name,classes:new Set(),present:0,absent:0,unmarked:0});
+        const total=students.get(row.id);
+        total.name=row.name;total.classes.add(record.classLabel);total[row.status]++;
+      }
+    }
+    return [...students.values()].sort((a,b)=>b.absent-a.absent||a.name.localeCompare(b.name,'ar'));
+  }
+  function lessonTotals(records,key){
+    const groups=new Map();
+    for(const record of records){
+      const name=String(record[key]||'غير محدد').trim();
+      if(!groups.has(name))groups.set(name,{name,lessons:0,present:0,absent:0,unmarked:0});
+      const group=groups.get(name);
+      group.lessons++;
+      for(const row of record.students)if(Object.hasOwn(labels,row.status))group[row.status]++;
+    }
+    return [...groups.values()].sort((a,b)=>b.absent-a.absent||a.name.localeCompare(b.name,'ar'));
+  }
   function rosterPlan(classMap,previous,source,makeId){
     const old=Object.entries(previous).flatMap(([classId,data])=>(data.students||[]).map(student=>({classId,student})));
     const byIdentity=new Map(),byName=new Map(),incomingNames=new Map(),incomingAliases=new Map(),seen=new Set(),claimed=new Set();
@@ -108,7 +131,7 @@
     }
     return {classes,classIds:[...classIds],students,archived,stats};
   }
-  if(typeof module!=='undefined')module.exports={reportClass,matchReport,guardianLink,remoteSessions,rosterPlan};
+  if(typeof module!=='undefined')module.exports={reportClass,matchReport,guardianLink,remoteSessions,rosterPlan,studentTotals,lessonTotals};
   if(!root.document||!root.firebase?.apps.length)return;
 
   const db=firebase.firestore(),auth=firebase.auth(),app=root.__FUACC;
@@ -125,57 +148,100 @@
   const button=document.createElement('button');
   button.type='button';button.id='vStudentAttendance';button.className='btn ghost';
   button.textContent='سجل حضور الطلاب';button.hidden=true;
+  button.dataset.workspaceKey='native';
   (app?document.querySelector('#schoolGroup-followup .school-nav-links')||document.querySelector('.views'):$('account'))?.prepend(button);
-  const dialog=document.createElement('dialog');
-  dialog.id='studentAttendance';dialog.setAttribute('aria-labelledby','saTitle');
-  dialog.innerHTML='<header><h2 id="saTitle">سجل حضور الطلاب</h2><button type="button" id="saClose">إغلاق</button></header>'+
-    '<form id="saFilters"><label>التاريخ<input type="date" id="saDate" required></label><div id="saManagerFilters"></div><button>عرض سجل الحصة</button><button id="saDaySummary" type="button">ملخص اليوم</button></form>'+
-    '<p id="saStatus" role="status"></p><section id="saBody"></section>';
-  document.body.append(dialog);
+  const view=document.createElement('section');
+  view.id='studentAttendance';view.hidden=true;view.setAttribute('aria-labelledby','saTitle');
+  view.innerHTML='<header><h2 id="saTitle" tabindex="-1">سجل حضور الطلاب</h2><button type="button" id="saClose">العودة</button></header>'+
+    '<form id="saFilters"><label>الفترة<select id="saDateMode"><option value="today">اليوم</option><option value="range">من تاريخ إلى تاريخ</option></select></label>'+
+    '<label id="saFromLabel" hidden>من تاريخ<input type="date" id="saFrom"></label><label id="saToLabel" hidden>إلى تاريخ<input type="date" id="saTo"></label>'+
+    '<label>الصف<select id="saGrade"><option value="">كل الصفوف</option>'+grades.slice(1).map((grade,i)=>'<option value="'+(i+1)+'">'+grade+' بالكامل</option>').join('')+'</select></label>'+
+    '<label>الشعبة<select id="saClass"><option value="">كل الشعب</option></select></label>'+
+    '<label>الحصة<select id="saPeriod"><option value="">جميع الحصص</option>'+periods.map((period,i)=>'<option value="'+(i+1)+'">'+period+'</option>').join('')+'</select></label>'+
+    '<button type="submit">عرض السجل</button></form>'+
+    '<p id="saStatus" role="status"></p><div id="saResults"></div><section id="saBody"></section>';
+  let navigation;
+  if(app){
+    $('boardView').after(view);
+    navigation=app.registerAttendance(button.id,view.id);
+  }else $('account')?.append(view);
   const style=document.createElement('style');
-  style.textContent='#studentAttendance{direction:rtl;width:min(880px,calc(100vw - 28px));max-height:85vh;border:1px solid #b8d6ce;border-radius:16px;padding:20px;color:#173f36;background:#fff}#studentAttendance::backdrop{background:#173f3666}#studentAttendance header,#saFilters,#saManagerFilters,#studentAttendance .sa-actions{display:flex;align-items:end;gap:10px;flex-wrap:wrap}#studentAttendance header{justify-content:space-between}#studentAttendance h2{margin:0}#studentAttendance label{display:grid;gap:4px}#studentAttendance button,#studentAttendance input,#studentAttendance select{font:inherit;padding:7px 9px;border:1px solid #a5c5ba;border-radius:8px;background:#fff;color:inherit}#studentAttendance table{width:100%;border-collapse:collapse;margin-block:12px}#studentAttendance th,#studentAttendance td{padding:8px;border-bottom:1px solid #dbe8e4;text-align:start}#studentAttendance details{padding:10px;border:1px solid #dbe8e4;border-radius:8px;margin-block:8px}#studentAttendance button:disabled{opacity:.55}#studentAttendance #saSave{background:#17624d;color:#fff}';
+  style.textContent=`
+    #studentAttendance{direction:rtl;min-width:0;padding:clamp(12px,2vw,24px);border:1px solid #b8d6ce;border-radius:16px;color:#173f36;background:#fff}
+    #studentAttendance header,#saFilters,#studentAttendance .sa-actions{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+    #studentAttendance header{justify-content:space-between;margin-bottom:16px}
+    #studentAttendance h2,#studentAttendance h3{margin:0}
+    #studentAttendance h3{margin-top:12px}
+    #studentAttendance label{display:grid;gap:4px}
+    #studentAttendance button,#studentAttendance input,#studentAttendance select{font:inherit;padding:7px 9px;border:1px solid #a5c5ba;border-radius:8px;background:#fff;color:inherit}
+    #studentAttendance button{cursor:pointer}
+    #studentAttendance input[type=file]{max-width:100%}
+    #studentAttendance .sa-grid{overflow:auto;margin-block:12px}
+    #studentAttendance table{width:100%;border-collapse:collapse;white-space:nowrap}
+    #studentAttendance th,#studentAttendance td{padding:7px;border:1px solid #a9bcb6;text-align:center}
+    #studentAttendance thead{background:#e8f2ed}
+    #studentAttendance .sa-total{background:#edf5f0;font-weight:700}
+    #studentAttendance .sa-present{background:#e8f5e9;color:#17633a}
+    #studentAttendance .sa-absent{background:#faebea;color:#9f2727}
+    #studentAttendance .sa-unmarked{color:#60716b}
+    #studentAttendance .sa-cell{display:inline-block;min-width:36px;padding:5px 7px}
+    #studentAttendance .sa-student-name{text-align:start}
+    #studentAttendance details{padding:10px;border:1px solid #dbe8e4;border-radius:8px;margin-block:8px}
+    #studentAttendance summary{cursor:pointer}
+    #studentAttendance button:disabled{opacity:.55}
+    #studentAttendance #saSave,#saFilters button[type=submit]{background:#17624d;color:#fff}
+    #saStatus:empty{display:none}
+    @media print{#saFilters,#saClose,#saStatus,#saStudentEditor,#studentAttendance button{display:none!important}#studentAttendance .sa-grid{overflow:visible}}
+  `;
   document.head.append(style);
   if(app)mountRosterSync();
-  let classes=[], context=null, sequence=0, busy=false, draft=null;
-  const status=message=>{$('saStatus').textContent=message;};
+  let classes=[],context=null,sequence=0,busy=false,draft=null,activeSheet=null;
+  const status=text=>{$('saStatus').textContent=text;};
   const message=err=>err?.code==='permission-denied'?'حسابك لا يملك صلاحية الوصول إلى هذا السجل.':err?.message||'تعذّر تحميل سجل الحضور.';
-  const setBusy=value=>{busy=value;for(const control of dialog.querySelectorAll('input,select,button:not(#saClose)'))control.disabled=value;};
-  const clear=()=>{sequence++;draft=null;$('saBody').textContent='';status('');};
-  const counts=rows=>rows.reduce((n,r)=>{n[r.status]++;return n;},{present:0,absent:0,unmarked:0});
+  const setBusy=value=>{busy=value;for(const control of view.querySelectorAll('input,select,button:not(#saClose)'))control.disabled=value;};
+  const clear=()=>{sequence++;draft=null;activeSheet=null;$('saResults').textContent='';$('saBody').textContent='';status('');};
+  const counts=rows=>rows.reduce((n,r)=>{if(Object.hasOwn(n,r.status))n[r.status]++;return n;},{present:0,absent:0,unmarked:0});
   const summary=rows=>{const n=counts(rows);return 'الحضور '+n.present+' · الغياب '+n.absent+' · غير مرصود '+n.unmarked;};
-  $('saClose').onclick=()=>dialog.close();
-  dialog.addEventListener('close',()=>{clear();context=null;});
+  const close=()=>{
+    clear();context=null;view.hidden=true;button.setAttribute('aria-pressed','false');
+    navigation?.close();
+  };
+  $('saClose').onclick=close;
   if(app){
-    let uid='';
+    let actor='';
     setInterval(()=>{
-      const user=auth.currentUser,next=user?.uid||'';
-      button.hidden=!user||!(manager()||app.state.role===8);
-      const actor=next+'|'+Boolean(manager())+'|'+app.state.role;
-      if(uid!==actor&&dialog.open)dialog.close();
-      uid=actor;
+      const user=auth.currentUser,next=(user?.uid||'')+'|'+app.state.role;
+      const hidden=!user||!(manager()||app.state.role===8);
+      if(button.hidden!==hidden)button.hidden=hidden;
+      if(actor&&actor!==next&&context)close();
+      actor=next;
     },500);
-  }else{
-    auth.onAuthStateChanged(user=>{if(dialog.open)dialog.close();button.hidden=!user;});
+  }else auth.onAuthStateChanged(user=>{close();button.hidden=!user;});
+  const gradeOf=id=>Number(String(id).match(/^g([123])-/)?.[1]||0);
+  const classOrder=(a,b)=>a.id.localeCompare(b.id,undefined,{numeric:true});
+  function refreshClasses(items){
+    const control=$('saClass'),previous=control.value,grade=Number($('saGrade').value);
+    control.innerHTML='<option value="">كل الشعب</option>'+items.filter(c=>!grade||c.grade===grade).map(c=>'<option value="'+escape(c.id)+'">'+escape(classLabel(c))+'</option>').join('');
+    if([...control.options].some(option=>option.value===previous))control.value=previous;
   }
   button.onclick=async()=>{
-    if(!auth.currentUser||busy)return;
+    if(!auth.currentUser||button.hidden||busy)return;
+    const uid=auth.currentUser.uid;
+    if(navigation)navigation.open();else view.hidden=false;
+    view.scrollIntoView({block:'start'});
+    $('saTitle').focus({preventScroll:true});
+    if(context?.uid===uid)return;
     clear();
-    const uid=auth.currentUser.uid,token=sequence;
+    const token=sequence;
     context={uid,edit:manager(),teacher:''};
-    const date=$('saDate');
-    date.value=today();date.max=today();
-    const filters=$('saManagerFilters');
-    filters.textContent='';
-    dialog.showModal();
+    for(const id of ['saFrom','saTo']){$(id).value=today();$(id).max=today();}
     setBusy(true);
     try{
       if(context.edit){
         const snap=await db.doc('config/onsite-classes').get();
         if(token!==sequence)return;
-        classes=Object.values(snap.data()?.classes||{}).filter(c=>c.active!==false).sort((a,b)=>a.grade-b.grade||a.section-b.section);
-        if(!classes.length)throw Error('أضف الفصول أولًا من إعدادات المدرسة.');
-        filters.innerHTML='<label>الفصل<select id="saClass">'+classes.map(c=>'<option value="'+escape(c.id)+'">'+escape(classLabel(c))+'</option>').join('')+'</select></label>'+
-          '<label>الحصة<select id="saPeriod">'+periods.map((period,index)=>'<option value="'+(index+1)+'">'+period+'</option>').join('')+'</select></label>';
+        classes=Object.values(snap.data()?.classes||{}).filter(c=>c.active!==false).sort(classOrder);
+        refreshClasses(classes);
       }else if(isTeacher){
         const snap=await db.doc('teacherProfiles/'+uid).get();
         if(token!==sequence)return;
@@ -183,76 +249,191 @@
         context.teacher=snap.data().scheduleName;
       }
       await load();
-    }catch(err){if(token===sequence)status(message(err));}
+    }catch(err){if(token===sequence){status(message(err));context=null;}}
     finally{setBusy(false);}
   };
-  $('saFilters').addEventListener('change',clear);
-  $('saFilters').onsubmit=event=>{event.preventDefault();load();};
-  function recordsForDay(date){
-    let query=db.collection('studentAttendance').where('date','==',date);
-    if(context.teacher)query=query.where('teacher','==',context.teacher);
-    return query.get().then(snap=>snap.docs.map(doc=>doc.data()).sort((a,b)=>a.period-b.period||a.classId.localeCompare(b.classId)));
-  }
-  function renderSummary(records){
-    if(!records.length){$('saBody').textContent='لا توجد حصص مرصودة في هذا التاريخ.';return;}
-    const byClass=new Map();
-    for(const record of records){
-      if(!byClass.has(record.classId))byClass.set(record.classId,{label:record.classLabel,periods:new Map()});
-      byClass.get(record.classId).periods.set(record.period,counts(record.students));
+  $('saDateMode').onchange=()=>{
+    const range=$('saDateMode').value==='range';
+    for(const id of ['saFrom','saTo']){$(id+'Label').hidden=!range;$(id).required=range;}
+  };
+  $('saGrade').onchange=()=>refreshClasses(classes);
+  $('saFilters').onsubmit=event=>{event.preventDefault();if(!busy)load();};
+  function schoolDates(from,to){
+    const dates=[];
+    const cursor=new Date(from+'T00:00:00Z');
+    if(!Number.isFinite(cursor.getTime())||from>to)return dates;
+    for(let day=cursor.toISOString().slice(0,10);day<=to;day=cursor.toISOString().slice(0,10)){
+      if(cursor.getUTCDay()<=4)dates.push(day);
+      cursor.setUTCDate(cursor.getUTCDate()+1);
     }
-    const columns=periods.map((period,index)=>({label:period,number:index+1}));
-    const cell=value=>{
-      if(!value)return '<td>—</td>';
-      const total=value.present+value.absent+value.unmarked;
-      const percent=total?Math.round(value.present*100/total)+'%':'—';
-      return '<td>'+value.present+' ح · '+value.absent+' غ<br><small>'+value.unmarked+' غير مرصود · '+percent+'</small></td>';
-    };
-    $('saBody').innerHTML='<h3>ملخص اليوم حسب الفصول</h3><p>ح = حاضر · غ = غائب. النسبة من إجمالي الأسماء في سجل الحصة.</p>'+
-      '<div style="overflow:auto"><table style="min-width:760px"><thead><tr><th>الفصل</th>'+columns.map(c=>'<th>'+c.label+'</th>').join('')+
-      '</tr></thead><tbody>'+[...byClass.entries()].sort(([a],[b])=>a.localeCompare(b,undefined,{numeric:true})).map(([,c])=>
-        '<tr><th>'+escape(c.label)+'</th>'+columns.map(column=>cell(c.periods.get(column.number))).join('')+'</tr>').join('')+
-      '</tbody></table></div><div id="saDayDetails"></div>';
-    renderReadOnly(records,$('saDayDetails'));
+    return dates;
   }
-  $('saDaySummary').onclick=async()=>{
-    if(!context||context.uid!==auth.currentUser?.uid||busy)return;
-    const date=$('saDate').value;
-    if(!date||date>today())return;
-    clear();
-    const token=sequence;
-    setBusy(true);status('جارٍ تحميل ملخص اليوم…');
-    try{
-      const records=await recordsForDay(date);
-      if(token===sequence){renderSummary(records);status('');}
-    }catch(err){if(token===sequence)status(message(err));}
-    finally{setBusy(false);}
+  async function recordsForRange(from,to,teacher){
+    const collection=db.collection('studentAttendance');
+    if(!teacher){
+      const result=await collection.where('date','>=',from).where('date','<=',to).get();
+      return result.docs.map(doc=>doc.data());
+    }
+    const dates=schoolDates(from,to),records=[];
+    for(let i=0;i<dates.length;i+=7){
+      const pages=await Promise.all(dates.slice(i,i+7).map(date=>collection.where('teacher','==',teacher).where('date','==',date).get()));
+      for(const page of pages)for(const doc of page.docs)records.push(doc.data());
+    }
+    return records;
+  }
+  const workbookColumns=[
+    {period:1},{period:2},{period:3},{label:'الفسحة'},{period:4},{period:5},{period:6},{label:'الصلاة'},{period:7},{label:'الحصة الثامنة'}
+  ].map(column=>({...column,label:column.label||'الحصة '+periods[column.period-1]}));
+  function periodMetrics(record){
+    if(!record)return null;
+    const values=counts(record.students),total=record.students.length;
+    const slots=navigation?.slots||(typeof SLOTS!=='undefined'?SLOTS:[]);
+    const cutoff=slots[record.period-1]?.[1];
+    const minutes=time=>{const match=/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(time||'');return match?Number(match[1])*3600+Number(match[2])*60+Number(match[3]||0):null;};
+    const start=minutes(cutoff);
+    const entries=record.students.filter(row=>row.status==='present').map(row=>minutes(/(?:^|[ T])(\d{1,2}:\d{2}(?::\d{2})?)/.exec(row.entry||'')?.[1]));
+    const late=start!==null&&entries.every(entry=>entry!==null)?entries.filter(entry=>entry>start).length:null;
+    return {...values,total,late};
+  }
+  function combineMetrics(values){
+    const active=values.filter(Boolean);
+    if(!active.length)return null;
+    return active.reduce((total,item)=>({
+      present:total.present+item.present,absent:total.absent+item.absent,total:total.total+item.total,
+      late:total.late===null||item.late===null?null:total.late+item.late
+    }),{present:0,absent:0,total:0,late:0});
+  }
+  function workbookTable(date,items,records,columns){
+    const metrics=new Map(records.map(record=>[record.classId+'|'+record.period,periodMetrics(record)]));
+    const valuesFor=c=>columns.map(col=>col.period?metrics.get(c.id+'|'+col.period):null);
+    const percent=value=>value.total?Math.round(value.present*100/value.total)+'%':'—';
+    const metricCell=value=>value?'<td>'+value.present+'</td><td>'+value.absent+'</td><td>'+percent(value)+'</td><td>'+(value.late??'—')+'</td>':'<td>—</td>'.repeat(4);
+    const end=value=>value?'<td>'+value.absent+'</td><td>'+percent(value)+'</td><td>'+(value.late??'—')+'</td>':'<td>—</td>'.repeat(3);
+    const heading=columns.map(col=>'<th scope="colgroup" colspan="4">'+col.label+'</th>').join('');
+    const headers=columns.map(()=>'<th title="حاضر">ح</th><th title="غائب">غ</th><th title="نسبة الحضور">م%</th><th title="متأخر">ت</th>').join('');
+    const row=(label,count,values,total=false)=>'<tr'+(total?' class="sa-total"':'')+'><th scope="row">'+escape(label)+'</th><td>'+count+'</td>'+values.map(metricCell).join('')+end(combineMetrics(values))+'</tr>';
+    const body=grades.slice(1).map((label,i)=>{
+      const group=items.filter(c=>c.grade===i+1);
+      if(!group.length)return '';
+      const rows=group.map(c=>row(c.label,c.count,valuesFor(c))).join('');
+      if(group.length===1&&$('saClass').value)return rows;
+      const subtotals=columns.map((_,position)=>combineMetrics(group.map(c=>valuesFor(c)[position])));
+      return rows+row(label,group.reduce((sum,c)=>sum+c.count,0),subtotals,true);
+    }).join('');
+    return '<div class="sa-grid"><table aria-label="ملخص حضور الفصول"><thead><tr><th colspan="'+(columns.length*4+5)+'">'+escape(date)+'</th></tr>'+
+      '<tr><th rowspan="2">الفصل</th><th rowspan="2">عدد الطلاب</th>'+heading+'<th scope="colgroup" colspan="3">المجموع</th></tr>'+
+      '<tr>'+headers+'<th>غ</th><th>م%</th><th>ت</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+  }
+  function classSheet(c,records,date,columns){
+    const matrix=new Map(c.roster.map(student=>[student.id,{name:student.name,status:new Map()}]));
+    for(const record of records){
+      for(const student of record.students){
+        if(!matrix.has(student.id))matrix.set(student.id,{name:student.name,status:new Map()});
+        matrix.get(student.id).status.set(record.period,student.status);
+      }
+    }
+    const edit=(period,label,student='')=>'<button type="button" data-sa-class="'+escape(c.id)+'" data-sa-period="'+period+'" data-sa-date="'+date+'" data-sa-student="'+escape(student)+'">'+escape(label)+'</button>';
+    const columnsHead=columns.map(col=>'<th scope="col">'+(context.edit?edit(col.period,col.label):escape(col.label))+'</th>').join('');
+    const rows=[...matrix].map(([id,student])=>'<tr><th class="sa-student-name" scope="row">'+escape(student.name)+'</th>'+
+      columns.map(col=>{
+        const key=student.status.get(col.period)||'unmarked';
+        const label=labels[key]||labels.unmarked;
+        return '<td class="sa-'+escape(key)+'">'+(context.edit?edit(col.period,label,id):'<span class="sa-cell">'+escape(label)+'</span>')+'</td>';
+      }).join('')+'</tr>').join('');
+    return '<details'+($('saClass').value||$('saGrade').value?' open':'')+'><summary>'+escape(c.label)+' · '+matrix.size+' طالبًا</summary>'+
+      (rows?'<div class="sa-grid"><table><thead><tr><th scope="col">اسم الطالب</th>'+columnsHead+'</tr></thead><tbody>'+rows+'</tbody></table></div>':'<p>لا توجد أسماء طلاب لهذه الشعبة.</p>')+'</details>';
+  }
+  function paintSheet(keepEditor=false){
+    const book=activeSheet;if(!book)return;
+    const date=$('saSheetDate').value;
+    if(!keepEditor){$('saBody').textContent='';draft=null;}
+    const all=book.records.filter(record=>record.date===date);
+    const byClass=new Map();
+    for(const record of all){if(!byClass.has(record.classId))byClass.set(record.classId,[]);byClass.get(record.classId).push(record);}
+    const items=book.items.filter(c=>context.edit||byClass.has(c.id)).map(c=>{
+      const records=byClass.get(c.id)||[];
+      const roster=book.rosters.get(c.id)||[];
+      const students=new Set([...roster.map(s=>s.id),...records.flatMap(r=>r.students.map(s=>s.id))]);
+      return {...c,roster,count:students.size};
+    });
+    const selected=book.period;
+    const columns=selected?workbookColumns.filter(col=>col.period===selected):workbookColumns;
+    $('saSheet').innerHTML=items.length?'<h3>ملخص الفصول</h3>'+
+      workbookTable(date,items,all,columns)+'<h3>سجل الطلاب بالأسماء</h3>'+
+      (context.edit?'<p>اضغط عنوان الحصة داخل الشعبة لتسجيل الحضور أو استيراد كشف فيوكلاس.</p>':'')+
+      items.map(c=>classSheet(c,byClass.get(c.id)||[],date,columns.filter(col=>col.period))).join(''):'<p>لا توجد سجلات مطابقة في هذا اليوم.</p>';
+    const records=studentTotals(book.records);
+    $('saPeriodTotals').innerHTML=records.length?'<details><summary>إجمالي حضور الطلاب وغيابهم للفترة المحددة</summary><div class="sa-grid"><table>'+
+      '<thead><tr><th>اسم الطالب</th><th>الفصل</th><th>حاضر</th><th>غائب</th><th>غير مرصود</th></tr></thead><tbody>'+
+      records.map(row=>'<tr><th class="sa-student-name" scope="row">'+escape(row.name)+'</th><td>'+escape([...row.classes].join('، '))+'</td><td>'+row.present+'</td><td>'+row.absent+'</td><td>'+row.unmarked+'</td></tr>').join('')+
+      '</tbody></table></div></details>'+rollup(book.records,'subject','المادة')+rollup(book.records,'teacher','المعلم'):'';
+  }
+  function rollup(records,key,label){
+    return '<details><summary>ملخص حضور وغياب الطلاب حسب '+label+'</summary><div class="sa-grid"><table>'+
+      '<thead><tr><th>'+label+'</th><th>سجلات الحصص</th><th>حاضر</th><th>غائب</th><th>غير مرصود</th><th>نسبة الحضور من الحالات المرصودة</th></tr></thead><tbody>'+
+      lessonTotals(records,key).map(row=>{
+        const name=key==='teacher'?(root.StaffSettings?.displayName(row.name)||row.name):row.name;
+        const marked=row.present+row.absent;
+        return '<tr><th scope="row">'+escape(name)+'</th><td>'+row.lessons+'</td><td>'+row.present+'</td><td>'+row.absent+'</td><td>'+row.unmarked+'</td><td>'+
+          (marked?Math.round(row.present*100/marked)+'%':'—')+'</td></tr>';
+      }).join('')+'</tbody></table></div></details>';
+  }
+  $('saResults').onclick=event=>{
+    const control=event.target.closest('[data-sa-class]');
+    if(!control||!context?.edit||busy)return;
+    openLesson(control.dataset.saDate,control.dataset.saClass,Number(control.dataset.saPeriod),control.dataset.saStudent);
   };
-  function renderReadOnly(records,target=$('saBody')){
-    target.innerHTML=records.length?records.map(record=>'<details><summary>'+escape(record.classLabel)+' · الحصة '+escape(periods[record.period-1])+' · '+escape(record.subject)+' · '+escape(record.teacher)+'</summary><p>'+escape(summary(record.students))+'</p>'+
-      '<table><thead><tr><th>الطالب</th><th>الحالة</th><th>وقت الحضور</th></tr></thead><tbody>'+record.students.map(row=>'<tr><td>'+escape(row.name)+'</td><td>'+escape(labels[row.status])+'</td><td>'+escape(row.entry||'—')+'</td></tr>').join('')+'</tbody></table></details>').join(''):'<p>لا توجد حصص مرصودة في هذا التاريخ.</p>';
-  }
   async function load(){
     if(!context||context.uid!==auth.currentUser?.uid)return;
-    const date=$('saDate').value;
-    if(!date||date>today())return;
+    const mode=$('saDateMode').value,from=mode==='today'?today():$('saFrom').value,to=mode==='today'?today():$('saTo').value;
+    if(!from||!to||from>to||to>today()){status('اختر فترة صحيحة حتى تاريخ اليوم.');return;}
+    const period=Number($('saPeriod').value),grade=Number($('saGrade').value),classId=$('saClass').value;
     clear();
-    const token=sequence,edit=context.edit;
+    const token=sequence,actor=context;
+    const dateList=schoolDates(from,to);
+    if(!dateList.length){status('لا توجد أيام دراسية في الفترة المحددة.');return;}
     setBusy(true);status('جارٍ تحميل السجل…');
     try{
-      if(!edit){
-        const records=await recordsForDay(date);
-        if(token===sequence){renderReadOnly(records);status('');}
-        return;
+      const records=await recordsForRange(from,to,actor.teacher);
+      if(token!==sequence)return;
+      if(!actor.edit){
+        classes=[...new Map(records.map(record=>[record.classId,{id:record.classId,grade:gradeOf(record.classId),section:Number(record.classId.split('-s')[1])}])).values()].sort(classOrder);
+        refreshClasses(classes);
       }
-      const c=classes.find(item=>item.id===$('saClass')?.value),period=Number($('saPeriod')?.value);
-      if(!c||!period)throw Error('اختر الفصل والحصة.');
+      const items=classes.filter(c=>(!grade||c.grade===grade)&&(!classId||c.id===classId))
+        .map(c=>({...c,label:grades[c.grade]+' '+c.grade+String(c.section).padStart(2,'0')}));
+      const selected=records.filter(record=>(!period||record.period===period)&&(!grade||gradeOf(record.classId)===grade)&&(!classId||record.classId===classId));
+      const rosters=new Map();
+      if(actor.edit){
+        const snapshots=await Promise.all(items.map(c=>db.doc('config/onsite-students-'+c.id).get()));
+        items.forEach((c,index)=>rosters.set(c.id,(snapshots[index].data()?.students||[]).map(s=>({id:s.id,name:s.name}))));
+      }
+      if(token!==sequence)return;
+      activeSheet={records:selected,items,rosters,period};
+      $('saResults').innerHTML='<div class="sa-actions" style="margin-top:12px"><label>يوم السجل<select id="saSheetDate">'+dateList.map(date=>'<option>'+date+'</option>').join('')+'</select></label></div><div id="saSheet"></div><div id="saPeriodTotals"></div>';
+      const datesWithRecords=[...new Set(selected.map(r=>r.date))].filter(date=>dateList.includes(date)).sort();
+      $('saSheetDate').value=datesWithRecords.at(-1)||dateList.at(-1);
+      $('saSheetDate').onchange=()=>paintSheet();
+      paintSheet();
+      status('');
+    }catch(err){if(token===sequence)status(message(err));}
+    finally{setBusy(false);}
+  }
+  async function openLesson(date,classId,period,studentId){
+    if(!context?.edit||!manager())return;
+    const c=classes.find(item=>item.id===classId);
+    if(!c||!period)return;
+    const token=++sequence;
+    draft=null;$('saBody').textContent='';
+    setBusy(true);status('جارٍ تحميل سجل الحصة…');
+    try{
       const ref=db.doc('studentAttendance/'+date+'_'+c.id+'_p'+period);
       const sunday=new Date(date+'T00:00:00Z');
       sunday.setUTCDate(sunday.getUTCDate()-sunday.getUTCDay());
       const week=sunday.toISOString().slice(0,10);
       const [roster,previous,subs]=await Promise.all([db.doc('config/onsite-students-'+c.id).get(),ref.get(),db.doc('config/subs-'+week).get()]);
       if(token!==sequence)return;
-      const old=previous.data()||{}, ready=new Map((old.students||[]).map(row=>[row.id,row]));
+      const old=previous.data()||{},ready=new Map((old.students||[]).map(row=>[row.id,row]));
       const phones=new Map();
       for(const student of roster.data()?.students||[]){
         phones.set(student.id,student.guardianPhone||'');
@@ -262,7 +443,13 @@
       if(!sessions.length)throw Error('لا توجد حصة مطابقة في جدول المنصة عن بُعد لهذا اليوم والفصل.');
       draft={ref,date,c,period,phones,sessions,students:[...ready.values()],teacher:old.teacher||'',subject:old.subject||'',revision:old.revision||0};
       renderEditor();
-      status(draft.students.length?'':'لا توجد أسماء طلاب لهذا الفصل.');
+      $('saBody').scrollIntoView({block:'start'});
+      status(draft.students.length?'':'لا توجد أسماء طلاب لهذه الشعبة.');
+      const studentIndex=draft.students.findIndex(student=>student.id===studentId);
+      if(studentIndex>=0){
+        setBusy(false);
+        $('saStudents').querySelector('[data-sa-index="'+studentIndex+'"]')?.focus();
+      }
     }catch(err){if(token===sequence)status(message(err));}
     finally{setBusy(false);}
   }
@@ -271,12 +458,17 @@
     const groups={c1:'الأول الثانوي',c2:'الثاني الثانوي',c3:'الثالث الثانوي',ba:'إدارة الأعمال',cs:'الحاسب والهندسة'};
     const fromRecord=current.sessions.find(lesson=>lesson.teacher===current.teacher&&lesson.subj===current.subject);
     const selected=fromRecord?.id||(current.sessions.length===1?current.sessions[0].id:'');
-    $('saBody').innerHTML='<form id="saEdit"><label>الحصة حسب جدول عن بُعد<select id="saSession" required><option value="">اختر الحصة أو المسار</option>'+
+    $('saBody').innerHTML='<section id="saStudentEditor"><div class="sa-actions"><h3>'+escape(classLabel(current.c)+' · '+current.date+' · الحصة '+periods[current.period-1])+'</h3><button id="saBackToSheet" type="button">العودة إلى سجل الطلاب</button></div>'+
+      '<form id="saEdit"><label>الحصة حسب جدول عن بُعد<select id="saSession" required><option value="">اختر الحصة أو المسار</option>'+
       current.sessions.map(lesson=>'<option '+(lesson.id===selected?'selected ':'')+'value="'+escape(lesson.id)+'">'+escape(groups[lesson.cls]+' · '+lesson.subj+' · '+(root.StaffSettings?.displayName(lesson.teacher)||lesson.teacher))+'</option>').join('')+
       '</select></label>'+
       '<div class="sa-actions"><label>كشف الحضور من فيوكلاس<input type="file" accept=".xlsx,.xls,.csv" id="saReport"></label><button type="button" id="saPreview">معاينة كشف الحضور</button></div>'+
       '<div id="saReportPreview"></div><p id="saTotals">'+escape(summary(current.students))+'</p><table><thead><tr><th>الطالب</th><th>الحالة</th><th>وقت الحضور</th></tr></thead><tbody id="saStudents"></tbody></table>'+
-      '<div class="sa-actions"><button id="saSave" type="submit">حفظ الحضور والغياب</button><button id="saNotice" type="button">تجهيز إشعارات الغياب</button></div></form><div id="saNotices"></div>';
+      '<div class="sa-actions"><button id="saSave" type="submit">حفظ الحضور والغياب</button><button id="saNotice" type="button">تجهيز إشعارات الغياب</button></div></form><div id="saNotices"></div></section>';
+    $('saBackToSheet').onclick=()=>{
+      $('saBody').textContent='';draft=null;status('');
+      $('saResults').scrollIntoView({block:'start'});
+    };
     const students=$('saStudents');
     function paintRows(){
       students.innerHTML=current.students.map((row,index)=>'<tr><td>'+escape(row.name)+'</td><td><select aria-label="حالة '+escape(row.name)+'" data-sa-index="'+index+'">'+
@@ -323,15 +515,24 @@
       const lesson=current.sessions.find(item=>item.id===$('saSession').value),uid=auth.currentUser.uid;
       if(!lesson)return;
       const teacher=lesson.teacher,subject=lesson.subj;
+      const record={date:current.date,classId:current.c.id,classLabel:classLabel(current.c),period:current.period,
+        teacher,subject,students:current.students.map(row=>({...row})),revision:current.revision+1};
       setBusy(true);
       try{
         await db.runTransaction(async tx=>{
           const previous=await tx.get(current.ref);
           if((previous.data()?.revision||0)!==current.revision)throw Error('تغيّر السجل في جلسة أخرى. أعد عرضه قبل الحفظ.');
-          tx.set(current.ref,{date:current.date,classId:current.c.id,classLabel:classLabel(current.c),period:current.period,
-            teacher,subject,students:current.students,revision:current.revision+1,updatedBy:uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+          tx.set(current.ref,{...record,updatedBy:uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
         });
-        if(draft===current){current.revision++;current.teacher=teacher;current.subject=subject;current.dirty=false;status('تم حفظ الحضور والغياب.');}
+        if(draft===current){
+          current.revision=record.revision;current.teacher=teacher;current.subject=subject;current.dirty=false;
+          if(activeSheet){
+            activeSheet.records=activeSheet.records.filter(row=>row.date!==record.date||row.classId!==record.classId||row.period!==record.period);
+            activeSheet.records.push(record);
+            paintSheet(true);
+          }
+          status('تم حفظ الحضور والغياب.');
+        }
       }catch(err){if(draft===current)status(message(err));}
       finally{setBusy(false);}
     };
