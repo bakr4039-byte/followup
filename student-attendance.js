@@ -40,7 +40,7 @@
       if(!name||reportClass(section)!==classId)continue;
       inClass++;
       const key=normalize(name), id=names.get(key);
-      const state=normalize(status)==='حاضر'?'present':normalize(status)==='غائب'?'absent':'';
+      const state=['حاضر','متاخر'].includes(normalize(status))?'present':normalize(status)==='غائب'?'absent':'';
       if(!id||!state){unresolved.add(name);continue;}
       const time=digits(entry), day=/^\d{4}-\d{2}-\d{2}/.exec(time)?.[0];
       if(day&&day!==date){rejectedDates++;continue;}
@@ -197,7 +197,7 @@
     @media print{#saFilters,#saClose,#saStatus,#saStudentEditor,#studentAttendance button{display:none!important}#studentAttendance .sa-grid{overflow:visible}}
   `;
   document.head.append(style);
-  if(app)mountRosterSync();
+  if(app){mountRosterSync();mountBatchAttendance();}
   let classes=[],context=null,sequence=0,busy=false,draft=null,activeSheet=null;
   const status=text=>{$('saStatus').textContent=text;};
   const message=err=>err?.code==='permission-denied'?'حسابك لا يملك صلاحية الوصول إلى هذا السجل.':err?.message||'تعذّر تحميل سجل الحضور.';
@@ -567,6 +567,128 @@
         }).join('')+'</ul>':'<p>لا يوجد طلاب غائبون في الحصة.</p>');
     };
     paintRows();
+  }
+  function mountBatchAttendance(){
+    const box=document.createElement('details');
+    box.hidden=true;
+    box.innerHTML='<summary>استيراد دفعة كشوف فيوكلاس</summary><label>كشوف الحصص<textarea id="saBatchInput" rows="4" dir="ltr"></textarea></label>'+
+      '<div class="sa-actions"><button type="button" id="saBatchPreview">مطابقة الكشوف</button><button type="button" id="saBatchSave" hidden>حفظ الرصد المطابق</button></div><p id="saBatchStatus" role="status"></p>';
+    $('saFilters').after(box);
+    setInterval(()=>{const hidden=!manager();if(box.hidden!==hidden)box.hidden=hidden;},500);
+    const input=box.querySelector('textarea'),preview=$('saBatchPreview'),save=$('saBatchSave'),output=$('saBatchStatus');
+    let matched=[],working=false;
+    const reset=()=>{save.hidden=true;matched=[];output.textContent='';};
+    input.oninput=reset;
+    const lock=value=>{working=value;input.disabled=preview.disabled=save.disabled=value;};
+    const words=value=>normalize(value).replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+    const squash=value=>words(value).replace(/\s+/g,'');
+    const aliases={
+      'محمود عبود':['محمود محمد الرفاعي','محمود الرفاعي'],
+      'أحمد حفني':['احمد الدوله','احمد الدولة'],
+      'موسى العطو':['موسى الحمد','موسى حمد العطو'],
+      'تامر شعيشع':['تامر محمد محمد السيد']
+    };
+    const subjectAliases={'لفظي':['قدرات لفظية','القدرات اللفظية'],'كمي':['قدرات كمية','القدرات الكمية'],'كفايات':['الكفايات اللغوية'],'انجليزي':['اللغة الإنجليزية']};
+    function evidence(title,lesson){
+      const raw=squash(title);
+      const teacher=lesson.teacher;
+      const people=[teacher,root.StaffSettings?.displayName(teacher),...(aliases[teacher]||[])].filter(Boolean);
+      const teacherHit=people.some(name=>{
+        const tokens=words(name).split(' ').filter(word=>word.length>1);
+        return tokens.length>=2&&(raw.includes(tokens.join(''))||tokens.every(word=>words(title).split(' ').includes(word)));
+      });
+      return teacherHit&&[lesson.subj,...(subjectAliases[lesson.subj]||[])].some(subject=>squash(subject).length>=2&&raw.includes(squash(subject)));
+    }
+    preview.onclick=async()=>{
+      if(working||!manager())return;
+      reset();lock(true);
+      try{
+        const source=JSON.parse(input.value);
+        if(!Array.isArray(source)||!source.length||source.length>1000)throw Error('أدخل دفعة صالحة من كشوف الحصص.');
+        const registry=(await db.doc('config/onsite-classes').get()).data()?.classes||{};
+        const rosters=new Map(),weeks=new Map(),pending=new Map(),conflicts=new Set();
+        let review=0,missing=0;
+        for(const [date,time,title,rows] of source){
+          if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>today()||!Array.isArray(rows)||typeof title!=='string'){review++;continue;}
+          const hm=String(time).match(/^(\d{1,2}:\d{2})/)?.[1]?.replace(/^0/,'');
+          const period=navigation.slots.findIndex(slot=>slot[1].replace(/^0/,'')===hm)+1;
+          const day=new Date(date+'T00:00:00Z');
+          if(!period||!Number.isFinite(day.getTime())||day.getUTCDay()>4){review++;continue;}
+          day.setUTCDate(day.getUTCDate()-day.getUTCDay());
+          const week=day.toISOString().slice(0,10);
+          if(!weeks.has(week))weeks.set(week,(await db.doc('config/subs-'+week).get()).data()?.map||{});
+          const groups=new Map();
+          for(const row of rows){
+            const classId=reportClass(row[3]);
+            if(!classId)continue;
+            if(!groups.has(classId))groups.set(classId,[]);
+            groups.get(classId).push([row[0],row[3],row[5],row[4]]);
+          }
+          if(!groups.size){review++;continue;}
+          for(const [id,entries] of groups){
+            const c=registry[id];
+            if(!c){review++;continue;}
+            const sessions=remoteSessions(app.S,date,c.grade,period,weeks.get(week)).filter(lesson=>evidence(title,lesson));
+            if(sessions.length!==1){review++;continue;}
+            if(!rosters.has(id))rosters.set(id,(await db.doc('config/onsite-students-'+id).get()).data()?.students||[]);
+            const roster=rosters.get(id).map(student=>({id:student.id,name:student.name,status:'unmarked',entry:''}));
+            let result;
+            try{result=matchReport([['اسم الطالب','الفصل','الحالة','وقت الحضور'],...entries],id,roster,date);}
+            catch{review++;continue;}
+            missing+=result.unresolved.length;
+            if(!result.matched.size){review++;continue;}
+            const key=date+'_'+id+'_p'+period;
+            if(pending.has(key)||conflicts.has(key)){pending.delete(key);conflicts.add(key);review++;continue;}
+            const lesson=sessions[0];
+            pending.set(key,{key,date,classId:id,classLabel:classLabel(c),period,teacher:lesson.teacher,subject:lesson.subj,roster,marks:result.matched});
+          }
+        }
+        matched=[...pending.values()];
+        output.textContent='المطابق: '+matched.length+' سجل شعبة وحصة. تحتاج مراجعة: '+review+'. أسماء غير مطابقة: '+missing+'.';
+        save.hidden=!matched.length;
+      }catch(err){output.textContent=message(err);}
+      finally{lock(false);}
+    };
+    save.onclick=async()=>{
+      if(working||!manager()||!matched.length)return;
+      lock(true);
+      const uid=auth.currentUser.uid;
+      let saved=0,unchanged=0,failed=0,protectedMarks=0;
+      try{
+        for(const item of matched){
+          if(!manager()||auth.currentUser?.uid!==uid)break;
+          const ref=db.doc('studentAttendance/'+item.key);
+          try{
+            const result=await db.runTransaction(async tx=>{
+              const old=(await tx.get(ref)).data()||{};
+              if(old.revision&&(old.teacher!==item.teacher||old.subject!==item.subject))return {conflicts:1};
+              const list=new Map((old.students||[]).map(s=>[s.id,s]));
+              let changed=false,conflicts=0;
+              for(const row of item.roster){
+                const mark=item.marks.get(row.id);
+                if(!list.has(row.id))list.set(row.id,{...row});
+                if(!mark)continue;
+                const current=list.get(row.id);
+                if(current.status!=='unmarked'&&current.status!==mark.status){conflicts++;continue;}
+                const entry=current.entry||mark.entry;
+                if(current.status===mark.status&&current.entry===entry)continue;
+                list.set(row.id,{...current,status:mark.status,entry});
+                changed=true;
+              }
+              if(!changed)return {conflicts};
+              tx.set(ref,{date:item.date,classId:item.classId,classLabel:item.classLabel,period:item.period,
+                teacher:item.teacher,subject:item.subject,students:[...list.values()],revision:(old.revision||0)+1,
+                updatedBy:uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+              return {saved:true,conflicts};
+            });
+            if(result.saved)saved++;else unchanged++;
+            protectedMarks+=result.conflicts;
+          }catch{failed++;}
+          output.textContent='حُفظ '+saved+' · دون تغيير '+unchanged+' · تعذّر '+failed+' · تعارضات محفوظة '+protectedMarks;
+        }
+        save.hidden=true;
+      }finally{lock(false);}
+    };
   }
   function mountRosterSync(){
     const sync=document.createElement('button');
