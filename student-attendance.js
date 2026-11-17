@@ -61,13 +61,16 @@
   }
   function rosterPlan(classMap,previous,source,makeId){
     const old=Object.entries(previous).flatMap(([classId,data])=>(data.students||[]).map(student=>({classId,student})));
-    const byIdentity=new Map(),byName=new Map(),incomingNames=new Map(),seen=new Set(),claimed=new Set();
+    const byIdentity=new Map(),byName=new Map(),incomingNames=new Map(),incomingAliases=new Map(),seen=new Set(),claimed=new Set();
     const index=(map,key,entry)=>{if(key)map.set(key,map.has(key)?null:entry);};
     for(const entry of old){
       index(byIdentity,String(entry.student.civilId||''),entry);
       index(byName,normalize(entry.student.name),entry);
     }
-    for(const row of source)index(incomingNames,normalize(row.name),row);
+    for(const row of source){
+      index(incomingNames,normalize(row.name),row);
+      index(incomingAliases,normalize(row.priorName),row);
+    }
     const classIds=new Set(Object.keys(classMap));
     const classes={...classMap},students={},stats={created:0,moved:0,renamed:0,archived:0,ids:0,phones:0};
     for(const row of source){
@@ -81,7 +84,9 @@
         const [,grade,section]=/^g([123])-s(\d+)$/.exec(classId);
         classes[classId]={id:classId,grade:Number(grade),section:Number(section),label:grade+'/'+section,active:true};
       }
-      const matched=(id&&byIdentity.get(id))||(incomingNames.get(key)&&byName.get(key));
+      const alias=normalize(row.priorName);
+      const matched=(id&&byIdentity.get(id))||(alias&&incomingAliases.get(alias)&&byName.get(alias))||
+        (incomingNames.get(key)&&byName.get(key));
       const entry=matched&&!claimed.has(matched.student.id)?matched:null;
       if(entry){
         claimed.add(entry.student.id);
@@ -350,7 +355,7 @@
     const panel=document.createElement('dialog');
     panel.id='viewClassRosterSync';
     panel.style.cssText='direction:rtl;width:min(750px,calc(100vw - 30px));max-height:85vh;border-radius:14px;padding:20px';
-    panel.innerHTML='<h2>مطابقة قوائم فيوكلاس</h2><p>الصق الأعمدة بالترتيب: الاسم، رمز الشعبة، السجل المدني، جوال ولي الأمر. اترك الخانات غير المتاحة فارغة.</p>'+
+    panel.innerHTML='<h2>مطابقة قوائم فيوكلاس</h2><p>الصق الأعمدة بالترتيب: الاسم، رمز الشعبة، السجل المدني، جوال ولي الأمر. يمكنك إضافة الاسم السابق في العمود الخامس للمطابقة.</p>'+
       '<textarea aria-label="قائمة طلاب فيوكلاس" rows="6" style="width:100%"></textarea><p role="status"></p>'+
       '<button type="button" data-vc-preview>معاينة المطابقة</button> <button type="button" data-vc-save hidden>اعتماد المطابقة</button> <button type="button" data-vc-close>إغلاق</button>';
     document.body.append(panel);
@@ -368,13 +373,18 @@
     const clear=()=>{prepared=null;save.hidden=true;status.textContent='';};
     input.oninput=clear;
     panel.addEventListener('close',()=>{input.value='';clear();});
+    const stable=(value)=>{
+      if(Array.isArray(value))return value.map(stable);
+      if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])]));
+      return value;
+    };
     async function compute(get,source){
       const registry=(await get(classesRef)).data()?.classes||{};
       const ids=[...new Set([...Object.keys(registry),...source.map(row=>reportClass(row.section))])];
       if(ids.some(id=>!id)||ids.length>100)throw Error('راجع رموز الشعب في الكشف.');
       const docs=await Promise.all(ids.map(id=>get(ref(id))));
       const old=Object.fromEntries(ids.map((id,i)=>[id,docs[i].data()||{}]));
-      const fingerprint=JSON.stringify([registry,old]);
+      const fingerprint=JSON.stringify(stable([registry,old]));
       return {old,fingerprint,...rosterPlan(registry,old,source,()=>crypto.randomUUID())};
     }
     const lock=value=>{doing=value;input.disabled=preview.disabled=save.disabled=value;};
@@ -383,8 +393,8 @@
       clear();lock(true);
       try{
         const source=input.value.split(/\r?\n/).filter(line=>line.trim()).map(line=>{
-          const [name='',section='',civilId='',guardianPhone='']=line.split('\t').map(value=>value.trim());
-          return {name,section,civilId,guardianPhone};
+          const [name='',section='',civilId='',guardianPhone='',priorName='']=line.split('\t').map(value=>value.trim());
+          return {name,section,civilId,guardianPhone,priorName};
         });
         if(!source.length||source.length>1500)throw Error('أدخل كشف فيوكلاس الكامل.');
         const plan=await compute(ref=>ref.get(),source);
