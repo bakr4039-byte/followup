@@ -7,7 +7,26 @@ function selectLessons(data,{classId='',teacher='',day=''}={}){return (data?.les
 function weekTable(data,rows,filters={}){const days=filters.day===''||filters.day==null?[0,1,2,3,4]:[Number(filters.day)];return '<table class="so-week"><thead><tr><th>اليوم</th>'+PERIODS.map(p=>'<th>'+p+'</th>').join('')+'</tr></thead><tbody>'+days.map(day=>'<tr><th>'+DAYS[day]+'</th>'+PERIODS.map((_,i)=>{const cells=rows.filter(l=>l.day===day&&l.period===i+1);return '<td>'+cells.map(l=>'<b>'+esc(l.subject)+'</b><br><small>'+esc(filters.teacher?(data.classes.find(c=>c.id===l.classId)?.label||l.classId):l.scheduleName)+'</small>').join('<hr>')+(cells.length?'':'—')+'</td>'}).join('')+'</tr>').join('')+'</tbody></table>'}
 function phoneLink(phone,name,topic){let n=String(phone||'').replace(/[\s()+-]/g,'');if(/^05\d{8}$/.test(n))n='966'+n.slice(1);if(!/^9665\d{8}$/.test(n))return null;return 'https://wa.me/'+n+'?text='+encodeURIComponent('السلام عليكم أستاذ/ '+name+'\nيرجى الاطلاع على '+topic+' من حسابكم في منصة ثانوية الصحافة.\nhttps://bakr4039-byte.github.io/followup/login.html\nشاكرين تعاونكم.')}
 function mergeClasses(current,incoming){const merged={...current};for(const c of incoming)if(!merged[c.id])merged[c.id]={...c,active:true};return merged}
-root.SchoolOperations={validate,selectLessons,phoneLink,mergeClasses,weekTable};if(typeof module!=='undefined')module.exports=root.SchoolOperations;
+const studentKey=name=>String(name??'').normalize('NFKC').trim().replace(/\s+/g,' ');
+function groupStudentNames(rows){
+  const groups=new Map(),invalid=[];
+  rows.forEach(([rawName,rawClass],index)=>{
+    if(!rawName&&!rawClass)return;
+    const name=studentKey(rawName);
+    const classCode=String(rawClass??'').normalize('NFKC').replace(/[٠-٩۰-۹]/g,n=>String(n.charCodeAt(0)-(n<='٩'?1632:1776))).replace(/[\sـ]/g,'');
+    const match=/^([123])(?:ث|\/)([1-9]\d?)$/.exec(classCode);
+    if(!match||!name||name.length>150){invalid.push(index+1);return;}
+    const grade=Number(match[1]),section=Number(match[2]),id=`g${grade}-s${section}`;
+    if(!groups.has(id))groups.set(id,{id,grade,section,label:`${grade}/${section}`,names:[]});
+    groups.get(id).names.push(name);
+  });
+  return {groups:[...groups.values()].sort((a,b)=>a.grade-b.grade||a.section-b.section),invalid};
+}
+function newStudentNames(list,names){
+  const seen=new Set(list.map(p=>studentKey(p.name)));
+  return names.filter(name=>{const key=studentKey(name);if(seen.has(key))return false;seen.add(key);return true;});
+}
+root.SchoolOperations={validate,selectLessons,phoneLink,mergeClasses,weekTable,groupStudentNames,newStudentNames};if(typeof module!=='undefined')module.exports=root.SchoolOperations;
 if(!root.document||!root.firebase)return;
 const F=root.__FUACC,personal=!!root.TeacherPortal||!!root.EmployeePortal;if(!F&&!personal)return;
 const standalone=!personal&&new URLSearchParams(location.search).get('view')==='school',db=()=>firebase.firestore(),authn=()=>root.EmployeeAuth||firebase.auth(),sv=()=>firebase.firestore.FieldValue.serverTimestamp();
@@ -36,7 +55,87 @@ $('soBody').onclick=async e=>{const b=e.target.closest('[data-pdf],[data-downloa
 function error(e){return e?.code==='permission-denied'?'تعذّر الوصول إلى الملفات؛ راجع صلاحية الحساب.':e.message||'تعذّر الاتصال. حاول مجددًا.'}
 async function bytesFor(f){if(fileCache.has(f.hash))return fileCache.get(f.hash).slice();const bytes=new Uint8Array(f.size);let offset=0;for(let i=0;i<f.chunks;i++){const s=await db().doc('config/subs-onsite-file-'+f.hash+'-'+i).get();if(!s.exists)throw Error('ملف PDF غير مكتمل');const b=DocumentSigning.decode(s.data().data);bytes.set(b,offset);offset+=b.length}if(offset!==f.size||await DocumentSigning.hash(bytes)!==f.hash)throw Error('تعذّر التحقق من سلامة PDF');fileCache.set(f.hash,bytes.slice());return bytes}
 async function viewFile(key,download){const uid=actor?.uid,epoch=turn;const f=data.files.find(f=>f.key===(key==='schedule'?'schedule':'duty'));if(!f)throw Error('ملف PDF غير موجود');tell('جارٍ تحميل PDF…');const bytes=await bytesFor(f);if(!actor||actor.uid!==uid||turn!==epoch)return;const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));if(download){const a=document.createElement('a');a.href=url;a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);tell('تم تجهيز تنزيل الملف الأصلي.');return}const modal=document.createElement('section');modal.className='so-modal';modal.setAttribute('role','dialog');modal.setAttribute('aria-label','عرض ملف PDF');modal.innerHTML='<header><strong>'+esc(key==='morning'?'المناوبة الصباحية والمسائية':key==='recess'?'الإشراف أثناء الفسح':'الجدول الحضوري')+'</strong><a download="'+esc(f.name)+'" href="'+url+'">تنزيل PDF الأصلي كاملًا</a><button data-close>إغلاق PDF</button></header><div class="so-pages"></div>';document.body.append(modal);let closed=false,pdf;modal.querySelector('[data-close]').onclick=()=>{closed=true;pdf?.destroy();modal.remove();URL.revokeObjectURL(url)};try{pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';pdf=await pdfjsLib.getDocument({data:bytes}).promise;const pages=key==='morning'?[1,2,3]:key==='recess'?[4,5]:[1,2,3,4,5];for(const n of pages){if(closed)break;const page=await pdf.getPage(n),viewport=page.getViewport({scale:1.7,...(key==='recess'?{rotation:270}:{})}),c=document.createElement('canvas');c.width=viewport.width;c.height=viewport.height;c.setAttribute('aria-label','صفحة '+n);modal.querySelector('.so-pages').append(c);await page.render({canvasContext:c.getContext('2d'),viewport}).promise}tell('تم عرض الملف الأصلي.')}catch(err){if(!closed){modal.querySelector('.so-pages').textContent=error(err);throw err}}}
-async function paintClasses(){if(!actor.admin)return;const epoch=rosterTurn;$('soBody').innerHTML='<section class="so-card"><h3>الفصول والطلاب</h3><p>جارٍ تحميل الفصول…</p></section>';try{const s=await db().doc('config/onsite-classes').get();if(epoch!==rosterTurn)return;const classes=Object.values(s.data()?.classes||{}).sort((a,b)=>a.grade-b.grade||a.section-b.section);$('soBody').innerHTML='<section class="so-card"><h3>الفصول والطلاب</h3><p>الفصول مستقلة عن مسارات جدول عن بُعد. بيانات الطلاب لا يطلع عليها إلا المدير.</p><div class="so-grid" id="soClasses">'+(classes.length?classes.map(c=>'<button data-class="'+esc(c.id)+'">'+esc(classLabel(c))+'<br><small>فتح قائمة الطلاب</small></button>').join(''):'<p>لا توجد فصول مسجّلة.</p>')+'</div><div id="soRoster"></div></section>';$('soClasses').onclick=e=>{const b=e.target.closest('[data-class]');if(b)openRoster(classes.find(c=>c.id===b.dataset.class))}}catch(e){if(epoch===rosterTurn)tell(error(e))}}
+async function paintClasses(){if(!actor.admin)return;const epoch=rosterTurn;$('soBody').innerHTML='<section class="so-card"><h3>الفصول والطلاب</h3><p>جارٍ تحميل الفصول…</p></section>';try{const s=await db().doc('config/onsite-classes').get();if(epoch!==rosterTurn)return;const classes=Object.values(s.data()?.classes||{}).sort((a,b)=>a.grade-b.grade||a.section-b.section);$('soBody').innerHTML='<section class="so-card"><h3>الفصول والطلاب</h3><p>الفصول مستقلة عن مسارات جدول عن بُعد. بيانات الطلاب لا يطلع عليها إلا المدير.</p><div class="so-grid" id="soClasses">'+(classes.length?classes.map(c=>'<button data-class="'+esc(c.id)+'">'+esc(classLabel(c))+'<br><small>فتح قائمة الطلاب</small></button>').join(''):'<p>لا توجد فصول مسجّلة.</p>')+'</div><details id="soStudentImport"><summary>استيراد أسماء الطلاب من Excel</summary><label>ملف Excel <input id="soStudentXlsx" type="file" accept=".xlsx,.xls"></label><label>أو الصق عمودي اسم الطالب والفصل من Excel <textarea id="soStudentPaste" rows="3" placeholder="اسم الطالب ثم الفصل، مثل 3ث9"></textarea></label><label><input id="soStudentNewClasses" type="checkbox"> إضافة الشعب الواردة في الملف إلى قائمة الفصول عند عدم وجودها</label><button type="button" id="soStudentPreview">معاينة الأسماء</button><div id="soStudentImportResult" aria-live="polite"></div></details><div id="soRoster"></div></section>';$('soClasses').onclick=e=>{const b=e.target.closest('[data-class]');if(b)openRoster(classes.find(c=>c.id===b.dataset.class))};bindStudentImport()}catch(e){if(epoch===rosterTurn)tell(error(e))}}
+function bindStudentImport(){
+  const uid=actor.uid, panel=$('soStudentImport'), file=$('soStudentXlsx'), paste=$('soStudentPaste');
+  const addClasses=$('soStudentNewClasses'), preview=$('soStudentPreview'), result=$('soStudentImportResult');
+  const active=()=>panel.isConnected&&actor?.admin&&actor.uid===uid;
+  const classesRef=db().doc('config/onsite-classes');
+  const rosterRef=id=>db().doc('config/onsite-students-'+id);
+  let revision=0;
+  const invalidate=()=>{revision++;result.textContent='';};
+  file.onchange=paste.oninput=addClasses.onchange=invalidate;
+  preview.onclick=async()=>{
+    invalidate();
+    const attempt=revision, canAdd=addClasses.checked;
+    preview.disabled=true;
+    try{
+      let rows;
+      if(paste.value.trim()){
+        rows=paste.value.trim().split(/\r?\n/).map(line=>line.split('\t'));
+        if(String(rows[0]?.[0]).trim()==='StudentName')rows.shift();
+      }else{
+        const source=file.files[0];
+        if(!source||source.size>5*1024*1024)throw Error('اختر ملف Excel بحجم لا يتجاوز 5 ميغابايت.');
+        const xlsx=await root.loadXLSX();
+        const book=xlsx.read(await source.arrayBuffer(),{type:'array',sheetRows:5002});
+        const [header,...data]=xlsx.utils.sheet_to_json(book.Sheets[book.SheetNames[0]],{header:1,raw:false});
+        const columns=(header||[]).map(cell=>String(cell??'').trim().toLowerCase());
+        const name=columns.indexOf('studentname'),section=columns.indexOf('class');
+        if(name<0||section<0)throw Error('يلزم وجود العمودين StudentName وclass في ملف Excel.');
+        rows=data.map(row=>[row[name],row[section]]);
+      }
+      if(!rows.length||rows.length>5000)throw Error('أدخل قائمة تضم من طالب واحد إلى 5000 طالب.');
+      const {groups,invalid}=groupStudentNames(rows);
+      if(invalid.length)throw Error('راجع الأسماء أو الشعب في الصفوف التالية من البيانات: '+invalid.slice(0,20).join('، '));
+      const [classSnap,...rosters]=await Promise.all([classesRef.get(),...groups.map(g=>rosterRef(g.id).get())]);
+      if(!active()||attempt!==revision)return;
+      const classes=classSnap.data()?.classes||{};
+      const candidates=groups.map((group,index)=>{
+        const known=classes[group.id], roster=rosters[index].data()?.students||[];
+        const names=newStudentNames(roster,group.names);
+        return {group,known,names,duplicates:group.names.length-names.length};
+      });
+      const allowed=candidates.filter(c=>c.known||canAdd);
+      const count=allowed.reduce((n,c)=>n+c.names.length,0);
+      result.innerHTML='<p>أسماء جاهزة للحفظ: '+count+'</p>'+candidates.map(({group,known,names,duplicates})=>
+        '<details><summary>'+esc(classLabel(known||group))+' · '+names.length+' اسم جديد'+(duplicates?' · '+duplicates+' مكرر':'')+
+        (!known?(canAdd?' · ستُضاف الشعبة':' · شعبة غير موجودة'):'')+'</summary><ul>'+names.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul></details>'
+      ).join('')+(count?'<button id="soSaveStudentImport" type="button">اعتماد وحفظ الأسماء</button>':'');
+      const save=$('soSaveStudentImport');
+      if(!save)return;
+      save.onclick=async()=>{
+        if(!active()||attempt!==revision||save.disabled)return;
+        save.disabled=preview.disabled=file.disabled=paste.disabled=addClasses.disabled=true;
+        try{
+          const total=await db().runTransaction(async tx=>{
+            const listSnap=await tx.get(classesRef);
+            const current=listSnap.data()?.classes||{};
+            const references=allowed.map(c=>rosterRef(c.group.id));
+            const snapshots=await Promise.all(references.map(ref=>tx.get(ref)));
+            const missing=[];
+            let total=0;
+            allowed.forEach(({group,names},index)=>{
+              if(!current[group.id]&&!canAdd)throw Error('تغيرت قائمة الشعب. أعد المعاينة.');
+              const roster=snapshots[index].data()?.students||[];
+              const additions=newStudentNames(roster,names).map(name=>({id:crypto.randomUUID(),name}));
+              if(roster.length+additions.length>500)throw Error('بلغت الشعبة '+group.label+' الحد الأقصى للطلاب.');
+              if(!additions.length)return;
+              if(!current[group.id])missing.push({id:group.id,grade:group.grade,section:group.section,label:group.label});
+              tx.set(references[index],{classId:group.id,students:[...roster,...additions],updatedBy:uid,updatedAt:sv()},{merge:true});
+              total+=additions.length;
+            });
+            if(missing.length)tx.set(classesRef,{classes:mergeClasses(current,missing),updatedBy:uid,updatedAt:sv()},{merge:true});
+            return total;
+          });
+          if(active()){tell('تم حفظ '+total+' اسم طالب.');await paintClasses();}
+        }catch(err){if(active())tell(error(err));}
+        finally{save.disabled=preview.disabled=file.disabled=paste.disabled=addClasses.disabled=false;}
+      };
+    }catch(err){if(active()&&attempt===revision)result.textContent=error(err);}
+    finally{preview.disabled=false;}
+  };
+}
 async function openRoster(c){
   if(!c||!actor?.admin)return;
   const epoch=++rosterTurn,uid=actor.uid;
