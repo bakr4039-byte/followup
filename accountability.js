@@ -20,7 +20,7 @@
   const replyText=a=>isAbsence(a)&&a.reply?.endsWith(SIGNED_REPLY)?a.reply.slice(0,-SIGNED_REPLY.length):a.reply||'';
   const hasReplySignature=a=>isAbsence(a)&&!!a.replyUid&&a.reply?.endsWith(SIGNED_REPLY);
   const MANAGER_PENDING='managerReply';
-  const waitingManager=a=>isAbsence(a)&&!a.archivedAt&&!a.reply&&[MANAGER_PENDING,'sent'].includes(a.status||'sent');
+  const waitingManager=a=>isAbsence(a)&&!a.archivedAt&&a.status==='replied'&&!!a.reply&&!a.managerResponse&&!managerReply(a);
   const statusFor=a=>waitingManager(a)?MANAGER_PENDING:a.status||'sent';
   const replySigner=a=>a.replyUid&&isAbsence(a)&&a.replySigner===PRINCIPAL?PRINCIPAL:hasReplySignature(a)?a.teacherFull||a.teacher:'';
   const managerReply=a=>!!a.replySigner&&replySigner(a)===PRINCIPAL;
@@ -105,7 +105,8 @@
       ${field(a.replyAt?hijriDate(isoOf(a.replyAt)):'',146,672,126,{dir:'ltr',blank:true})}
       ${selected?field('✓',selected[0],selected[1],26,{size:19,bold:true}):''}
       ${Number(a.action)===6?field(a.decision,185,805,231,{size:12,align:'right',blank:true}):''}
-      ${field(gregorian(decisionDate),68,845,70,{size:13,dir:'ltr'})}
+      ${field(a.managerSignedBy,205,844,120,{size:12,align:'right'})}
+      ${field(gregorian(decisionDate||isoOf(a.managerSignedAt)),68,845,70,{size:13,dir:'ltr'})}
     </div>`;
   }
   function formHTML(a,opt={}){const header=opt.headerSrc||new URL('acc-header.jpg',document.baseURI).href;

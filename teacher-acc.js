@@ -23,7 +23,7 @@
   function item(a){const st=A.statusFor(a);const act=+a.action||0;const absence=A.isAbsence(a);
     return `<article class="acc-item ${st==='sent'&&!a.archivedAt?'need':''} ${a.id===target?'hl':''}" id="acc-${esc(a.id)}"><div class="top"><h4>${absence?'مساءلة غياب':'مساءلة'} · ${esc(A.dayName(a.date))} ${esc(A.hijri(a.date))}هـ</h4><span class="acc-st ${esc(st)}">${a.archivedAt?'مغلقة ومؤرشفة':st==='sent'?'مطلوب ردك':A.waitingManager(a)?'بانتظار إفادة المدير':st==='replied'?(A.managerReply(a)?'سجّل المدير الإفادة · بانتظار القرار':'تم إرسال ردك · قيد المراجعة'):'تم اتخاذ القرار'}</span></div>
      <div class="acc-box">رقم المساءلة: ${esc(a.id)} · تاريخ الواقعة: ${esc(a.date||'—')} · تاريخ الإغلاق: ${esc(A.isoOf(a.archivedAt)||'لم تغلق بعد')}${!absence&&a.replyDue?' · آخر موعد للإفادة: '+esc(a.replyDue):''}</div><div><b>أرجو بيان سبب ما يلي:</b><ul>${A.subjectText(a).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
-     ${st==='sent'&&!absence&&!a.archivedAt?`<label><b>السبب / إجابتك</b><textarea data-reply maxlength="1500" placeholder="اكتب سبب المخالفة هنا…"></textarea></label><div class="actions"><button class="btn primary" data-send>إرسال الرد</button></div>`
+     ${st==='sent'&&!a.archivedAt?`<label><b>السبب / إجابتك</b><textarea data-reply maxlength="1500" placeholder="اكتب سبب المخالفة هنا…"></textarea></label><div class="actions"><button class="btn primary" data-send>إرسال الرد</button></div>`
        :a.reply?`<div><b>${A.managerReply(a)?'إفادة مدير المدرسة':'إجابتك'}</b><div class="acc-box">${esc(A.replyText(a))}</div>${A.replySigner(a)?'<div>التوقيع الإلكتروني: <b>'+esc(A.replySigner(a))+'</b></div>':''}</div>`:''}
      ${st==='decided'?`<div><b>قرار الإدارة:</b><div class="acc-box">${esc(a.decision||'—')}${act?`\nالإجراء: ${esc(A.actionsFor(a)[act-1])}`:''}</div></div>`:''}
      <div class="actions">${a.archivedAt?'<button class="btn" data-view>عرض PDF النهائي</button>':''}${!absence&&st!=='sent'?'<button class="btn primary" data-wa>إرسال المساءلة PDF واتساب للإدارة</button>':''}<button class="btn" data-pdf>تحميل نموذج المساءلة PDF</button></div></article>`}
@@ -38,7 +38,7 @@
   function waText(a){return [`السلام عليكم ورحمة الله`,`ردّ المعلم ${fullName(a)} على المساءلة بتاريخ ${A.hijri(a.date)}هـ:`,'',A.replyText(a)].join('\n')}
   sec.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const el=b.closest('.acc-item');const a=list.find(x=>'acc-'+x.id===el.id);if(!a)return;
     if(b.hasAttribute('data-view')){try{await A.viewPdf(a)}catch(err){toast('تعذر عرض PDF')}}
-    else if(b.hasAttribute('data-send')){if(a.archivedAt||A.isAbsence(a))return;const t=el.querySelector('[data-reply]').value.trim();if(t.length<3){toast('اكتب السبب أولاً.');return}
+    else if(b.hasAttribute('data-send')){if(a.archivedAt||A.statusFor(a)!=='sent')return;const t=el.querySelector('[data-reply]').value.trim();if(t.length<3){toast('اكتب السبب أولاً.');return}
       if(!confirm('سيتم إرسال ردك للإدارة ولا يمكن تعديله بعد الإرسال. متابعة؟'))return;
       b.disabled=true;b.textContent='جارٍ الإرسال…';
       try{await rawDb.collection(A.COL).doc(a.id).update({reply:t,replyAt:firebase.firestore.FieldValue.serverTimestamp(),replyUid:uid,...(auth.currentUser?.managerAccess?{replyActorUid:auth.currentUser.actorUid}:{}),status:'replied'})}

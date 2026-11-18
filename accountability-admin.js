@@ -99,7 +99,7 @@
     if(absence)$a('acPreview').textContent='معاينة نموذج الغياب';
     else $a('acPreview').textContent='معاينة النموذج';
     $a('acPrev').hidden=true;
-    if(!editId)$a('acSave').textContent=absence?'حفظ مساءلة الغياب':'حفظ وفتح واتساب للمنسوب';
+    if(!editId)$a('acSave').textContent=absence?'حفظ وإتاحة النموذج للمعلم':'حفظ وفتح واتساب للمنسوب';
   }
   function draft(){const d={teacher:$a('acT').value,teacherFull:$a('acFull').value.trim()||$a('acT').value,date:$a('acDate').value,replyDue:list.find(a=>a.id===editId)?.replyDue||'',time:$a('acTime').value,monitor:$a('acMon').value,items:picked(),other:$a('acOther').value.trim(),details:$a('acDetails').value.trim(),teacherPhone:A.normPhone($a('acTPhone').value),replyPhone:A.ADMIN_PHONE};
     if(!absenceSelected())return d;
@@ -150,7 +150,7 @@
     catch(e){toast('تعذّر تحميل بيانات المنسوب للمعاينة')}finally{button.disabled=false}
   };
   const tPhone=a=>A.normPhone(a.teacherPhone||phoneOf(a.teacher));
-  function teacherMsg(a,id){const ph=tPhone(a);return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم مساءلة إدارية بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة الإفادة وإرسالها:',portal(id,a.teacher)].join('\n')}}
+  function teacherMsg(a,id){const ph=tPhone(a);return {phone:ph,text:[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,'ثانوية الصحافة الأهلية – القسم الثانوي',`صدرت لكم ${A.isAbsence(a)?'مساءلة غياب':'مساءلة إدارية'} بتاريخ ${A.hijri(a.date)}هـ بخصوص:`,...A.subjectText(a).map(x=>'• '+x),'','نأمل الدخول إلى حسابكم في المنصة وكتابة الإفادة وإرسالها:',(A.isAbsence(a)?pdfLink:portal)(id,a.teacher)].join('\n')}}
   let editId=null;
   function resetForm(){$a('acAbsenceJob').value='';$a('acAbsenceSpecialty').value='';$a('acAbsenceJobNumber').value='';$a('acCats').querySelectorAll('input:checked').forEach(x=>x.checked=false);$a('acCats').dispatchEvent(new Event('change'));$a('acOther').value='';$a('acDetails').value='';renderKind()}
   function endEdit(){editId=null;$a('acKind').disabled=false;$a('acT').disabled=false;$a('acFull').disabled=false;$a('acEditBar').hidden=true;$a('acCancelEdit').hidden=true;$a('acSave').textContent='حفظ وفتح واتساب للمنسوب'}
@@ -164,11 +164,11 @@
     if(editId&&list.find(a=>a.id===editId)?.archivedAt){msg.textContent='المساءلة مؤرشفة ولا يمكن تعديلها.';return}
     if(editId){const recordId=editId;$a('acSave').disabled=true;msg.textContent='جارٍ حفظ التعديل…';try{await loadPersonnel(d);const {replyPhone,...upd}=d;await fs().collection(A.COL).doc(recordId).update({...upd,editedAt:firebase.firestore.FieldValue.serverTimestamp(),editedBy:(firebase.auth().currentUser||{}).uid||''});endEdit();resetForm();msg.textContent='تم حفظ التعديل.';toast('تم حفظ التعديل');setTab('log')}catch(e){console.error(e);msg.textContent='تعذّر حفظ التعديل، حاول مرة أخرى.'}finally{$a('acSave').disabled=false}return}
     // نفتح نافذة الواتساب فورًا (قبل انتظار الحفظ) حتى لا يحجبها المتصفح
-    const absence=A.isAbsence(d),ph=absence?'':d.teacherPhone;const win=ph?window.open('about:blank','_blank'):null;
+    const absence=A.isAbsence(d),ph=tPhone(d);const win=ph?window.open('about:blank','_blank'):null;
     $a('acSave').disabled=true;msg.textContent='جارٍ الحفظ…';
-    try{await loadPersonnel(d);const ref=fs().collection(A.COL).doc();await ref.set({...d,status:absence?A.MANAGER_PENDING:'sent',createdAt:firebase.firestore.FieldValue.serverTimestamp(),createdBy:state.uid||(firebase.auth().currentUser||{}).uid||''});
+    try{await loadPersonnel(d);const ref=fs().collection(A.COL).doc();await ref.set({...d,status:'sent',createdAt:firebase.firestore.FieldValue.serverTimestamp(),createdBy:state.uid||(firebase.auth().currentUser||{}).uid||''});
       if(win){const m=teacherMsg(d,ref.id);win.location.href=A.waUrl(m.phone,m.text)}
-      msg.textContent=absence?'تم حفظ مساءلة الغياب. أدخل الإفادة ووقّعها من السجل.':ph?'تم حفظ المساءلة وفتح الواتساب للمعلم.':'تم حفظ المساءلة. لا يوجد رقم جوال لهذا المعلم — اكتبه في خانة «جوال المعلم» في المرة القادمة أو أضفه من «تقارير المعلمين».';
+      msg.textContent=absence?(win?'ظهر نموذج مساءلة الغياب في حساب المعلم، وفُتح واتساب لإرسال رابط النسخة والرد.':'ظهر نموذج مساءلة الغياب في حساب المعلم للرد.'):ph?'تم حفظ المساءلة وفتح الواتساب للمعلم.':'تم حفظ المساءلة. لا يوجد رقم جوال لهذا المعلم — اكتبه في خانة «جوال المعلم» في المرة القادمة أو أضفه من «تقارير المعلمين».';
       toast('تم حفظ المساءلة');resetForm();if(A.isAbsence(d)){$a('acT').value='';$a('acT').onchange()}setTab('log')}
     catch(e){if(win)win.close();console.error(e);const em=e&&e.code==='permission-denied'?'لم تُحفظ المساءلة: قواعد الأمان الجديدة غير منشورة في Firebase بعد.\nمن الإعدادات ← القواعد انسخ القواعد، ثم الصقها في Firebase Console ← Firestore ← Rules واضغط Publish.':'تعذّر الحفظ، حاول مرة أخرى.';msg.textContent=em;alert(em)}
     finally{$a('acSave').disabled=false}};
@@ -189,26 +189,28 @@
      ${a.archivedAt?`<div class="acc-reply"><b>القرار النهائي:</b> ${esc(a.decision||'—')}<br>${esc(A.actionsFor(a)[(+a.action||0)-1]||'')} ${esc(a.amount||'')} ${esc(a.penalty||'')}</div>`:''}
      <div>${A.subjectText(a).map(x=>esc(x)).join('<br>')}</div>
      ${a.reply?`<div><b style="font-size:13px">${A.managerReply(a)?'إفادة مدير المدرسة':'رد المعلم'} (${esc(A.hijri(A.isoOf(a.replyAt)))}هـ):</b><div class="acc-reply">${esc(A.replyText(a))}</div>${A.replySigner(a)?'<div>التوقيع الإلكتروني: <b>'+esc(A.replySigner(a))+'</b></div>':''}</div>`:''}
-     ${A.waitingManager(a)?`<div class="acc-dec"><label class="field">إفادة الغياب<textarea class="acc-in" data-manager-reply maxlength="1500"></textarea></label>
+     ${a.managerResponse?`<div><b>رد مدير المدرسة</b><div class="acc-reply">${esc(a.managerResponse)}</div><div>توقيع المدير: <b>${esc(a.managerSignedBy)}</b></div></div>`:''}
+     ${absence&&a.status===A.MANAGER_PENDING&&!a.reply&&!a.archivedAt?'<div class="acc-acts"><button class="btn" data-acc-release>إتاحة المساءلة للمعلم للرد</button></div>':''}
+     ${A.waitingManager(a)?`<div class="acc-dec"><label class="field">رد مدير المدرسة<textarea class="acc-in" data-manager-reply maxlength="1500"></textarea></label>
        <label><input type="checkbox" data-manager-sign> أوقّع باسم مدير المدرسة ${esc(A.PRINCIPAL)}</label>
        <div class="acc-acts"><button class="btn" data-acc-manager-reply>حفظ الإفادة والتوقيع</button></div></div>`:''}
      ${['replied','decided'].includes(st)&&!a.archivedAt?`<div class="acc-dec"><label class="field"><span style="font-size:13px;font-weight:600">قرار المسؤول المباشر</span><textarea class="acc-in" data-dec maxlength="${A.isAbsence(a)?240:600}">${esc(a.decision||'')}</textarea></label>
        <div class="acc-radios">${A.actionsFor(a).map((t,i)=>`<label><input type="radio" name="act-${esc(a.id)}" value="${i+1}" ${act===i+1?'checked':''}>${i+1}- ${esc(t)}</label>`).join('')}</div>
        ${A.isAbsence(a)?'':`<div class="acc-grid"><input class="acc-in" data-amount placeholder="مبلغ الحسم (للبند 4)" value="${esc(a.amount||'')}"><input class="acc-in" data-penalty placeholder="مع عقوبة (للبند 4)" value="${esc(a.penalty||'')}"></div>
        <label class="field">قرار المشرف العام (إن وجد)<textarea class="acc-in" data-general maxlength="600">${esc(a.generalDecision||'')}</textarea></label>`}<div class="acc-acts"><button class="btn" data-acc-dec>إرسال</button></div></div>`:''}
-     <div class="acc-acts">${st==='decided'&&!a.archivedAt?'<button class="btn" data-acc-archive>إغلاق المساءلة وأرشفتها</button>':''}${a.archivedAt?`<span>أغلقت: ${esc(A.isoOf(a.archivedAt))} · بواسطة ${esc(a.archivedBy||'—')}</span><button class="btn" data-acc-pdfview>عرض PDF النهائي</button>`:''}${absence?'':ph?`<button class="btn ghost" data-acc-wa>واتساب للمعلم (رابط الرد)</button>`:'<span class="muted">لا يوجد رقم جوال للمعلم</span>'}<button class="btn ghost" data-acc-pdfwa>إرسال النموذج PDF واتساب</button><button class="btn ghost" data-acc-pdf>تحميل PDF</button><button class="btn ghost" data-acc-view>معاينة</button>${recordActions(a)}</div>
+     <div class="acc-acts">${st==='decided'&&!a.archivedAt?'<button class="btn" data-acc-archive>إغلاق المساءلة وأرشفتها</button>':''}${a.archivedAt?`<span>أغلقت: ${esc(A.isoOf(a.archivedAt))} · بواسطة ${esc(a.archivedBy||'—')}</span><button class="btn" data-acc-pdfview>عرض PDF النهائي</button>`:''}${ph?`<button class="btn ghost" data-acc-wa>واتساب للمعلم (رابط الرد)</button>`:'<span class="muted">لا يوجد رقم جوال للمعلم</span>'}<button class="btn ghost" data-acc-pdfwa>إرسال النموذج PDF واتساب</button><button class="btn ghost" data-acc-pdf>تحميل PDF</button><button class="btn ghost" data-acc-view>معاينة</button>${recordActions(a)}</div>
      <div class="acc-prev" data-prev hidden></div></article>`}
   function paintList(){
     const q=$a('acSearch').value.trim().toLocaleLowerCase('ar'),f=$a('acFilter').value,from=$a('acFrom').value,to=$a('acTo').value,type=$a('acType').value;
     const live=list.filter(a=>a.status!=='deleted');
-    $a('acStats').innerHTML=[['إجمالي المساءلات',live.length,'all'],['بانتظار رد المعلم',live.filter(a=>A.statusFor(a)==='sent').length,'sent'],['بانتظار إفادة المدير',live.filter(A.waitingManager).length,A.MANAGER_PENDING],['بانتظار القرار',live.filter(a=>a.status==='replied').length,'replied'],['مغلقة ومؤرشفة',live.filter(a=>a.archivedAt).length,'archived']].map(([t,n,key])=>`<button type="button" class="acc-card" data-stat="${key}" aria-pressed="${String(key==='all'?f===''&&scope==='all':f===key)}" style="text-align:right;cursor:pointer;font:inherit;color:inherit"><b>${esc(t)}</b><strong>${n}</strong></button>`).join('');
+    $a('acStats').innerHTML=[['إجمالي المساءلات',live.length,'all'],['بانتظار رد المعلم',live.filter(a=>A.statusFor(a)==='sent').length,'sent'],['بانتظار إفادة المدير',live.filter(a=>A.statusFor(a)===A.MANAGER_PENDING).length,A.MANAGER_PENDING],['بانتظار القرار',live.filter(a=>A.statusFor(a)==='replied').length,'replied'],['مغلقة ومؤرشفة',live.filter(a=>a.archivedAt).length,'archived']].map(([t,n,key])=>`<button type="button" class="acc-card" data-stat="${key}" aria-pressed="${String(key==='all'?f===''&&scope==='all':f===key)}" style="text-align:right;cursor:pointer;font:inherit;color:inherit"><b>${esc(t)}</b><strong>${n}</strong></button>`).join('');
     $a('acActive').setAttribute('aria-pressed',String(scope==='active'));$a('acArchive').setAttribute('aria-pressed',String(scope==='archive'));
     const types=[...new Set(live.flatMap(a=>a.items||[]))];$a('acType').innerHTML='<option value="">كل المخالفات</option>'+types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');$a('acType').value=type;
     const rows=list.filter(a=>f==='deleted'?a.status==='deleted':a.status!=='deleted'&&(f==='archived'?!!a.archivedAt:(scope==='all'?true:scope==='archive'?!!a.archivedAt:!a.archivedAt))&&(!f||f==='archived'||A.statusFor(a)===f)).filter(a=>(!q||[a.teacher,a.teacherFull,a.id,...A.subjectText(a)].join(' ').toLocaleLowerCase('ar').includes(q))&&(!from||a.date>=from)&&(!to||a.date<=to)&&(!type||(a.items||[]).includes(type))).sort((a,b)=>Number(!!overdue(b))-Number(!!overdue(a))||(b.date||'').localeCompare(a.date||'')||when(b)-when(a));
     $a('acCount').textContent=`(${live.length})`;
     $a('acList').innerHTML=`<p class="muted">${rows.length} مساءلة · المتأخرة أولًا ثم الأحدث</p><div style="overflow:auto"><table style="width:100%;border-collapse:collapse;text-align:right"><thead><tr><th>الرقم</th><th>المعلم</th><th>الموضوع</th><th>تاريخ الواقعة</th><th>تاريخ الإغلاق</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>${rows.map(a=>`<tr data-id="${esc(a.id)}"><td>${esc(a.id)}</td><td>${esc(a.teacher)}</td><td>${esc(A.subjectText(a).join('، '))}</td><td>${esc(a.date||'—')}</td><td>${esc(A.isoOf(a.archivedAt)||'—')}</td><td><span class="acc-st ${esc(A.statusFor(a))}">${a.archivedAt?'مغلقة ومؤرشفة':esc(A.STATUS[A.statusFor(a)])}${overdue(a)?' · متأخرة':''}</span></td><td><button class="btn ghost" data-open-record="${esc(a.id)}">فتح التفاصيل</button>${recordActions(a)}</td></tr>`).join('')}</tbody></table></div>${rows.length?'':'<p>لا توجد مساءلات مطابقة.</p>'}<div id="acSelected"></div>`;
 
-    const answered=showAfterReply&&rows.find(a=>a.id===showAfterReply&&a.status==='replied');
+    const answered=showAfterReply&&rows.find(a=>a.id===showAfterReply&&a.managerResponse);
     if(answered){showAfterReply=null;$a('acSelected').innerHTML=card(answered)}
   }
   ['acSearch','acFrom','acTo'].forEach(id=>$a(id).oninput=paintList);['acFilter','acType'].forEach(id=>$a(id).onchange=paintList);
@@ -226,6 +228,18 @@
     }
     else if(b.hasAttribute('data-acc-pdfview')){try{await A.viewPdf(a)}catch(err){toast('تعذر عرض PDF')}}
     else if(a.archivedAt&&(b.hasAttribute('data-acc-edit')||b.hasAttribute('data-acc-dec')||b.hasAttribute('data-acc-del'))){toast('المساءلة مغلقة ومحفوظة');return}
+    else if(b.hasAttribute('data-acc-release')){
+      b.disabled=true;
+      try{
+        const db=fs(),ref=db.collection(A.COL).doc(a.id);
+        await db.runTransaction(async tx=>{
+          const current=(await tx.get(ref)).data();
+          if(!current||!A.isAbsence(current)||current.status!==A.MANAGER_PENDING||current.reply||current.archivedAt)throw Error('state-changed');
+          tx.update(ref,{status:'sent'});
+        });
+        toast('أصبحت المساءلة متاحة للرد في حساب المعلم.');
+      }catch(err){toast('تعذرت إتاحة المساءلة. أعد فتح السجل وحاول مرة أخرى.')}finally{b.disabled=false}
+    }
     else if(b.hasAttribute('data-acc-manager-reply')){
       if(state.role!==-1||!A.waitingManager(a))return;
       const user=firebase.auth().currentUser,reply=el.querySelector('[data-manager-reply]').value.trim();
@@ -238,7 +252,7 @@
         await db.runTransaction(async tx=>{
           const current=(await tx.get(ref)).data();
           if(!current||!A.waitingManager(current))throw Error('state-changed');
-          tx.update(ref,{reply,replyUid:user.uid,replySigner:A.PRINCIPAL,replyAt:firebase.firestore.FieldValue.serverTimestamp(),status:'replied'});
+          tx.update(ref,{managerResponse:reply,managerSignedBy:A.PRINCIPAL,managerSignedUid:user.uid,managerSignedAt:firebase.firestore.FieldValue.serverTimestamp()});
         });
         toast('تم حفظ الإفادة وتوقيع المدير. يمكنك الآن تسجيل القرار.');
       }catch(e){showAfterReply=null;toast(e.message==='state-changed'?'تغيّرت حالة المساءلة. أعد فتحها من السجل.':'تعذّر حفظ الإفادة والتوقيع.')}
@@ -254,7 +268,7 @@
     else if(b.hasAttribute('data-acc-del')){if(!confirm(`حذف مساءلة ${a.teacher} بتاريخ ${A.hijri(a.date)}هـ؟\nستختفي من السجل ومن حساب المعلم، ويمكن استرجاعها من «المحذوفة».`))return;b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({prevStatus:a.status||'sent',status:'deleted',deletedAt:firebase.firestore.FieldValue.serverTimestamp(),deletedBy:(firebase.auth().currentUser||{}).uid||''});if(editId===a.id){endEdit();resetForm()}toast('تم حذف المساءلة')}catch(err){b.disabled=false;toast('تعذّر الحذف')}}
     else if(b.hasAttribute('data-acc-restore')){b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({status:A.statusFor({...a,status:a.prevStatus||'sent'})});toast('تم استرجاع المساءلة')}catch(err){b.disabled=false;toast('تعذّر الاسترجاع')}}
     else if(b.hasAttribute('data-acc-view')){const p=el.querySelector('[data-prev]');if(!p.hidden){p.hidden=true;return}previewPaper(p,a)}
-    else if(b.hasAttribute('data-acc-dec')){const dec=el.querySelector('[data-dec]').value.trim();const r=el.querySelector('input[type=radio]:checked');if(!dec&&!r){toast('اكتب القرار أو اختر الإجراء');return}
+    else if(b.hasAttribute('data-acc-dec')){if(A.waitingManager(a))return;const dec=el.querySelector('[data-dec]').value.trim();const r=el.querySelector('input[type=radio]:checked');if(!dec&&!r){toast('اكتب القرار أو اختر الإجراء');return}
       b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({decision:dec,generalDecision:el.querySelector('[data-general]')?.value.trim()||'',action:r?+r.value:0,amount:el.querySelector('[data-amount]')?.value.trim()||'',penalty:el.querySelector('[data-penalty]')?.value.trim()||'',status:'decided',decidedAt:firebase.firestore.FieldValue.serverTimestamp(),decidedBy:(firebase.auth().currentUser||{}).uid||''});toast('تم إرسال القرار')}catch(err){toast('تعذّر إرسال القرار')}finally{b.disabled=false}}});
 
   // ---------- drawer ----------
