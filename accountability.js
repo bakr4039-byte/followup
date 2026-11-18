@@ -59,47 +59,57 @@
   .accp .ac-sec{border-top:1.5px solid #000;padding-top:4px;margin-top:4px}
   .accp .ac-acts{display:grid;grid-template-columns:repeat(3,1fr);font-size:14px;font-weight:600;gap:4px 10px;margin:6px 0}
   .accp .ac-acts span{display:flex;align-items:center;gap:6px}.accp .ac-bx{display:inline-block;width:14px;height:14px;border:1.5px solid #000;text-align:center;line-height:11px;font-size:13px;color:#0b2a6b;font-weight:700}
-  .accp .ab-title{margin:14px 0 10px;text-align:center}.accp .ab-title h1{margin:0;font-size:25px}.accp .ab-title small{font-size:12px;color:#273d41}
-  .accp .ab-table{min-width:0;width:100%;border-collapse:collapse;table-layout:fixed;text-align:center;font-size:13px}.accp .ab-table th,.accp .ab-table td{border:1px solid #aabbb7;padding:5px;overflow-wrap:anywhere;white-space:normal;text-align:center;position:static;color:#152925}.accp .ab-table th,.accp .ab-heading{background:#e8f1ed}
-  .accp .ab-identity{display:flex;justify-content:center;gap:8px 22px;flex-wrap:wrap;margin:0 0 9px;font-size:14px}.accp .ab-stamp{font-weight:700;color:#173d62;border-bottom:1px solid #78948b;padding:0 8px}.accp .ab-note p{margin:3px 0}
-  .accp .ab-section{margin-top:10px;font-size:14px}.accp .ab-heading{margin:0 0 5px;padding:4px 8px;font-size:15px}.accp .ab-section p{margin:4px 0}
-  .accp .ab-writing{border:1px solid #c2cec9;min-height:88px;padding:5px 8px;overflow-wrap:anywhere;color:#173d62;font-size:13px;line-height:1.5}
-  .accp .ab-writing.empty{background:repeating-linear-gradient(to bottom,#fff 0,#fff 25px,#aabbb7 26px,#fff 27px)}
-  .accp .ab-actions{display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;margin:7px 0;font-size:13px}.accp .ab-actions span{display:flex;align-items:center;gap:6px}.accp .ab-actions i{flex:none}
-  .accp .ab-note{margin-top:auto;border-top:1px solid #9badab;padding-top:6px;font-size:12px}
+  .accp.ab-paper{padding:0;font-family:Arial,sans-serif}
+  .ab-paper>img{display:block;position:absolute;inset:0;width:100%;height:100%}
+  .ab-paper>.ab-value{position:absolute;line-height:1.08;overflow-wrap:anywhere}
+  .accp .ab-identity{display:flex;justify-content:center;gap:8px 22px;flex-wrap:wrap;margin:0 0 9px;font-size:14px}
   .accp .ac-copy{margin-top:auto;font-size:13px;font-weight:600;border-top:1.5px solid #000;padding-top:4px}.accp .ac-copy div{display:flex;justify-content:space-around;margin-top:6px}`;
-  function absenceHTML(a,header){
-    const name=esc(a.teacherFull||a.teacher)||'……………………';
-    const date=d=>d?'<bdi>'+esc(d)+'</bdi>':'………………';
-    const text=v=>esc(String(v||'').trim().replace(/\s+/g,' '));
-    const writing=v=>'<div class="ab-writing'+(v?'':' empty')+'">'+text(v)+'</div>';
-    return `<div class="accp"><div class="ac-frame">
-      <div class="ac-head"><img src="${esc(header)}" alt="" crossorigin="anonymous"></div>
-      <div class="ab-title"><h1>مساءلة غياب</h1><small>نموذج 20 · F-14-04 · رمز النموذج (و.م.ع.ن – 02 – 04)</small></div>
-      <div class="ab-identity"><span>المدرسة / المكتب <b>ثانوية الصحافة الأهلية</b></span><span>رقم السجل المدني <bdi class="ab-stamp">${esc(a.absenceCivilId)||'………………'}</bdi></span></div>
-      <table class="ab-table"><colgroup><col style="width:22%"><col style="width:19%"><col style="width:13%"><col style="width:12%"><col style="width:13%"><col style="width:13%"><col style="width:8%"></colgroup>
-      <thead><tr><th>الاسم</th><th>الوظيفة</th><th>التخصص</th><th>رقم الوظيفة</th><th>تاريخ الغياب</th><th>الموافق</th><th>اليوم</th></tr></thead>
-      <tbody><tr><td>${name}</td><td>${esc(a.absenceJob)||'—'}</td><td>${esc(a.absenceSpecialty)||'—'}</td><td>${esc(a.absenceJobNumber)||'—'}</td><td>${date(a.date)}</td><td>${a.date?date(hijri(a.date))+' هـ':'…………'}</td><td>${esc(dayName(a.date))||'—'}</td></tr></tbody></table>
-      <section class="ab-section"><h2 class="ab-heading">طلب الإفادة</h2>
-      <p>المكرم / ${name}، وفقه الله</p>
-      <p>السلام عليكم ورحمة الله وبركاته، وبعد</p>
-      <p>تبيّن من متابعة سجل الدوام غيابكم في التاريخ الموضح أعلاه. يرجى الإفادة عن سبب الغياب وتقديم ما يؤيد العذر خلال أسبوع من تاريخ الطلب، علمًا بأنه في حالة عدم الالتزام سيتم اتخاذ اللازم حسب التعليمات.</p>
-      ${a.details?'<p>'+text(a.details)+'</p>':''}
-      <div class="ac-sig"><span>الرئيس المباشر / ${esc(a.monitor?.split(' / ').at(-1)||PRINCIPAL)}</span><span>التوقيع /</span><span>التاريخ / ${date(isoOf(a.createdAt))}</span></div></section>
-      <section class="ab-section"><h2 class="ab-heading">إفادة المنسوب</h2>
-      <p>المكرم مدير المدرسة / ${PRINCIPAL}</p>
-      ${writing(replyText(a))}
-      ${managerReply(a)?'<p>أثبت مدير المدرسة هذه الإفادة من حسابه.</p>':'<p>وسأقدّم ما يؤيد عذري خلال أسبوع من تاريخ الطلب.</p>'}
-      <div class="ac-sig"><span>الاسم / ${name}</span><span>التوقيع / ${replySigner(a)?'<b class="ab-stamp">'+esc(replySigner(a))+'</b>':''}</span><span>التاريخ / ${date(isoOf(a.replyAt))}</span></div></section>
-      <section class="ab-section"><h2 class="ab-heading">إجراء مدير المدرسة</h2>
-      <div class="ab-actions">${ABSENCE_ACTIONS.map((label,i)=>`<span><i class="ac-bx">${Number(a.action)===i+1?'✓':''}</i>${esc(label)}</span>`).join('')}</div>
-      ${a.decision?'<p>'+text(a.decision)+'</p>':''}
-      <div class="ac-sig"><span>مدير المدرسة / ${PRINCIPAL}</span><span>التوقيع /</span><span>التاريخ / ${date(isoOf(a.decidedAt))}</span></div></section>
-      <div class="ab-note"><b>ملاحظات هامة</b><p>١. يستكمل المدير المباشر الاستمارة ويصدر القرار بموجبه.</p><p>٢. إذا سبق عطلة نهاية الأسبوع غياب وألحقها غياب تُحسب مدة الغياب كاملة.</p><p>٣. يوضح المتغيب أسباب غيابه فور تسلّم الاستمارة ويعيدها لمديره المباشر.</p><p>٤. يُمنح المتغيب أسبوعًا لتقديم ما يؤيد العذر، فإذا انقضت المدة تُستكمل الاستمارة ويُتخذ الإجراء.</p></div>
-    </div></div>`;
+  function absenceHTML(a){
+    const name=a.teacherFull||a.teacher||'';
+    const template=new URL('assets/absence-accountability-template.png',document.baseURI).href;
+    // Coordinates refer to the 884px-wide reference page before scaling to A4.
+    const scale=W/884;
+    const field=(value,x,y,width,{size=14,align='center',dir='rtl',bold=false,blank=false}={})=>value?`
+      <span class="ab-value" dir="${dir}" style="left:${x*scale}px;top:${y*scale}px;width:${width*scale}px;font-size:${size*scale}px;text-align:${align};font-weight:${bold?700:400};${blank?'background:#fff':''}">${esc(value)}</span>`:'';
+    const gregorian=iso=>iso?String(iso).slice(0,10).split('-').reverse().join('/'):'';
+    const hijriDate=iso=>iso?hijri(iso).split('/').map(part=>part.padStart(2,'0')).join('/'):'';
+    const requestDate=isoOf(a.createdAt)||a.date;
+    const reply=replyText(a);
+    const decisionDate=isoOf(a.decidedAt);
+    const choices=[[797,729],[797,754],[797,779],[797,805],[625,805],[453,805]];
+    const selected=choices[Number(a.action)-1];
+    let replySize=14;
+    let replyLines=reply?wrap(reply,748*scale,replySize*scale):[];
+    while(replyLines.length>3&&replySize>7){
+      replySize--;
+      replyLines=wrap(reply,748*scale,replySize*scale);
+    }
+    const replyStep=replyLines.length>3?Math.min(16,72/replyLines.length):25;
+    if(replyLines.length>3)replySize=Math.min(replySize,replyStep*.9);
+    return `<div class="accp ab-paper">
+      <img src="${esc(template)}" alt="نموذج مساءلة غياب" crossorigin="anonymous">
+      ${field(a.absenceCivilId,225,199,239,{dir:'ltr'})}
+      ${field(name,621,253,230)}
+      ${field(a.absenceSpecialty,516,253,103)}
+      ${field(a.absenceJob,411,253,103)}
+      ${field(a.absenceJobNumber,305,253,104,{dir:'ltr'})}
+      ${field(gregorian(a.date),204,253,99,{dir:'ltr'})}
+      ${field(hijriDate(a.date),103,253,99,{dir:'ltr'})}
+      ${field(dayName(a.date),36,253,65)}
+      ${field(name,355,303,412,{align:'right'})}
+      ${field(a.monitor?.split(' / ').at(-1)||PRINCIPAL,389,410,298,{align:'right',bold:true})}
+      ${field(gregorian(requestDate),68,411,70,{size:13,dir:'ltr'})}
+      ${replyLines.map((line,i)=>field(line,65,566+i*replyStep,748,{size:replySize,align:'right'})).join('')}
+      ${field(reply?name:'',476,672,249,{align:'right',blank:true})}
+      ${field(replySigner(a),327,657,136,{size:12})}
+      ${field(a.replyAt?hijriDate(isoOf(a.replyAt)):'',146,672,126,{dir:'ltr',blank:true})}
+      ${selected?field('✓',selected[0],selected[1],26,{size:19,bold:true}):''}
+      ${Number(a.action)===6?field(a.decision,185,805,231,{size:12,align:'right',blank:true}):''}
+      ${field(gregorian(decisionDate),68,845,70,{size:13,dir:'ltr'})}
+    </div>`;
   }
   function formHTML(a,opt={}){const header=opt.headerSrc||new URL('acc-header.jpg',document.baseURI).href;
-    if(isAbsence(a))return absenceHTML(a,header);
+    if(isAbsence(a))return absenceHTML(a);
     const h=d=>d?`<span dir="rtl">${hijri(d)} هـ</span>`:'&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;/ 1448 هـ';
     const act=+a.action||0;const box=i=>`<span class="ac-bx">${act===i?'✓':''}</span>`;
     const amount=act===4?`( ${esc(a.amount||'……')} ) ريال مع عقوبة ${esc(a.penalty||'………')}`:'(………) ريال مع عقوبة ………';
@@ -126,7 +136,8 @@
     try{await document.fonts.ready}catch(e){}
     el.innerHTML=`<style>${CSS}</style>${formHTML(a)}`;
     const img=el.querySelector('img');if(img&&!img.complete)await new Promise(r=>{img.onload=img.onerror=r});
-    try{const pdf=new root.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+    try{if(isAbsence(a)&&img?.naturalWidth===0)throw Error('absence-template-unavailable');
+      const pdf=new root.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
       const capture=async node=>{const canvas=await root.html2canvas(node,{scale:1.5,backgroundColor:'#ffffff',logging:false,useCORS:true});if(canvas.width!==undefined&&(!canvas.width||!canvas.height))throw Error('pdf-empty-canvas');if(canvas.getContext){const pixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;let ink=false;for(let i=0;i<pixels.length;i+=388){if(pixels[i+3]>0&&(pixels[i]<240||pixels[i+1]<240||pixels[i+2]<240)){ink=true;break}}if(!ink)throw Error('pdf-empty-canvas');}pdf.addImage(canvas.toDataURL('image/jpeg',.72),'JPEG',0,0,210,297)};
       await capture(el.querySelector('.accp'));
       return pdf.output('blob')}
@@ -179,6 +190,13 @@
     try{const file=await pdfFile(a);if(closed)return;url=URL.createObjectURL(file);
       const downloadLink=overlay.querySelector('[data-download]');downloadLink.href=url;downloadLink.download=file.name;downloadLink.hidden=false;
       const openLink=overlay.querySelector('[data-open]');openLink.href=url;openLink.hidden=false;
+      if(isAbsence(a)&&a.archivePdf&&a.archiveFileName?.startsWith('نموذج-')){
+        const frame=document.createElement('iframe');
+        frame.title='مساءلة الغياب المؤرشفة';
+        frame.src=url;
+        frame.style.cssText='width:100%;height:100%;min-height:65vh;border:0';
+        overlay.querySelector('[data-paper]').replaceChildren(frame);
+      }
       overlay.querySelector('[data-loading]').textContent='النموذج المعروض مطابق لملف PDF · ورقة واحدة. استخدم «تحميل PDF» لحفظه.';
     }catch(error){close();throw error}
   }
