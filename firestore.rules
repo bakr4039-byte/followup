@@ -164,6 +164,33 @@ service cloud.firestore {
     allow update: if ownsAccountability() && resource.data.status == 'sent' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply','replyAt','replyUid','status']) && request.resource.data.status == 'replied' && request.resource.data.replyUid == request.auth.uid && request.resource.data.replyAt == request.time && request.resource.data.reply is string && request.resource.data.reply.size() > 0 && request.resource.data.reply.size() <= 1500;
     allow delete: if false;
   }
+  // Immutable attachments remain linked to historical and archived absence records.
+  match /accountability/{recordId}/attachments/{fileId} {
+    function record() { return get(/databases/$(database)/documents/accountability/$(recordId)).data; }
+    function attachmentOwner() {
+      return request.auth != null && record().kind == 'absence' && record().status != 'deleted' &&
+        (teacher() && record().teacher == teacherName() || employee() && record().teacher == employeeName());
+    }
+    function attachmentReader() { return admin() || attachmentOwner(); }
+    allow read: if attachmentReader();
+    allow create: if attachmentOwner() && request.resource.data.keys().hasOnly(['name','type','size','chunks','createdAt','uploadedBy']) &&
+      request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200 &&
+      request.resource.data.type in ['application/pdf','image/jpeg','image/png','image/webp'] &&
+      request.resource.data.size is int && request.resource.data.size > 0 && request.resource.data.size <= 5242880 &&
+      request.resource.data.chunks is int && request.resource.data.chunks > 0 && request.resource.data.chunks <= 12 &&
+      request.resource.data.createdAt == request.time && request.resource.data.uploadedBy == request.auth.uid;
+    allow update, delete: if false;
+    match /parts/{partId} {
+      allow read: if attachmentReader();
+      allow create: if attachmentOwner() &&
+        getAfter(/databases/$(database)/documents/accountability/$(recordId)/attachments/$(fileId)).data.uploadedBy == request.auth.uid &&
+        getAfter(/databases/$(database)/documents/accountability/$(recordId)/attachments/$(fileId)).data.createdAt == request.time &&
+        partId.matches('[0-9]{1,2}') && int(partId) < getAfter(/databases/$(database)/documents/accountability/$(recordId)/attachments/$(fileId)).data.chunks &&
+        request.resource.data.keys().hasOnly(['data']) && request.resource.data.data is string &&
+        request.resource.data.data.size() > 0 && request.resource.data.data.size() <= 614400;
+      allow update, delete: if false;
+    }
+  }
   // PDF acknowledgements. Each signer can create one immutable receipt from their own account.
   function signatureActor() { return staff() && role() >= -1 && role() <= 7 || teacher() || employee(); }
   function signatureKey() { return staff() ? 's:' + string(role()) : employee() ? 'e:' + employeeName() : 't:' + teacherName(); }

@@ -208,3 +208,134 @@
   }
   root.ACC={sameRecord,archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,actionsFor,isAbsence,replyText,hasReplySignature,replySigner,managerReply,waitingManager,statusFor,MANAGER_PENDING,PRINCIPAL,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
 })(window);
+
+
+/* مرفقات مساءلات الغياب، محفوظة بشكل مستقل عن الرد ونسخة PDF المؤرشفة. */
+(function () {
+  'use strict';
+  const A = window.ACC;
+  const MAX_SIZE = 5 * 1024 * 1024;
+  const CHUNK = 450 * 1024;
+  const TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+  A.attachmentButton = (record, writable = false) => A.isAbsence(record)
+    ? `<button type="button" class="btn" data-absence-files="${A.esc(record.id)}" ${writable ? 'data-files-write' : ''}>${writable ? 'إرفاق ملف أو صور / عرض المرفقات' : 'عرض مرفقات المعلم'}</button>` : '';
+  if (!document.addEventListener) return;
+  document.addEventListener('click', async event => {
+    const trigger = event.target.closest('[data-absence-files]');
+    if (!trigger) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const db = typeof rawDb !== 'undefined' ? rawDb : firebase.firestore();
+    const ref = db.collection(A.COL).doc(trigger.dataset.absenceFiles);
+    const writable = trigger.hasAttribute('data-files-write');
+    const panel = document.createElement('dialog');
+    panel.dir = 'rtl';
+    panel.setAttribute('aria-label', 'مرفقات مساءلة الغياب');
+    panel.style.cssText = 'width:min(620px,90vw);max-height:85vh;overflow:auto;border:1px solid #d7e5df;border-radius:16px;padding:24px;font:inherit';
+    panel.innerHTML = `<h3>مرفقات مساءلة الغياب</h3><p>رقم المساءلة: ${A.esc(ref.id)}</p>${writable ? '<label>إرفاق ملف أو صور<input data-files type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp" style="display:block;margin:12px 0"></label><p>PDF أو صور JPG وPNG وWebP، حتى 5 ملفات في المرة، وحجم الملف حتى 5 ميجابايت.</p><button type="button" data-upload>حفظ المرفقات</button>' : ''}<p role="status" data-message></p><div data-list>جارٍ تحميل المرفقات…</div><button type="button" data-close style="margin-top:20px">إغلاق</button>`;
+    document.body.appendChild(panel);
+    panel.showModal();
+    const urls = [];
+    let busy = false;
+    const message = panel.querySelector('[data-message]');
+    const close = () => {
+      if (busy) { message.textContent = 'انتظر حتى يكتمل حفظ المرفقات.'; return; }
+      panel.close();
+      panel.remove();
+      urls.forEach(url => URL.revokeObjectURL(url));
+    };
+    panel.querySelector('[data-close]').onclick = close;
+    panel.addEventListener('cancel', event => { event.preventDefault(); close(); });
+    const render = async () => {
+      const snapshot = await ref.collection('attachments').orderBy('createdAt').get();
+      const list = panel.querySelector('[data-list]');
+      list.innerHTML = snapshot.empty ? '<p>لا توجد مرفقات محفوظة.</p>' : '';
+      snapshot.forEach(doc => {
+        const file = doc.data();
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:12px 0;border-bottom:1px solid #ddd;display:flex;gap:10px;flex-wrap:wrap;align-items:center';
+        const label = document.createElement('span');
+        label.textContent = file.name + ' (' + Math.ceil(file.size / 1024) + ' كيلوبايت)';
+        row.appendChild(label);
+        for (const download of [false, true]) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = download ? 'تحميل' : 'عرض';
+          button.onclick = async () => {
+            button.disabled = true;
+            try {
+              const chunks = [];
+              for (let i = 0; i < file.chunks; i++) {
+                const part = await doc.ref.collection('parts').doc(String(i)).get();
+                if (!part.exists) throw Error('الملف غير مكتمل.');
+                chunks.push(Uint8Array.from(atob(part.data().data), c => c.charCodeAt(0)));
+              }
+              const blob = new Blob(chunks, { type: file.type });
+              if (blob.size !== file.size) throw Error('تعذر التحقق من حجم الملف.');
+              const url = URL.createObjectURL(blob);
+              urls.push(url);
+              if (download) {
+                const link = document.createElement('a');
+                link.href = url; link.download = file.name; link.click();
+              } else {
+                const preview = document.createElement('iframe');
+                preview.title = file.name;
+                preview.src = url;
+                preview.style.cssText = 'width:100%;height:55vh;border:1px solid #ddd';
+                panel.querySelector('[data-preview]')?.remove();
+                preview.dataset.preview = '';
+                panel.appendChild(preview);
+              }
+            } catch (error) { message.textContent = 'تعذر فتح المرفق. أعد المحاولة.'; }
+            finally { button.disabled = false; }
+          };
+          row.appendChild(button);
+        }
+        list.appendChild(row);
+      });
+    };
+    if (writable) panel.querySelector('[data-upload]').onclick = async () => {
+      const input = panel.querySelector('[data-files]');
+      const files = Array.from(input.files);
+      if (!files.length || files.length > 5) { message.textContent = 'اختر من ملف واحد إلى 5 ملفات.'; return; }
+      if (files.some(file => !TYPES.includes(file.type) || !file.size || file.size > MAX_SIZE)) {
+        message.textContent = 'اختر PDF أو صورًا مدعومة، بحجم لا يتجاوز 5 ميجابايت لكل ملف.'; return;
+      }
+      busy = true;
+      input.disabled = true;
+      panel.querySelector('[data-upload]').disabled = true;
+      let saved = 0;
+      try {
+        for (const file of files) {
+          message.textContent = 'جارٍ حفظ ' + file.name + '…';
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          const fileRef = ref.collection('attachments').doc();
+          const batch = db.batch();
+          batch.set(fileRef, { name: file.name.slice(0, 200), type: file.type, size: file.size,
+            chunks: Math.ceil(bytes.length / CHUNK), createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            uploadedBy: firebase.auth().currentUser.uid });
+          for (let start = 0, index = 0; start < bytes.length; start += CHUNK, index++) {
+            let binary = '';
+            const chunk = bytes.subarray(start, start + CHUNK);
+            for (let offset = 0; offset < chunk.length; offset += 8192)
+              binary += String.fromCharCode(...chunk.subarray(offset, offset + 8192));
+            batch.set(fileRef.collection('parts').doc(String(index)), { data: btoa(binary) });
+          }
+          await batch.commit();
+          saved++;
+        }
+        input.value = '';
+        message.textContent = 'تم حفظ ' + saved + ' مرفق. تظهر المرفقات في حساب المدير مع المساءلة.';
+      } catch (error) {
+        message.textContent = 'تم حفظ ' + saved + ' من ' + files.length + ' مرفق. تعذر حفظ البقية؛ أعد اختيار الملفات المتبقية وحاول مجددًا.';
+        input.value = '';
+      } finally {
+        busy = false; input.disabled = false;
+        panel.querySelector('[data-upload]').disabled = false;
+        try { await render(); } catch (error) { message.textContent += ' تعذر تحديث القائمة.'; }
+      }
+    };
+    try { await render(); }
+    catch (error) { message.textContent = 'تعذر تحميل المرفقات؛ تحقق من الاتصال وصلاحيات الحساب.'; }
+  }, true);
+})();
