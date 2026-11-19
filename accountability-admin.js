@@ -191,7 +191,7 @@
      ${a.reply?`<div><b style="font-size:13px">${A.managerReply(a)?'إفادة مدير المدرسة':'رد المعلم'} (${esc(A.hijri(A.isoOf(a.replyAt)))}هـ):</b><div class="acc-reply">${esc(A.replyText(a))}</div>${A.replySigner(a)?'<div>التوقيع الإلكتروني: <b>'+esc(A.replySigner(a))+'</b></div>':''}</div>`:''}
      ${a.managerResponse?`<div><b>رد مدير المدرسة</b><div class="acc-reply">${esc(a.managerResponse)}</div><div>توقيع المدير: <b>${esc(a.managerSignedBy)}</b></div></div>`:''}
      ${absence&&a.status===A.MANAGER_PENDING&&!a.reply&&!a.archivedAt?'<div class="acc-acts"><button class="btn" data-acc-release>إتاحة المساءلة للمعلم للرد</button></div>':''}
-     ${A.waitingManager(a)?`<div class="acc-dec"><label class="field">رد مدير المدرسة<textarea class="acc-in" data-manager-reply maxlength="1500"></textarea></label>
+     ${A.waitingManager(a)?`<div class="acc-dec"><b>إجراء مدير المدرسة</b><div class="acc-radios">${A.MANAGER_ABSENCE_ACTIONS.map((text,index)=>`<label><input type="radio" name="manager-action-${esc(a.id)}" data-manager-action value="${index+1}">${esc(text)}</label>`).join('')}</div><label class="field" data-manager-other-field hidden>أخرى<textarea class="acc-in" data-manager-reply maxlength="240" placeholder="اكتب الإجراء الآخر"></textarea></label>
        <label><input type="checkbox" data-manager-sign> أوقّع باسم مدير المدرسة ${esc(A.PRINCIPAL)}</label>
        <div class="acc-acts"><button class="btn" data-acc-manager-reply>حفظ الإفادة والتوقيع</button></div></div>`:''}
      ${['replied','decided'].includes(st)&&!a.archivedAt?`<div class="acc-dec"><label class="field"><span style="font-size:13px;font-weight:600">قرار المسؤول المباشر</span><textarea class="acc-in" data-dec maxlength="${A.isAbsence(a)?240:600}">${esc(a.decision||'')}</textarea></label>
@@ -219,6 +219,12 @@
   $a('acStats').addEventListener('click',e=>{const b=e.target.closest('[data-stat]');if(!b)return;const key=b.dataset.stat;scope=key==='all'?'all':key==='archived'?'archive':'active';$a('acFilter').value=key==='all'?'':key;$a('acSearch').value='';$a('acFrom').value='';$a('acTo').value='';$a('acType').value='';paintList()});
   $a('acActive').onclick=()=>{scope='active';$a('acFilter').value='';paintList()};$a('acArchive').onclick=()=>{scope='archive';$a('acFilter').value='';paintList()};
   function listen(){if(window.AccountabilityRecorder||stop)return;stop=fs().collection(A.COL).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+(d.data().decidedAt&&d.data().decidedAt.seconds||'')}));paintList()},e=>{stop=null;$a('acMsg').textContent=e&&e.code==='permission-denied'?'لا توجد صلاحية لقراءة المساءلات — انشر قواعد الأمان المحدّثة في Firebase.':'تعذّر تحميل المساءلات.'})}
+  $a('acList').addEventListener('change',event=>{
+    if(!event.target.matches('[data-manager-action]'))return;
+    const card=event.target.closest('[data-id]'),field=card.querySelector('[data-manager-other-field]');
+    field.hidden=event.target.value!=='6';
+    if(!field.hidden)field.querySelector('textarea').focus();
+  });
   $a('acList').addEventListener('click',async e=>{if(window.AccountabilityRecorder||state.role!==-1)return;const b=e.target.closest('button');if(!b)return;if(b.dataset.openRecord){const record=list.find(a=>a.id===b.dataset.openRecord);if(record){$a('acSelected').innerHTML=card(record);$a('acSelected').scrollIntoView({behavior:'smooth',block:'start'})}return}const el=b.closest('[data-id]');const a=list.find(x=>x.id===el?.dataset.id);if(!a)return;
     if(b.hasAttribute('data-acc-archive')){
       if(!confirm('إغلاق المساءلة وحفظ نسخة PDF نهائية؟ لن يمكن تعديل النسخة المغلقة.'))return;
@@ -244,8 +250,10 @@
     }
     else if(b.hasAttribute('data-acc-manager-reply')){
       if(state.role!==-1||!A.waitingManager(a))return;
-      const user=firebase.auth().currentUser,reply=el.querySelector('[data-manager-reply]').value.trim();
-      if(!user||reply.length<3||reply.length>1500){toast('أدخل إفادة الغياب من 3 إلى 1500 حرف.');return}
+      const user=firebase.auth().currentUser,choice=Number(el.querySelector('[data-manager-action]:checked')?.value),other=el.querySelector('[data-manager-reply]').value.trim();
+      if(!user||!Number.isInteger(choice)||choice<1||choice>A.MANAGER_ABSENCE_ACTIONS.length){toast('اختر إجراء مدير المدرسة.');return}
+      if(choice===6&&(other.length<3||other.length>240)){toast('اكتب الإجراء الآخر من 3 إلى 240 حرفًا.');return}
+      const reply=choice===6?other:A.MANAGER_ABSENCE_ACTIONS[choice-1];
       if(!el.querySelector('[data-manager-sign]').checked){toast('اعتمد التوقيع قبل حفظ الإفادة.');return}
       b.disabled=true;showAfterReply=a.id;
       if($a('acFilter').value===A.MANAGER_PENDING)$a('acFilter').value='';
@@ -254,7 +262,7 @@
         await db.runTransaction(async tx=>{
           const current=(await tx.get(ref)).data();
           if(!current||!A.waitingManager(current))throw Error('state-changed');
-          tx.update(ref,{managerResponse:reply,managerSignedBy:A.PRINCIPAL,managerSignedUid:user.uid,managerSignedAt:firebase.firestore.FieldValue.serverTimestamp()});
+          tx.update(ref,{managerResponse:reply,managerAction:choice,managerOther:choice===6?other:'',managerSignedBy:A.PRINCIPAL,managerSignedUid:user.uid,managerSignedAt:firebase.firestore.FieldValue.serverTimestamp()});
         });
         toast('تم حفظ الإفادة وتوقيع المدير. يمكنك الآن تسجيل القرار.');
       }catch(e){showAfterReply=null;toast(e.message==='state-changed'?'تغيّرت حالة المساءلة. أعد فتحها من السجل.':'تعذّر حفظ الإفادة والتوقيع.')}

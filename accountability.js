@@ -15,6 +15,7 @@
   const MONITORS=['المدير / حسن بن محمد العمري','الوكيل / عادل عبد الرحيم','الوكيل / حسين القحطاني','الوكيل / عبد المجيد العمري','الأستاذ / محمد الأحمري','الأستاذ / على نعمان','الأستاذ / بكر الدوخي','الأستاذ / إبراهيم المشرقي','الأستاذ / محمود هلال','الأستاذ / محمد جوده','الأستاذ / السيد عبد المجيد'];
   const ACTIONS=['التنبيه','لفت نظر','إنـــــذار','الحسم من الراتب','الحفظ','إنذار بالفصل'];
   const ABSENCE_ACTIONS=['احتساب إجازة مرضية بعد التحقق من التقرير','قبول العذر واحتسابه من رصيد الإجازة الاضطرارية','اعتماد الحسم لعدم قبول العذر','دورة تدريبية','تكليف','أخرى'];
+  const MANAGER_ABSENCE_ACTIONS=['تحتسب له إجازة مرضية بعد التأكد من نظامية التقرير.','يحتسب غيابه من رصيده للإجازات الاضطرارية لقبول عذره إذا كان رصيده يسمح وإلا يحسم عليه.','يعتمد الحسم لعدم قبول عذره.','دورة تدريبية','تكليف','أخرى'];
   const isAbsence=a=>a.kind==='absence';
   const SIGNED_REPLY='\n\n[إقرار وتوقيع إلكتروني]';
   const replyText=a=>isAbsence(a)&&a.reply?.endsWith(SIGNED_REPLY)?a.reply.slice(0,-SIGNED_REPLY.length):a.reply||'';
@@ -77,7 +78,8 @@
     const reply=replyText(a);
     const decisionDate=isoOf(a.decidedAt);
     const choices=[[797,729],[797,754],[797,779],[797,805],[625,805],[453,805]];
-    const selected=choices[Number(a.action)-1];
+    const managerAction=Number(a.managerAction)||Number(a.action);
+    const selected=choices[managerAction-1];
     let replySize=14;
     let replyLines=reply?wrap(reply,748*scale,replySize*scale):[];
     while(replyLines.length>3&&replySize>7){
@@ -98,14 +100,15 @@
       ${field(dayName(a.date),36,253,65)}
       ${field(name,355,303,412,{align:'right'})}
       ${field(a.monitor?.split(' / ').at(-1)||PRINCIPAL,389,410,298,{align:'right',bold:true})}
-      ${field(gregorian(requestDate),68,411,70,{size:13,dir:'ltr'})}
+      ${field(a.managerSignedBy,295,411,90,{size:12})}
+      ${field(gregorian(isoOf(a.managerSignedAt)||requestDate),68,411,70,{size:13,dir:'ltr'})}
       ${replyLines.map((line,i)=>field(line,65,566+i*replyStep,748,{size:replySize,align:'right'})).join('')}
       ${field(reply?name:'',476,672,249,{align:'right',blank:true})}
       ${field(replySigner(a),327,657,136,{size:12})}
       ${field(a.replyAt?hijriDate(isoOf(a.replyAt)):'',146,672,126,{dir:'ltr',blank:true})}
       ${selected?field('✓',selected[0],selected[1],26,{size:19,bold:true}):''}
-      ${Number(a.action)===6?field(a.decision,185,805,231,{size:12,align:'right',blank:true}):''}
-      ${field(a.managerSignedBy,205,844,120,{size:12,align:'right'})}
+      ${managerAction===6?field(a.managerAction?a.managerOther:a.decision,185,805,231,{size:12,align:'right',blank:true}):''}
+
       ${field(gregorian(decisionDate||isoOf(a.managerSignedAt)),68,845,70,{size:13,dir:'ltr'})}
     </div>`;
   }
@@ -206,7 +209,7 @@
     const canonical=v=>v instanceof Date?v.toISOString():Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
     return JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
   }
-  root.ACC={sameRecord,archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,actionsFor,isAbsence,replyText,hasReplySignature,replySigner,managerReply,waitingManager,statusFor,MANAGER_PENDING,PRINCIPAL,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
+  root.ACC={sameRecord,archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,ABSENCE_ACTIONS,MANAGER_ABSENCE_ACTIONS,actionsFor,isAbsence,replyText,hasReplySignature,replySigner,managerReply,waitingManager,statusFor,MANAGER_PENDING,PRINCIPAL,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
 })(window);
 
 
