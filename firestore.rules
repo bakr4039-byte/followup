@@ -161,7 +161,17 @@ service cloud.firestore {
        request.resource.data.archivedAt == request.time && request.resource.data.archivedBy == request.auth.uid &&
        request.resource.data.archiveActor == request.auth.uid && request.resource.data.archiveVersion == 1 &&
        request.resource.data.archivePdf is string && request.resource.data.archivePdf.size() > 0 && request.resource.data.archivePdf.size() < 910000);
-    allow update: if ownsAccountability() && resource.data.status == 'sent' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply','replyAt','replyUid','status']) && request.resource.data.status == 'replied' && request.resource.data.replyUid == request.auth.uid && request.resource.data.replyAt == request.time && request.resource.data.reply is string && request.resource.data.reply.size() > 0 && request.resource.data.reply.size() <= 1500;
+    allow update: if ownsAccountability() && resource.data.status == 'sent' &&
+      !resource.data.keys().hasAny(['archivedAt']) &&
+      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply','replyAt','replyUid','status','replySignatureImage']) &&
+      request.resource.data.status == 'replied' && request.resource.data.replyUid == request.auth.uid &&
+      request.resource.data.replyAt == request.time && request.resource.data.reply is string &&
+      request.resource.data.reply.size() > 0 && request.resource.data.reply.size() <= 1500 &&
+      (resource.data.get('kind','') == 'absence'
+        ? request.resource.data.get('replySignatureImage','') is string &&
+          request.resource.data.replySignatureImage.size() <= 95000 &&
+          request.resource.data.replySignatureImage.matches('^data:image/png;base64,[A-Za-z0-9+/=]+$')
+        : !request.resource.data.diff(resource.data).affectedKeys().hasAny(['replySignatureImage']));
     allow delete: if false;
   }
   // Immutable attachments remain linked to historical and archived absence records.

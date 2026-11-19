@@ -19,7 +19,7 @@
   const isAbsence=a=>a.kind==='absence';
   const SIGNED_REPLY='\n\n[إقرار وتوقيع إلكتروني]';
   const replyText=a=>isAbsence(a)&&a.reply?.endsWith(SIGNED_REPLY)?a.reply.slice(0,-SIGNED_REPLY.length):a.reply||'';
-  const hasReplySignature=a=>isAbsence(a)&&!!a.replyUid&&a.reply?.endsWith(SIGNED_REPLY);
+  const hasReplySignature=a=>isAbsence(a)&&!!a.replyUid&&(!!teacherSignatureHTML(a)||a.reply?.endsWith(SIGNED_REPLY));
   const MANAGER_PENDING='managerReply';
   const waitingManager=a=>isAbsence(a)&&!a.archivedAt&&a.status==='replied'&&!!a.reply&&!a.managerResponse&&!managerReply(a);
   const statusFor=a=>waitingManager(a)?MANAGER_PENDING:a.status||'sent';
@@ -69,6 +69,11 @@
     const source=a.managerSignatureImage;
     return typeof source==='string'&&source.length<=95000&&/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(source)?`<img src="${source}" alt="${a.managerSignatureMode==='delegate'?'توقيع بالنيابة عن المدير':'توقيع المدير'}" style="${style}">`:'';
   }
+  function teacherSignatureHTML(a,style='display:block;max-width:220px;max-height:80px;object-fit:contain'){
+    const source=a.replySignatureImage;
+    return isAbsence(a)&&a.replyUid&&typeof source==='string'&&source.length<=95000&&/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(source)
+      ?`<img src="${source}" alt="توقيع المعلم" style="${style}">`:'';
+  }
   function absenceHTML(a){
     const name=a.teacherFull||a.teacher||'';
     const template=new URL('assets/absence-accountability-template.png',document.baseURI).href;
@@ -104,16 +109,16 @@
       ${field(dayName(a.date),36,253,65)}
       ${field(name,355,303,412,{align:'right'})}
       ${field(a.monitor?.split(' / ').at(-1)||PRINCIPAL,389,410,298,{align:'right',bold:true})}
-      ${managerSignatureHTML(a,`position:absolute;left:${295*scale}px;top:${398*scale}px;width:${90*scale}px;height:${23*scale}px;object-fit:contain`)}
-      ${field(a.managerSignatureImage?(a.managerSignatureMode==='delegate'?'بالنيابة / '+a.managerSignedBy:''):a.managerSignedBy,275,a.managerSignatureImage?425:411,125,{size:a.managerSignatureImage?9:12})}
       ${field(gregorian(isoOf(a.managerSignedAt)||requestDate),68,411,70,{size:13,dir:'ltr'})}
       ${replyLines.map((line,i)=>field(line,65,566+i*replyStep,748,{size:replySize,align:'right'})).join('')}
       ${field(reply?name:'',476,672,249,{align:'right',blank:true})}
-      ${field(replySigner(a),327,657,136,{size:12})}
+      ${teacherSignatureHTML(a,`position:absolute;inset:auto;left:${323*scale}px;top:${663*scale}px;width:${100*scale}px;height:${26*scale}px;object-fit:contain`)||field(replySigner(a),327,657,136,{size:12})}
       ${field(a.replyAt?hijriDate(isoOf(a.replyAt)):'',146,672,126,{dir:'ltr',blank:true})}
       ${selected?field('✓',selected[0],selected[1],26,{size:19,bold:true}):''}
       ${managerAction===6?field(a.managerAction?a.managerOther:a.decision,185,805,231,{size:12,align:'right',blank:true}):''}
 
+      ${managerSignatureHTML(a,`position:absolute;inset:auto;left:${370*scale}px;top:${830*scale}px;width:${165*scale}px;height:${28*scale}px;object-fit:contain`)}
+      ${field(a.managerSignatureMode==='delegate'&&a.managerSignedBy?'بالنيابة / '+a.managerSignedBy:'',370,857,165,{size:9})}
       ${field(gregorian(decisionDate||isoOf(a.managerSignedAt)),68,845,70,{size:13,dir:'ltr'})}
     </div>`;
   }
@@ -144,7 +149,8 @@
   async function pdfBlob(a){if(!root.html2canvas||!root.jspdf)throw Error('pdf-lib');const el=host();
     try{await document.fonts.ready}catch(e){}
     el.innerHTML=`<style>${CSS}</style>${formHTML(a)}`;
-    const img=el.querySelector('img');if(img&&!img.complete)await new Promise(r=>{img.onload=img.onerror=r});
+    const img=el.querySelector('img');
+    await Promise.all(Array.from(el.querySelectorAll('img'),image=>image.decode().catch(()=>{})));
     try{if(isAbsence(a)&&img?.naturalWidth===0)throw Error('absence-template-unavailable');
       const pdf=new root.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
       const capture=async node=>{const canvas=await root.html2canvas(node,{scale:1.5,backgroundColor:'#ffffff',logging:false,useCORS:true});if(canvas.width!==undefined&&(!canvas.width||!canvas.height))throw Error('pdf-empty-canvas');if(canvas.getContext){const pixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;let ink=false;for(let i=0;i<pixels.length;i+=388){if(pixels[i+3]>0&&(pixels[i]<240||pixels[i+1]<240||pixels[i+2]<240)){ink=true;break}}if(!ink)throw Error('pdf-empty-canvas');}pdf.addImage(canvas.toDataURL('image/jpeg',.72),'JPEG',0,0,210,297)};
@@ -214,7 +220,7 @@
     const canonical=v=>v instanceof Date?v.toISOString():Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
     return JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
   }
-  root.ACC={managerSignatureHTML,sameRecord,archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,ABSENCE_ACTIONS,MANAGER_ABSENCE_ACTIONS,actionsFor,isAbsence,replyText,hasReplySignature,replySigner,managerReply,waitingManager,statusFor,MANAGER_PENDING,PRINCIPAL,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
+  root.ACC={managerSignatureHTML,teacherSignatureHTML,sameRecord,archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,ABSENCE_ACTIONS,MANAGER_ABSENCE_ACTIONS,actionsFor,isAbsence,replyText,hasReplySignature,replySigner,managerReply,waitingManager,statusFor,MANAGER_PENDING,PRINCIPAL,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
 })(window);
 
 
