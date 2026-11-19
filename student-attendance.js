@@ -488,6 +488,29 @@
       ((kind==='all'||kind==='absence')?'<h3>غياب يوم '+escape(reportDate)+'</h3><p>طلاب رُصد لهم غياب في حصة واحدة على الأقل: '+todayRows.length+' · غياب اليوم الكامل: '+todayRows.filter(row=>row.status==='absent').length+'</p>'+absent:'')+
       ((kind==='all'||kind==='daily')?'<h3>تقرير الحضور والغياب اليومي</h3>'+daily:'')+
       ((kind==='all'||kind==='teachers')?'<h3>أعلى المعلمين حضورًا للطلاب لكل صف</h3><p>الترتيب حسب نسبة الحضور من الحالات المرصودة في الحصص، وتطبق فلاتر الصف والشعبة والحصة والمعلم.</p>'+ranking:'');
+    for(const heading of host.querySelectorAll('h3')){
+      const next=heading.nextElementSibling;
+      const grid=next?.matches('.sa-grid')?next:next?.nextElementSibling;
+      if(!grid?.matches('.sa-grid'))continue;
+      const share=document.createElement('button');
+      share.type='button';
+      share.textContent='مشاركة التقرير عبر واتساب';
+      share.onclick=()=>{
+        const rows=[...grid.querySelectorAll('tr')].map(row=>[...row.cells].map(cell=>cell.querySelector('a')?'':cell.textContent.trim()).filter(Boolean).join(' | '));
+        const report=[heading.textContent,book.from+' إلى '+book.to,...rows].join('\n');
+        if(encodeURIComponent(report).length>3500){
+          const url=URL.createObjectURL(new Blob([report],{type:'text/plain;charset=utf-8'}));
+          const link=document.createElement('a');
+          link.href=url;link.download=heading.textContent+'.txt';link.click();
+          setTimeout(()=>URL.revokeObjectURL(url),1000);
+          root.open('https://wa.me/?text='+encodeURIComponent(heading.textContent+' — '+book.from+' إلى '+book.to),'_blank','noopener');
+          status('نُزّل التقرير كاملًا. أرفق الملف في محادثة واتساب.');
+          return;
+        }
+        root.open('https://wa.me/?text='+encodeURIComponent(report),'_blank','noopener');
+      };
+      heading.insertAdjacentElement('afterend',share);
+    }
     $('saResults').hidden=kind!== 'all';
     $('saReportPrint').onclick=()=>{
       const printWindow=root.open('','_blank');
