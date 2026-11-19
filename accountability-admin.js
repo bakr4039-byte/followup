@@ -189,10 +189,13 @@
      ${a.archivedAt?`<div class="acc-reply"><b>القرار النهائي:</b> ${esc(a.decision||'—')}<br>${esc(A.actionsFor(a)[(+a.action||0)-1]||'')} ${esc(a.amount||'')} ${esc(a.penalty||'')}</div>`:''}
      <div>${A.subjectText(a).map(x=>esc(x)).join('<br>')}</div>
      ${a.reply?`<div><b style="font-size:13px">${A.managerReply(a)?'إفادة مدير المدرسة':'رد المعلم'} (${esc(A.hijri(A.isoOf(a.replyAt)))}هـ):</b><div class="acc-reply">${esc(A.replyText(a))}</div>${A.replySigner(a)?'<div>التوقيع الإلكتروني: <b>'+esc(A.replySigner(a))+'</b></div>':''}</div>`:''}
-     ${a.managerResponse?`<div><b>رد مدير المدرسة</b><div class="acc-reply">${esc(a.managerResponse)}</div><div>توقيع المدير: <b>${esc(a.managerSignedBy)}</b></div></div>`:''}
+     ${a.managerResponse?`<div><b>رد مدير المدرسة</b><div class="acc-reply">${esc(a.managerResponse)}</div><div>${a.managerSignatureMode==='delegate'?'التوقيع بالنيابة عن المدير':'توقيع المدير'}: <b>${esc(a.managerSignedBy)}</b></div>${A.managerSignatureHTML(a)}</div>`:''}
      ${absence&&a.status===A.MANAGER_PENDING&&!a.reply&&!a.archivedAt?'<div class="acc-acts"><button class="btn" data-acc-release>إتاحة المساءلة للمعلم للرد</button></div>':''}
      ${A.waitingManager(a)?`<div class="acc-dec"><b>إجراء مدير المدرسة</b><div class="acc-radios">${A.MANAGER_ABSENCE_ACTIONS.map((text,index)=>`<label><input type="radio" name="manager-action-${esc(a.id)}" data-manager-action value="${index+1}">${esc(text)}</label>`).join('')}</div><label class="field" data-manager-other-field hidden>أخرى<textarea class="acc-in" data-manager-reply maxlength="240" placeholder="اكتب الإجراء الآخر"></textarea></label>
-       <label><input type="checkbox" data-manager-sign> أوقّع باسم مدير المدرسة ${esc(A.PRINCIPAL)}</label>
+       <fieldset><legend>صفة التوقيع</legend><label><input type="radio" name="manager-sign-mode-${esc(a.id)}" data-manager-sign-mode value="manager"> توقيع المدير</label><label><input type="radio" name="manager-sign-mode-${esc(a.id)}" data-manager-sign-mode value="delegate"> أوقّع بالنيابة عن المدير</label></fieldset>
+       <label class="field" data-manager-delegate-field hidden>اسم الموقّع بالنيابة<input data-manager-delegate-name maxlength="150"></label>
+       <label class="field">صورة التوقيع<input type="file" data-manager-sign-file accept="image/png,image/jpeg,image/webp" disabled></label><p data-manager-sign-message role="status">اختر صفة التوقيع أولًا ثم ارفع الصورة.</p><img data-manager-sign-preview hidden alt="معاينة صورة التوقيع" style="max-width:220px;max-height:80px;object-fit:contain">
+       <label><input type="checkbox" data-manager-sign> أعتمد الصورة المرفوعة للتوقيع بالصفة المحددة</label>
        <div class="acc-acts"><button class="btn" data-acc-manager-reply>حفظ الإفادة والتوقيع</button></div></div>`:''}
      ${['replied','decided'].includes(st)&&!a.archivedAt?`<div class="acc-dec"><label class="field"><span style="font-size:13px;font-weight:600">قرار المسؤول المباشر</span><textarea class="acc-in" data-dec maxlength="${A.isAbsence(a)?240:600}">${esc(a.decision||'')}</textarea></label>
        <div class="acc-radios">${A.actionsFor(a).map((t,i)=>`<label><input type="radio" name="act-${esc(a.id)}" value="${i+1}" ${act===i+1?'checked':''}>${i+1}- ${esc(t)}</label>`).join('')}</div>
@@ -219,6 +222,33 @@
   $a('acStats').addEventListener('click',e=>{const b=e.target.closest('[data-stat]');if(!b)return;const key=b.dataset.stat;scope=key==='all'?'all':key==='archived'?'archive':'active';$a('acFilter').value=key==='all'?'':key;$a('acSearch').value='';$a('acFrom').value='';$a('acTo').value='';$a('acType').value='';paintList()});
   $a('acActive').onclick=()=>{scope='active';$a('acFilter').value='';paintList()};$a('acArchive').onclick=()=>{scope='archive';$a('acFilter').value='';paintList()};
   function listen(){if(window.AccountabilityRecorder||stop)return;stop=fs().collection(A.COL).onSnapshot(snap=>{list=snap.docs.map(d=>({id:d.id,...d.data(),updatedKey:String((d.data().replyAt&&d.data().replyAt.seconds)||'')+(d.data().decidedAt&&d.data().decidedAt.seconds||'')}));paintList()},e=>{stop=null;$a('acMsg').textContent=e&&e.code==='permission-denied'?'لا توجد صلاحية لقراءة المساءلات — انشر قواعد الأمان المحدّثة في Firebase.':'تعذّر تحميل المساءلات.'})}
+  $a('acList').addEventListener('change',async event=>{
+    const input=event.target;
+    if(!input.matches('[data-manager-sign-mode],[data-manager-sign-file]'))return;
+    const card=input.closest('[data-id]'),fileInput=card.querySelector('[data-manager-sign-file]'),preview=card.querySelector('[data-manager-sign-preview]'),message=card.querySelector('[data-manager-sign-message]');
+    const mode=card.querySelector('[data-manager-sign-mode]:checked')?.value;
+    preview.hidden=true;preview.removeAttribute('src');card.querySelector('[data-manager-sign]').checked=false;
+    if(input.matches('[data-manager-sign-mode]')){
+      fileInput.value='';fileInput.disabled=false;
+      card.querySelector('[data-manager-delegate-field]').hidden=mode!=='delegate';
+      message.textContent='ارفع صورة التوقيع للصفة المحددة.';return;
+    }
+    const file=fileInput.files[0];
+    if(!file)return;
+    if(!mode||!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>5*1024*1024){message.textContent='اختر صورة PNG أو JPG أو WebP حتى 5 ميجابايت.';fileInput.value='';return}
+    fileInput.dataset.loading='true';message.textContent='جارٍ تجهيز صورة التوقيع…';
+    const url=URL.createObjectURL(file);
+    try{
+      const image=new Image();image.src=url;await image.decode();
+      if(fileInput.files[0]!==file||card.querySelector('[data-manager-sign-mode]:checked')?.value!==mode)return;
+      const canvas=document.createElement('canvas'),ratio=Math.min(1,1600/image.naturalWidth,800/image.naturalHeight);
+      canvas.width=Math.max(1,Math.round(image.naturalWidth*ratio));canvas.height=Math.max(1,Math.round(image.naturalHeight*ratio));
+      canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
+      const signature=window.AssignmentSigning.normalizeSignature(canvas);
+      preview.src=signature;preview.hidden=false;message.textContent='راجع صورة التوقيع ثم اعتمدها.';
+    }catch(error){message.textContent=error.message||'تعذر تجهيز صورة التوقيع.';fileInput.value=''}
+    finally{URL.revokeObjectURL(url);fileInput.dataset.loading='false'}
+  });
   $a('acList').addEventListener('change',event=>{
     if(!event.target.matches('[data-manager-action]'))return;
     const card=event.target.closest('[data-id]'),field=card.querySelector('[data-manager-other-field]');
@@ -254,7 +284,13 @@
       if(!user||!Number.isInteger(choice)||choice<1||choice>A.MANAGER_ABSENCE_ACTIONS.length){toast('اختر إجراء مدير المدرسة.');return}
       if(choice===6&&(other.length<3||other.length>240)){toast('اكتب الإجراء الآخر من 3 إلى 240 حرفًا.');return}
       const reply=choice===6?other:A.MANAGER_ABSENCE_ACTIONS[choice-1];
-      if(!el.querySelector('[data-manager-sign]').checked){toast('اعتمد التوقيع قبل حفظ الإفادة.');return}
+      const signMode=el.querySelector('[data-manager-sign-mode]:checked')?.value;
+      const delegatedName=el.querySelector('[data-manager-delegate-name]').value.trim();
+      const signatureImage=el.querySelector('[data-manager-sign-preview]').getAttribute('src')||'';
+      if(!['manager','delegate'].includes(signMode)){toast('اختر توقيع المدير أو التوقيع بالنيابة عنه.');return}
+      if(signMode==='delegate'&&delegatedName.length<3){toast('اكتب اسم الموقّع بالنيابة عن المدير.');return}
+      if(el.querySelector('[data-manager-sign-file]').dataset.loading==='true'||!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signatureImage)||signatureImage.length>95000){toast('ارفع صورة توقيع واضحة وانتظر ظهور المعاينة.');return}
+      if(!el.querySelector('[data-manager-sign]').checked){toast('اعتمد صورة التوقيع بالصفة المحددة.');return}
       b.disabled=true;showAfterReply=a.id;
       if($a('acFilter').value===A.MANAGER_PENDING)$a('acFilter').value='';
       try{
@@ -262,7 +298,7 @@
         await db.runTransaction(async tx=>{
           const current=(await tx.get(ref)).data();
           if(!current||!A.waitingManager(current))throw Error('state-changed');
-          tx.update(ref,{managerResponse:reply,managerAction:choice,managerOther:choice===6?other:'',managerSignedBy:A.PRINCIPAL,managerSignedUid:user.uid,managerSignedAt:firebase.firestore.FieldValue.serverTimestamp()});
+          tx.update(ref,{managerResponse:reply,managerAction:choice,managerOther:choice===6?other:'',managerSignedBy:signMode==='delegate'?delegatedName:A.PRINCIPAL,managerSignatureImage:signatureImage,managerSignatureMode:signMode,managerSignedUid:user.uid,managerSignedAt:firebase.firestore.FieldValue.serverTimestamp()});
         });
         toast('تم حفظ الإفادة وتوقيع المدير. يمكنك الآن تسجيل القرار.');
       }catch(e){showAfterReply=null;toast(e.message==='state-changed'?'تغيّرت حالة المساءلة. أعد فتحها من السجل.':'تعذّر حفظ الإفادة والتوقيع.')}

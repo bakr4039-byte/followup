@@ -65,6 +65,10 @@
   .ab-paper>.ab-value{position:absolute;line-height:1.08;overflow-wrap:anywhere}
   .accp .ab-identity{display:flex;justify-content:center;gap:8px 22px;flex-wrap:wrap;margin:0 0 9px;font-size:14px}
   .accp .ac-copy{margin-top:auto;font-size:13px;font-weight:600;border-top:1.5px solid #000;padding-top:4px}.accp .ac-copy div{display:flex;justify-content:space-around;margin-top:6px}`;
+  function managerSignatureHTML(a,style='max-width:220px;max-height:80px;object-fit:contain'){
+    const source=a.managerSignatureImage;
+    return typeof source==='string'&&source.length<=95000&&/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(source)?`<img src="${source}" alt="${a.managerSignatureMode==='delegate'?'توقيع بالنيابة عن المدير':'توقيع المدير'}" style="${style}">`:'';
+  }
   function absenceHTML(a){
     const name=a.teacherFull||a.teacher||'';
     const template=new URL('assets/absence-accountability-template.png',document.baseURI).href;
@@ -100,7 +104,8 @@
       ${field(dayName(a.date),36,253,65)}
       ${field(name,355,303,412,{align:'right'})}
       ${field(a.monitor?.split(' / ').at(-1)||PRINCIPAL,389,410,298,{align:'right',bold:true})}
-      ${field(a.managerSignedBy,295,411,90,{size:12})}
+      ${managerSignatureHTML(a,`position:absolute;left:${295*scale}px;top:${398*scale}px;width:${90*scale}px;height:${23*scale}px;object-fit:contain`)}
+      ${field(a.managerSignatureImage?(a.managerSignatureMode==='delegate'?'بالنيابة / '+a.managerSignedBy:''):a.managerSignedBy,275,a.managerSignatureImage?425:411,125,{size:a.managerSignatureImage?9:12})}
       ${field(gregorian(isoOf(a.managerSignedAt)||requestDate),68,411,70,{size:13,dir:'ltr'})}
       ${replyLines.map((line,i)=>field(line,65,566+i*replyStep,748,{size:replySize,align:'right'})).join('')}
       ${field(reply?name:'',476,672,249,{align:'right',blank:true})}
@@ -209,7 +214,7 @@
     const canonical=v=>v instanceof Date?v.toISOString():Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
     return JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
   }
-  root.ACC={sameRecord,archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,ABSENCE_ACTIONS,MANAGER_ABSENCE_ACTIONS,actionsFor,isAbsence,replyText,hasReplySignature,replySigner,managerReply,waitingManager,statusFor,MANAGER_PENDING,PRINCIPAL,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
+  root.ACC={managerSignatureHTML,sameRecord,archiveData,viewPdf,ADMIN_PHONE,COL:ACC_COL,CATS,TIMES,MONITORS,ACTIONS,ABSENCE_ACTIONS,MANAGER_ABSENCE_ACTIONS,actionsFor,isAbsence,replyText,hasReplySignature,replySigner,managerReply,waitingManager,statusFor,MANAGER_PENDING,PRINCIPAL,STATUS,hijri,dayName,riyadhISO,isoOf,normPhone,subjectText,formHTML,CSS,pdfBlob,pdfFile,download,waUrl,sharePdfWa,esc};
 })(window);
 
 
