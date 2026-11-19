@@ -81,6 +81,11 @@
     const scale=W/884;
     const field=(value,x,y,width,{size=14,align='center',dir='rtl',bold=false,blank=false}={})=>value?`
       <span class="ab-value" dir="${dir}" style="left:${x*scale}px;top:${y*scale}px;width:${width*scale}px;font-size:${size*scale}px;text-align:${align};font-weight:${bold?700:400};${blank?'background:#fff':''}">${esc(value)}</span>`:'';
+    // Both printed signature labels have the same left edge on the official form.
+    const managerSignatureAt=y=>{
+      const signature=managerSignatureHTML(a,`position:absolute;inset:auto;left:${198*scale}px;top:${y*scale}px;width:${125*scale}px;height:${26*scale}px;object-fit:contain`);
+      return signature&&signature+field(a.managerSignatureMode==='delegate'&&a.managerSignedBy?'بالنيابة / '+a.managerSignedBy:'',198,y+26,125,{size:9});
+    };
     const gregorian=iso=>iso?String(iso).slice(0,10).split('-').reverse().join('/'):'';
     const hijriDate=iso=>iso?hijri(iso).split('/').map(part=>part.padStart(2,'0')).join('/'):'';
     const requestDate=isoOf(a.createdAt)||a.date;
@@ -109,6 +114,7 @@
       ${field(dayName(a.date),36,253,65)}
       ${field(name,355,303,412,{align:'right'})}
       ${field(a.monitor?.split(' / ').at(-1)||PRINCIPAL,389,410,298,{align:'right',bold:true})}
+      ${managerSignatureAt(403)}
       ${field(gregorian(isoOf(a.managerSignedAt)||requestDate),68,411,70,{size:13,dir:'ltr'})}
       ${replyLines.map((line,i)=>field(line,65,566+i*replyStep,748,{size:replySize,align:'right'})).join('')}
       ${field(reply?name:'',476,672,249,{align:'right',blank:true})}
@@ -117,8 +123,7 @@
       ${selected?field('✓',selected[0],selected[1],26,{size:19,bold:true}):''}
       ${managerAction===6?field(a.managerAction?a.managerOther:a.decision,185,805,231,{size:12,align:'right',blank:true}):''}
 
-      ${managerSignatureHTML(a,`position:absolute;inset:auto;left:${370*scale}px;top:${830*scale}px;width:${165*scale}px;height:${28*scale}px;object-fit:contain`)}
-      ${field(a.managerSignatureMode==='delegate'&&a.managerSignedBy?'بالنيابة / '+a.managerSignedBy:'',370,857,165,{size:9})}
+      ${managerSignatureAt(832)}
       ${field(gregorian(decisionDate||isoOf(a.managerSignedAt)),68,845,70,{size:13,dir:'ltr'})}
     </div>`;
   }
