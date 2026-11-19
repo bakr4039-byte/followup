@@ -25,7 +25,7 @@
   }
   const titleWords=value=>normalize(digits(value)).replace(/[^\p{L}\p{N}]+/gu,' ').trim();
   function titleSlot(title){
-    const text=titleWords(title);
+    const text=titleWords(title).replace(/اال(?=(?:اولي|ثاني|ثالث|رابع|خامس|سادس|سابع))/g,'ال');
     const match=/(?:^|\s)الحص[هة]\s+((?:ال)?(?:اولي|ثاني[ةه]|ثالث[ةه]|رابع[ةه]|خامس[ةه]|سادس[ةه]|سابع[ةه])|[1-7])(?=\s|$)/.exec(text);
     if(!match)return {period:0,subject:''};
     const ordinal=match[1].replace(/^ال/,'').replace(/ه$/,'ة');
@@ -92,6 +92,52 @@
     }
     return [...groups.values()].sort((a,b)=>b.absent-a.absent||a.name.localeCompare(b.name,'ar'));
   }
+  function dailyAttendance(records,rosters,dates,expectedPeriods){
+    const days=new Map();
+    for(const date of dates){
+      for(const [classId,roster] of rosters){
+        const expected=expectedPeriods(classId,date);
+        if(!expected.length)continue;
+        const lessons=records.filter(record=>record.date===date&&record.classId===classId);
+        const students=new Map(roster.map(student=>[student.id,student]));
+        for(const lesson of lessons)for(const student of lesson.students)if(!students.has(student.id))students.set(student.id,student);
+        for(const student of students.values()){
+          const marks=new Map();
+          for(const lesson of lessons){
+            const mark=lesson.students.find(row=>row.id===student.id);
+            if(mark&&expected.includes(lesson.period))marks.set(lesson.period,mark.status);
+          }
+          const present=[...marks.values()].includes('present');
+          const complete=expected.every(period=>marks.get(period)==='absent');
+          const status=present?'present':complete?'absent':'unmarked';
+          const key=date+'|'+student.id,row={...student,date,classId,status,absentLessons:[...marks.values()].filter(mark=>mark==='absent').length,presentLessons:[...marks.values()].filter(mark=>mark==='present').length,marked:[...marks.values()].filter(mark=>mark==='present'||mark==='absent').length,expected:expected.length};
+          const previous=days.get(key);
+          if(!previous||row.status==='present'&&previous.status!=='present'||row.marked>previous.marked&&previous.status!=='present')days.set(key,row);
+        }
+      }
+    }
+    return [...days.values()];
+  }
+  function attendanceDays(rows){
+    const students=new Map();
+    for(const row of rows){
+      const key=row.id;
+      if(!students.has(key))students.set(key,{id:key,name:row.name,classes:new Set(),present:0,absent:0,unmarked:0});
+      const total=students.get(key);total.classes.add(row.classId);total[row.status]++;
+    }
+    return [...students.values()].sort((a,b)=>b.absent-a.absent||a.name.localeCompare(b.name,'ar'));
+  }
+  function teacherRanking(records){
+    const groups=new Map();
+    for(const record of records){
+      const grade=Number(/^g([123])-/.exec(record.classId)?.[1]||0),teacher=String(record.teacher||'غير محدد'),key=grade+'|'+teacher;
+      if(!groups.has(key))groups.set(key,{grade,teacher,lessons:0,present:0,absent:0,unmarked:0});
+      const group=groups.get(key);group.lessons++;
+      for(const student of record.students)if(Object.hasOwn(labels,student.status))group[student.status]++;
+    }
+    return [...groups.values()].map(row=>({...row,rate:row.present+row.absent?row.present/(row.present+row.absent):null}))
+      .sort((a,b)=>a.grade-b.grade||(b.rate??-1)-(a.rate??-1)||b.present-a.present||a.teacher.localeCompare(b.teacher,'ar'));
+  }
   function rosterPlan(classMap,previous,source,makeId){
     const old=Object.entries(previous).flatMap(([classId,data])=>(data.students||[]).map(student=>({classId,student})));
     const byIdentity=new Map(),byName=new Map(),incomingNames=new Map(),incomingAliases=new Map(),seen=new Set(),claimed=new Set();
@@ -141,7 +187,7 @@
     }
     return {classes,classIds:[...classIds],students,archived,stats};
   }
-  if(typeof module!=='undefined')module.exports={reportClass,matchReport,guardianLink,remoteSessions,rosterPlan,studentTotals,lessonTotals,titleSlot};
+  if(typeof module!=='undefined')module.exports={reportClass,matchReport,guardianLink,remoteSessions,rosterPlan,studentTotals,lessonTotals,titleSlot,dailyAttendance,attendanceDays,teacherRanking};
   if(!root.document||!root.firebase?.apps.length)return;
 
   const db=firebase.firestore(),auth=firebase.auth(),app=root.__FUACC;
@@ -168,8 +214,10 @@
     '<label>الصف<select id="saGrade"><option value="">كل الصفوف</option>'+grades.slice(1).map((grade,i)=>'<option value="'+(i+1)+'">'+grade+' بالكامل</option>').join('')+'</select></label>'+
     '<label>الشعبة<select id="saClass"><option value="">كل الشعب</option></select></label>'+
     '<label>الحصة<select id="saPeriod"><option value="">جميع الحصص</option>'+periods.map((period,i)=>'<option value="'+(i+1)+'">'+period+'</option>').join('')+'</select></label>'+
+    '<label>المعلم<select id="saTeacher"><option value="">الجميع</option></select></label>'+
+    '<label>التقرير<select id="saReportKind"><option value="all">جميع التقارير</option><option value="students">أيام حضور وغياب الطلاب</option><option value="absence">غياب اليوم ورسائل أولياء الأمور</option><option value="daily">الحضور والغياب اليومي</option><option value="teachers">أعلى المعلمين حضورًا للطلاب</option></select></label>'+
     '<button type="submit">عرض السجل</button></form>'+
-    '<p id="saStatus" role="status"></p><div id="saResults"></div><section id="saBody"></section>';
+    '<p id="saStatus" role="status"></p><section id="saReports"></section><div id="saResults"></div><section id="saBody"></section>';
   let navigation;
   if(app){
     $('boardView').after(view);
@@ -204,7 +252,7 @@
     #studentAttendance button:disabled{opacity:.55}
     #studentAttendance #saSave,#saFilters button[type=submit]{background:#17624d;color:#fff}
     #saStatus:empty{display:none}
-    @media print{#saFilters,#saClose,#saStatus,#saStudentEditor,#studentAttendance button{display:none!important}#studentAttendance .sa-grid{overflow:visible}}
+    @media print{#saFilters,#saClose,#saStatus,#saStudentEditor,#studentAttendance button,#studentAttendance .sa-actions{display:none!important}#studentAttendance .sa-grid{overflow:visible}}
   `;
   document.head.append(style);
   if(app){mountRosterSync();mountBatchAttendance();}
@@ -212,7 +260,7 @@
   const status=text=>{$('saStatus').textContent=text;};
   const message=err=>err?.code==='permission-denied'?'حسابك لا يملك صلاحية الوصول إلى هذا السجل.':err?.message||'تعذّر تحميل سجل الحضور.';
   const setBusy=value=>{busy=value;for(const control of view.querySelectorAll('input,select,button:not(#saClose)'))control.disabled=value;};
-  const clear=()=>{sequence++;draft=null;activeSheet=null;$('saResults').textContent='';$('saBody').textContent='';status('');};
+  const clear=()=>{sequence++;draft=null;activeSheet=null;$('saReports').textContent='';$('saResults').textContent='';$('saResults').hidden=false;$('saBody').textContent='';status('');};
   const counts=rows=>rows.reduce((n,r)=>{if(Object.hasOwn(n,r.status))n[r.status]++;return n;},{present:0,absent:0,unmarked:0});
   const summary=rows=>{const n=counts(rows);return 'الحضور '+n.present+' · الغياب '+n.absent+' · غير مرصود '+n.unmarked;};
   const close=()=>{
@@ -266,6 +314,8 @@
     finally{setBusy(false);}
   };
   $('saGrade').onchange=()=>refreshClasses(classes);
+  $('saTeacher').onchange=()=>{if(!busy)load();};
+  $('saReportKind').onchange=()=>{if(activeSheet)paintReports();};
   $('saFilters').onsubmit=event=>{event.preventDefault();if(!busy)load();};
   function schoolDates(from,to){
     const dates=[];
@@ -364,6 +414,7 @@
   }
   function paintSheet(keepEditor=false){
     const book=activeSheet;if(!book)return;
+    paintReports();
     if(!keepEditor){$('saBody').textContent='';draft=null;}
     const opened=new Set([...$('saSheet').querySelectorAll('details[data-sa-day][open]')].map(row=>row.dataset.saDay));
     const byClass=new Map();
@@ -401,6 +452,56 @@
       records.map(row=>'<tr><th class="sa-student-name" scope="row">'+escape(row.name)+'</th><td>'+escape([...row.classes].join('، '))+'</td><td>'+row.present+'</td><td>'+row.absent+'</td><td>'+row.unmarked+'</td></tr>').join('')+
       '</tbody></table></div></details>'+rollup(book.records,'subject','المادة')+rollup(book.records,'teacher','المعلم'):'';
   }
+  function paintReports(){
+    const book=activeSheet,host=$('saReports');if(!book||!host)return;
+    const rosterMap=new Map(book.rosters);
+    for(const c of book.items)if(!rosterMap.has(c.id))rosterMap.set(c.id,[]);
+    const expected=(classId,date)=>{
+      const grade=gradeOf(classId),section=Number(classId.split('-s')[1]);
+      const group=grade===3?(section===10?'ba':section===9?'cs':'c3'):'c'+grade;
+      const day=new Date(date+'T00:00:00Z').getUTCDay();
+      const sessions=(app?.S||[]).filter(row=>row.day===day&&row.cls===group);
+      const periods=sessions.map(row=>row.slot+1);
+      if(!app?.S?.length)periods.push(...scheduleColumns.map(column=>column.period));
+      // Include saved lessons when their schedule changed after attendance was recorded.
+      for(const record of book.dailyRecords||book.records)if(record.classId===classId&&record.date===date&&!periods.includes(record.period))periods.push(record.period);
+      return [...new Set(periods)];
+    };
+    const days=dailyAttendance(book.dailyRecords||book.records,rosterMap,book.dates,expected),totals=attendanceDays(days);
+    const kind=$('saReportKind').value;
+    const className=id=>book.items.find(c=>c.id===id)?.label||id;
+    const table=(head,body)=>'<div class="sa-grid"><table><thead><tr>'+head.map(x=>'<th>'+escape(x)+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table></div>';
+    const cells=values=>'<tr>'+values.map(x=>'<td>'+escape(x)+'</td>').join('')+'</tr>';
+    const students=table(['الطالب','الفصل','أيام الحضور','أيام الغياب الكامل','أيام غير مكتملة الرصد'],totals.map(row=>cells([row.name,[...row.classes].map(className).join('، '),row.present,row.absent,row.unmarked])).join(''));
+    const dailyRows=book.dates.map(date=>{const rows=days.filter(row=>row.date===date);return cells([date,rows.length,rows.filter(row=>row.status==='present').length,rows.filter(row=>row.status==='absent').length,rows.filter(row=>row.status==='unmarked').length]);}).join('');
+    const daily=table(['التاريخ','عدد الطلاب','حاضر خلال اليوم','غائب اليوم كاملًا','غير مكتمل الرصد'],dailyRows);
+    const ranking=table(['الصف','المعلم','الحصص المرصودة','حالات الحضور','حالات الغياب','غير مرصود','نسبة الحضور'],teacherRanking(book.records).map(row=>cells([grades[row.grade]||'—',root.StaffSettings?.displayName(row.teacher)||row.teacher,row.lessons,row.present,row.absent,row.unmarked,row.rate===null?'—':(row.rate*100).toFixed(1)+'%'])).join(''));
+    const reportDate=book.to;
+    const todayRows=days.filter(row=>row.date===reportDate&&row.absentLessons>0);
+    const absent=table(['الطالب','الفصل','حصص الغياب','حالة اليوم','إشعار ولي الأمر'],todayRows.map(row=>{
+      const text='ولي أمر الطالب '+row.name+'، السلام عليكم ورحمة الله. نحيطكم برصد غياب الطالب عن '+row.absentLessons+' حصة بتاريخ '+reportDate+' في ثانوية الصحافة الأهلية. نأمل التواصل مع المدرسة وبيان العذر. شكرًا لتعاونكم.';
+      const link=guardianLink(row.guardianPhone||'',text);
+      return '<tr><td>'+escape(row.name)+'</td><td>'+escape(className(row.classId))+'</td><td>'+row.absentLessons+' / '+row.expected+'</td><td>'+escape(row.status==='absent'?'غائب اليوم كاملًا':row.status==='present'?'حضر بعض الحصص':'بانتظار اكتمال الرصد')+'</td><td>'+(link?'<a target="_blank" rel="noopener noreferrer" href="'+escape(link)+'">إرسال رسالة واتساب لولي الأمر</a>':'جوال ولي الأمر غير مسجّل')+'</td></tr>';
+    }).join(''));
+    host.innerHTML='<h3>تقارير الطلاب للفترة '+escape(book.from)+' إلى '+escape(book.to)+'</h3><p>يحسب حضور اليوم من حضور حصة واحدة على الأقل، ويحسب غياب اليوم الكامل بعد رصد كل الحصص المطلوبة بالغياب. المتأخرون ضمن الحضور. الأيام غير المكتملة تحتاج استكمال الرصد. إحصاءات الأيام تشمل جميع حصص الطالب، وفلاتر المعلم والحصة تطبق على ترتيب المعلمين وسجل الحصص.</p><div class="sa-actions"><button type="button" id="saReportPrint">طباعة التقارير / حفظ PDF</button><button type="button" id="saReportExport">تنزيل التقارير Excel (CSV)</button></div>'+
+      ((kind==='all'||kind==='students')?'<h3>سجل أيام حضور وغياب كل طالب</h3>'+students:'')+
+      ((kind==='all'||kind==='absence')?'<h3>غياب يوم '+escape(reportDate)+'</h3><p>طلاب رُصد لهم غياب في حصة واحدة على الأقل: '+todayRows.length+' · غياب اليوم الكامل: '+todayRows.filter(row=>row.status==='absent').length+'</p>'+absent:'')+
+      ((kind==='all'||kind==='daily')?'<h3>تقرير الحضور والغياب اليومي</h3>'+daily:'')+
+      ((kind==='all'||kind==='teachers')?'<h3>أعلى المعلمين حضورًا للطلاب لكل صف</h3><p>الترتيب حسب نسبة الحضور من الحالات المرصودة في الحصص، وتطبق فلاتر الصف والشعبة والحصة والمعلم.</p>'+ranking:'');
+    $('saResults').hidden=kind!== 'all';
+    $('saReportPrint').onclick=()=>{
+      const printWindow=root.open('','_blank');
+      if(!printWindow){status('اسمح بفتح نافذة الطباعة ثم حاول مجددًا.');return;}
+      printWindow.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقارير حضور الطلاب</title><style>body{font:14px Tahoma,Arial;direction:rtl;padding:20px}table{width:100%;border-collapse:collapse;margin:12px 0}td,th{border:1px solid #999;padding:7px;text-align:right}th{background:#e8f2ed}h3{margin-top:24px}button,.sa-actions,a{display:none}@page{size:A4 landscape;margin:12mm}</style></head><body>'+host.innerHTML+'</body></html>');
+      printWindow.document.close();printWindow.focus();printWindow.print();
+    };
+    $('saReportExport').onclick=()=>{
+      const rows=[...host.querySelectorAll('h3,table tr')].map(el=>el.tagName==='H3'?[el.textContent]:[...el.children].map(cell=>cell.textContent));
+      const csv='\ufeff'+rows.map(row=>row.map(value=>'"'+String(value).replace(/^[=+@-]/,"'\$&").replace(/"/g,'""')+'"').join(',')).join('\r\n');
+      const link=document.createElement('a'),url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+      link.href=url;link.download='تقارير-حضور-الطلاب-'+book.from+'-'+book.to+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    };
+  }
   function rollup(records,key,label){
     return '<details><summary>ملخص حضور وغياب الطلاب حسب '+label+'</summary><div class="sa-grid"><table>'+
       '<thead><tr><th>'+label+'</th><th>سجلات الحصص</th><th>حاضر</th><th>غائب</th><th>غير مرصود</th><th>نسبة الحضور من الحالات المرصودة</th></tr></thead><tbody>'+
@@ -435,14 +536,20 @@
       }
       const items=classes.filter(c=>(!grade||c.grade===grade)&&(!classId||c.id===classId))
         .map(c=>({...c,label:grades[c.grade]+' '+c.grade+String(c.section).padStart(2,'0')}));
-      const selected=records.filter(record=>(!period||record.period===period)&&(!grade||gradeOf(record.classId)===grade)&&(!classId||record.classId===classId));
+      let teacher=$('saTeacher').value;
+      const teachers=[...new Set(records.map(record=>record.teacher))].sort((a,b)=>a.localeCompare(b,'ar'));
+      $('saTeacher').innerHTML='<option value="">الجميع</option>'+teachers.map(name=>'<option value="'+escape(name)+'">'+escape(root.StaffSettings?.displayName(name)||name)+'</option>').join('');
+      if(!teachers.includes(teacher))teacher='';
+      $('saTeacher').value=teacher;
+      const selected=records.filter(record=>(!period||record.period===period)&&(!grade||gradeOf(record.classId)===grade)&&(!classId||record.classId===classId)&&(!teacher||record.teacher===teacher));
       const rosters=new Map();
       if(actor.edit){
         const snapshots=await Promise.all(items.map(c=>db.doc('config/onsite-students-'+c.id).get()));
-        items.forEach((c,index)=>rosters.set(c.id,(snapshots[index].data()?.students||[]).map(s=>({id:s.id,name:s.name}))));
+        items.forEach((c,index)=>rosters.set(c.id,(snapshots[index].data()?.students||[]).map(s=>({id:s.id,name:s.name,guardianPhone:s.guardianPhone||''}))));
       }
       if(token!==sequence)return;
-      activeSheet={records:selected,items,rosters,period,from,to,dates:dateList};
+      const dailyRecords=records.filter(record=>(!grade||gradeOf(record.classId)===grade)&&(!classId||record.classId===classId));
+      activeSheet={records:selected,dailyRecords,items,rosters,period,teacher,from,to,dates:dateList};
       $('saResults').innerHTML='<div id="saSheet"></div><div id="saPeriodTotals"></div>';
       paintSheet();
       status('');
@@ -559,6 +666,8 @@
           if(activeSheet){
             activeSheet.records=activeSheet.records.filter(row=>row.date!==record.date||row.classId!==record.classId||row.period!==record.period);
             activeSheet.records.push(record);
+            activeSheet.dailyRecords=(activeSheet.dailyRecords||[]).filter(row=>row.date!==record.date||row.classId!==record.classId||row.period!==record.period);
+            activeSheet.dailyRecords.push(record);
             paintSheet(true);
           }
           status('تم حفظ الحضور والغياب.');
@@ -598,7 +707,7 @@
       'موسى العطو':['موسى الحمد','موسى حمد العطو'],
       'تامر شعيشع':['تامر محمد محمد السيد']
     };
-    const subjectAliases={'لفظي':['قدرات لفظية','القدرات اللفظية'],'كمي':['قدرات كمية','القدرات الكمية'],'كفايات':['الكفايات اللغوية'],'انجليزي':['اللغة الإنجليزية']};
+    const subjectAliases={'لفظي':['قدرات لفظية','القدرات اللفظية'],'كمي':['قدرات كمية','القدرات الكمية'],'كفايات':['الكفايات اللغوية'],'انجليزي':['اللغة الإنجليزية'],'علم أرض':['علوم الأرض والفضاء','علوم الارض والفضاء'],'تحصيلي فيزياء':['فيزياء تحصيلي'],'تحصيلي كيمياء':['كيمياء تحصيلي'],'تحصيلي أحياء':['أحياء تحصيلي'],'تحصيلي رياضيات':['رياضيات تحصيلي']};
     function evidence(title,subjectOnly,lesson){
       const raw=squash(title);
       const teacher=lesson.teacher;
