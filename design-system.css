@@ -36,7 +36,8 @@ h1,h2,h3{font-family:var(--f-display);font-weight:700}
 canvas.as-pad,.acc-sign canvas{background-color:#fff;border:1.5px dashed var(--accent);border-radius:12px;touch-action:none;cursor:crosshair}
 
 /* Manager home dashboard (home-dashboard.js). */
-.hd-home{display:grid;gap:18px;padding:0!important;border:0!important;background:none!important;box-shadow:none!important}
+.hd-home>*+*{margin-top:16px}
+.hd-home{padding:0!important;border:0!important;background:none!important;box-shadow:none!important}
 .hd-hero{background:linear-gradient(135deg,var(--accent),#0b5747);color:#fff;border-radius:18px;padding:22px 24px;box-shadow:var(--shadow)}
 .hd-hero h2{margin:4px 0;font-size:22px;color:#fff}.hd-hero p{margin:0;opacity:.9;font-size:13.5px}
 .hd-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
