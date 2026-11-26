@@ -557,7 +557,7 @@
     const toMode=book.skipped?.get(book.to);
     const lessonsDay=(book.dailyRecords||book.records).filter(record=>record.date===cardDay).length;
     const card=(count,label,tone,target)=>'<button type="button" class="sa-card '+tone+'" data-sa-goto="'+target+'"><b>'+count+'</b><span>'+escape(label)+'</span></button>';
-    $('saCards').innerHTML='<p class="sa-cards-title">'+(toMode?'يوم '+escape(book.to)+' '+escape(modeNames[toMode]||toMode)+' ولا يُحتسب في رصد الحضور عن بُعد · ملخص آخر يوم دراسي '+escape(cardDay):'ملخص يوم '+escape(cardDay))+(book.skipped?.size?' · استُبعد من الفترة '+book.skipped.size+' يوم إجازة أو حضوري':'')+'</p>'+
+    $('saCards').innerHTML='<p class="sa-cards-title">'+(toMode?'يوم '+escape(book.to)+' '+escape(modeNames[toMode]||toMode)+' ولا يُحتسب في رصد الحضور عن بُعد · ملخص آخر يوم دراسي '+escape(cardDay):'ملخص يوم '+escape(cardDay))+(book.skipped?.size?' · استُبعد من الفترة '+book.skipped.size+(book.skipped.size>=3&&book.skipped.size<=10?' أيام':' يومًا')+' (إجازة أو حضوري)':'')+'</p>'+
       card(dayRows.length,'طالبًا مطلوب رصدهم','','record')+
       card(dayRows.filter(row=>row.status==='present').length,'حاضرون','ok','record')+
       card(dayRows.filter(row=>row.status==='absent').length,'غائبون اليوم كاملًا','bad','absence')+
