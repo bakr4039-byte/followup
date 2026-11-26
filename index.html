@@ -1207,7 +1207,7 @@ $('bDay').onchange=()=>{state.bDay=+$('bDay').value;renderBoard()};
 $('fsBtn').onclick=async()=>{const el=$('boardView');try{if(document.fullscreenElement)await document.exitFullscreen();else await el.requestFullscreen()}catch(e){toast('ملء الشاشة غير متاح هنا')}};
 
 // ---------- overdue (ended + 10 min, not logged) ----------
-const dueSeen=new Set();let dueInit=false,dueHide=0;
+const dueSeen=new Set();let dueInit=false,dueHide=0,dueExpanded=false;
 function overdueList(){if(state.week!==CUR_WEEK||state.role==null||isMon()||!state.db)return [];const ti=todayIdx();if(ti<0)return [];const now=riyadh().min;
   return scope().filter(s=>(state.role<0||s.sup===state.role)&&!(state.logs[s.id]&&ST[state.logs[s.id].status])&&(s.day<ti||(s.day===ti&&now>=toMin(SLOTS[s.slot][2])+10)))}
 function renderDue(){if(!onlineWeek()){$("dueBar").hidden=true;return;}const list=overdueList(),bar=$('dueBar');const ti=todayIdx();
@@ -1217,10 +1217,11 @@ function renderDue(){if(!onlineWeek()){$("dueBar").hidden=true;return;}const lis
   if(!list.length||dueHide>=list.length){bar.hidden=true;return}
   const today=list.filter(s=>s.day===ti),older=list.length-today.length;
   const canAsk='Notification' in window&&Notification.permission==='default';
-  bar.innerHTML=`<b>⏰ ${list.length} حصة انتهت ولم تُرصد بعد</b><div class="dchips">${list.slice(0,8).map(s=>`<button class="dchip" data-open="${s.id}">${s.day===ti?'':DAYS[s.day].n+' · '}${esc(s.label)} · ${esc(s.subj)} · ${esc(s.teacher)}</button>`).join('')}${list.length>8?`<span class="note">و${list.length-8} أخرى</span>`:''}${older?`<span class="note">(${older} من أيام سابقة)</span>`:''}</div>${canAsk?'<button class="iconbtn" id="dueNotif">تفعيل إشعارات المتصفح</button>':''}<button class="iconbtn" id="dueAll">عرضها في السجل</button><button class="iconbtn" id="dueHide" aria-label="إخفاء">إخفاء</button>`;
+  bar.innerHTML=`<b>⏰ ${list.length} حصة انتهت ولم تُرصد بعد</b><div class="dchips">${list.slice(0,dueExpanded?60:3).map(s=>`<button class="dchip" data-open="${s.id}">${s.day===ti?'':DAYS[s.day].n+' · '}${esc(s.label)} · ${esc(s.subj)} · ${esc(s.teacher)}</button>`).join('')}${list.length>3?`<button class="iconbtn" id="dueMore" type="button" aria-expanded="${dueExpanded}">${dueExpanded?'عرض أقل':'+ '+(list.length-3)+' أخرى'}</button>`:''}${older&&!dueExpanded?`<span class="note">(${older} من أيام سابقة)</span>`:''}</div>${canAsk?'<button class="iconbtn" id="dueNotif">تفعيل إشعارات المتصفح</button>':''}<button class="iconbtn" id="dueAll">عرضها في السجل</button><button class="iconbtn" id="dueHide" aria-label="إخفاء">إخفاء</button>`;
   bar.hidden=false;
   $('dueAll').onclick=()=>{state.from=0;state.to=4;paintDayOpts();$('fStatus').value='pending';setView('report')};
   $('dueHide').onclick=()=>{dueHide=list.length;bar.hidden=true};
+  const more=$('dueMore');if(more)more.onclick=()=>{dueExpanded=!dueExpanded;renderDue()};
   const nb=$('dueNotif');if(nb)nb.onclick=async()=>{try{const r=await Notification.requestPermission();toast(r==='granted'?'تم تفعيل الإشعارات':'لم تُفعّل الإشعارات')}catch(e){}renderDue()}}
 // ---------- admin: staff follow-up ----------
 function isDue(s){if(state.week<CUR_WEEK)return true;if(state.week>CUR_WEEK)return false;const ti=todayIdx();if(ti<0)return true;return s.day<ti||(s.day===ti&&riyadh().min>=toMin(SLOTS[s.slot][2]))}
