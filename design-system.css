@@ -1,0 +1,22 @@
+/* design-system.css — one visual identity for every page of the platform
+   (manager, teacher, employee, recorder, login). Loaded first on each page:
+   page styles keep their layout but share these tokens, fonts and focus styles. */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;600;700&display=swap');
+
+:root{
+  --bg:#EEF2F1;--surface:#FFFFFF;--surface-2:#F5F8F7;--line:#D5DFDC;--ink:#11302B;--muted:#5B726D;
+  --accent:#0E6B57;--accent-ink:#FFFFFF;--accent-soft:#DCEFE9;--brass:#A87B2D;
+  --ok:#1C8A4E;--ok-soft:#DDF3E5;--warn:#B7791F;--warn-soft:#FBEFD8;--bad:#C2413A;--bad-soft:#FBE1DF;
+  --tech:#6B4FB8;--tech-soft:#ECE6FA;--idle:#8A9A96;--idle-soft:#EAEFEE;
+  --shadow:0 1px 2px rgba(17,48,43,.06),0 6px 18px rgba(17,48,43,.06);
+  --f-display:"Reem Kufi","IBM Plex Sans Arabic",Tahoma,sans-serif;
+  --f-body:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",sans-serif;
+  --r:12px;
+  /* Aliases used by teacher-ui.css pages. */
+  --green:var(--accent);--radius:20px;
+}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--f-body);color:var(--ink);background:var(--bg)}
+h1,h2,h3{font-family:var(--f-display);font-weight:600}
+:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+::selection{background:var(--accent-soft)}
