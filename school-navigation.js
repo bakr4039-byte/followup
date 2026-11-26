@@ -1,7 +1,7 @@
 /* Move existing controls into one school navigation; preserve their listeners and role gates. */
 (function(root){'use strict';if(!root.document)return;document.body.classList.add('school-ui');
 const groups=[
-{key:'students',title:'شؤون الطلاب والحضور',note:'حضور الطلاب وملفاتهم وبياناتهم',ids:['vStudentAttendance','schoolProfilesLink']},
+{key:'students',title:'شؤون الطلاب والحضور',note:'حضور الطلاب وملفاتهم والإذاعة المدرسية',ids:['vStudentAttendance','schoolProfilesLink','schoolRadioLink']},
 {key:'day',title:'شؤون المعلمين والمتابعة',note:'جدول اليوم والانتظار والمناوبة والزيارات',ids:['vSchedule','vSubs','vSchoolDuty','vStaff','schoolSupervisionLink']},
 {key:'schedules',title:'الجداول',note:'الجدول المدرسي وملفات الجداول',ids:['vTimetable','schoolTimetableBuilderLink','vSchoolSchedule']},
 {key:'followup',title:'التقارير والمؤشرات',note:'التقارير ومؤشرات المدرسة',ids:['schoolReportsLink','vReport','vBoard']},

@@ -477,6 +477,28 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active','updatedBy','updatedAt']);
       allow delete: if false;
     }
+    // School radio programs: manager only; programs are cancelled, never deleted.
+    function validRadio(d) {
+      return d.keys().hasOnly(['date','classId','classLabel','supervisor','theme','segments','status','rating','notes','createdBy','createdAt','updatedBy','updatedAt'])
+        && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.classId is string && d.classId.size() > 0 && d.classId.size() <= 40
+        && d.classLabel is string && d.classLabel.size() <= 80
+        && d.supervisor is string && d.supervisor.size() <= 80
+        && d.theme is string && d.theme.size() <= 120
+        && d.segments is list && d.segments.size() <= 15
+        && d.status in ['planned','done','cancelled']
+        && d.rating is int && d.rating >= 0 && d.rating <= 5
+        && d.notes is string && d.notes.size() <= 600
+        && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
+    }
+    match /radioPrograms/{programId} {
+      allow read: if admin();
+      allow create: if admin() && validRadio(request.resource.data)
+        && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+      allow update: if admin() && validRadio(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['supervisor','theme','segments','status','rating','notes','updatedBy','updatedAt']);
+      allow delete: if false;
+    }
   match /formRecords/{recordId} {
     function validForm(f) {
       return f.keys().hasOnly(['formCode','owner','title','header','rows','status','revision','createdBy','createdAt','updatedBy','updatedAt']) &&
