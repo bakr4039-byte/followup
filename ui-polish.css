@@ -70,3 +70,15 @@
 .load-spin{width:34px;height:34px;flex:none;border-radius:50%;border:4px solid #d7e6df;border-top-color:#176c4e;animation:load-spin 1s linear infinite}
 @keyframes load-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.load-spin{animation:none;border-top-color:#8bb4a2}}
+/* Compact sidebar header so all four navigation groups fit on short screens. */
+.school-sidebar .school-sidebar-brand{padding:14px 16px 12px;gap:10px}
+.school-sidebar .school-sidebar-seal.school-brand-seal{width:52px;height:46px;flex:0 0 52px;padding:2px;border-radius:8px}
+.school-sidebar .school-sidebar-brand strong{font-size:14px;line-height:1.45}
+.school-sidebar .school-sidebar-brand small{font-size:10.5px;margin-top:1px}
+.school-sidebar .school-sidebar-account{margin:10px 14px 2px;padding:7px 12px;border-radius:10px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.school-sidebar .school-sidebar-account span{display:inline;margin:0;font-size:10.5px}
+.school-sidebar .school-sidebar-account strong{font-size:12.5px;line-height:1.5}
+.school-sidebar .school-sidebar-links{padding-top:10px}
+.school-sidebar .school-nav-group .school-group-toggle{min-height:46px;padding:8px 12px}
+.school-sidebar .school-sidebar-footer{padding:10px 16px 12px;gap:8px}
+.school-sidebar .school-sidebar-footer button{min-height:38px}
