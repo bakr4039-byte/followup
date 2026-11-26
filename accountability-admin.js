@@ -170,7 +170,7 @@
       if(win){const m=teacherMsg(d,ref.id);win.location.href=A.waUrl(m.phone,m.text)}
       msg.textContent=absence?(win?'ظهر نموذج مساءلة الغياب في حساب المعلم، وفُتح واتساب لإرسال رابط النسخة والرد.':'ظهر نموذج مساءلة الغياب في حساب المعلم للرد.'):ph?'تم حفظ المساءلة وفتح الواتساب للمعلم.':'تم حفظ المساءلة. لا يوجد رقم جوال لهذا المعلم — اكتبه في خانة «جوال المعلم» في المرة القادمة أو أضفه من «تقارير المعلمين».';
       toast('تم حفظ المساءلة');resetForm();if(A.isAbsence(d)){$a('acT').value='';$a('acT').onchange()}setTab('log')}
-    catch(e){if(win)win.close();console.error(e);const em=e&&e.code==='permission-denied'?'لم تُحفظ المساءلة: قواعد الأمان الجديدة غير منشورة في Firebase بعد.\nمن الإعدادات ← القواعد انسخ القواعد، ثم الصقها في Firebase Console ← Firestore ← Rules واضغط Publish.':'تعذّر الحفظ، حاول مرة أخرى.';msg.textContent=em;alert(em)}
+    catch(e){if(win)win.close();console.error(e);const em=e&&e.code==='permission-denied'?'لم تُحفظ المساءلة: قواعد الأمان الجديدة غير منشورة في Firebase بعد.\nمن الإعدادات ← القواعد انسخ القواعد، ثم الصقها في Firebase Console ← Firestore ← Rules واضغط Publish.':'تعذّر الحفظ، حاول مرة أخرى.';msg.textContent=em;(typeof UIKit!=='undefined'?UIKit:{alert:async m=>alert(m)}).alert(em)}
     finally{$a('acSave').disabled=false}};
 
   // ---------- log ----------
@@ -257,7 +257,7 @@
   });
   $a('acList').addEventListener('click',async e=>{if(window.AccountabilityRecorder||state.role!==-1)return;const b=e.target.closest('button');if(!b)return;if(b.dataset.openRecord){const record=list.find(a=>a.id===b.dataset.openRecord);if(record){$a('acSelected').innerHTML=card(record);$a('acSelected').scrollIntoView({behavior:'smooth',block:'start'})}return}const el=b.closest('[data-id]');const a=list.find(x=>x.id===el?.dataset.id);if(!a)return;
     if(b.hasAttribute('data-acc-archive')){
-      if(!confirm('إغلاق المساءلة وحفظ نسخة PDF نهائية؟ لن يمكن تعديل النسخة المغلقة.'))return;
+      if(!await (typeof UIKit!=='undefined'?UIKit:{confirm:async m=>confirm(m)}).confirm('إغلاق المساءلة وحفظ نسخة PDF نهائية؟ لن يمكن تعديل النسخة المغلقة.'))return;
       b.disabled=true;
       try{const ref=fs().collection(A.COL).doc(a.id),fresh=await ref.get(),current={id:a.id,...fresh.data()};if(current.archivedAt||current.status!=='decided')throw Error('state-changed');
         const archive=await A.archiveData({...current,archiveActor:(firebase.auth().currentUser||{}).uid||''});
@@ -311,7 +311,7 @@
       if(ph){const text=[`السلام عليكم ورحمة الله، أ. ${a.teacher}`,`نموذج المساءلة بتاريخ ${A.hijri(a.date)}هـ${a.status==='decided'?' متضمنًا القرار والإجراء المتخذ':''}.`,'لتحميل النموذج PDF افتح الرابط وسجّل الدخول:',pdfLink(a.id,a.teacher)].join('\n');window.open(A.waUrl(ph,text),'_blank','noopener')}
       else{toast('لا يوجد رقم جوال لهذا المعلم — أضفه من «تعديل» أو «تقارير المعلمين».')}}
     else if(b.hasAttribute('data-acc-edit')){startEdit(a)}
-    else if(b.hasAttribute('data-acc-del')){if(!confirm(`حذف مساءلة ${a.teacher} بتاريخ ${A.hijri(a.date)}هـ؟\nستختفي من السجل ومن حساب المعلم، ويمكن استرجاعها من «المحذوفة».`))return;b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({prevStatus:a.status||'sent',status:'deleted',deletedAt:firebase.firestore.FieldValue.serverTimestamp(),deletedBy:(firebase.auth().currentUser||{}).uid||''});if(editId===a.id){endEdit();resetForm()}toast('تم حذف المساءلة')}catch(err){b.disabled=false;toast('تعذّر الحذف')}}
+    else if(b.hasAttribute('data-acc-del')){if(!await (typeof UIKit!=='undefined'?UIKit:{confirm:async m=>confirm(m)}).confirm(`حذف مساءلة ${a.teacher} بتاريخ ${A.hijri(a.date)}هـ؟\nستختفي من السجل ومن حساب المعلم، ويمكن استرجاعها من «المحذوفة».`))return;b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({prevStatus:a.status||'sent',status:'deleted',deletedAt:firebase.firestore.FieldValue.serverTimestamp(),deletedBy:(firebase.auth().currentUser||{}).uid||''});if(editId===a.id){endEdit();resetForm()}toast('تم حذف المساءلة')}catch(err){b.disabled=false;toast('تعذّر الحذف')}}
     else if(b.hasAttribute('data-acc-restore')){b.disabled=true;try{await fs().collection(A.COL).doc(a.id).update({status:A.statusFor({...a,status:a.prevStatus||'sent'})});toast('تم استرجاع المساءلة')}catch(err){b.disabled=false;toast('تعذّر الاسترجاع')}}
     else if(b.hasAttribute('data-acc-view')){const p=el.querySelector('[data-prev]');if(!p.hidden){p.hidden=true;return}previewPaper(p,a)}
     else if(b.hasAttribute('data-acc-dec')){if(A.waitingManager(a))return;const dec=el.querySelector('[data-dec]').value.trim();const r=el.querySelector('input[type=radio]:checked');if(!dec&&!r){toast('اكتب القرار أو اختر الإجراء');return}
