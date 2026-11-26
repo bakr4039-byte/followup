@@ -37,7 +37,7 @@ function ensure(){
   const a=section('audit','schoolAuditLink','سجل العمليات وسلة المحذوفات','سجل العمليات وسلة المحذوفات');
   const r=section('reports','schoolReportsLink','مركز التقارير','مركز التقارير');
   if(a&&a!==audit){audit=a;a.innerHTML='<div class="au-head"><h2>سجل العمليات وسلة المحذوفات</h2><p>من عدّل ماذا ومتى في أقسام المنصة، والعناصر الموقوفة أو الملغاة أو الممسوحة مع إمكانية استعادتها.</p><div class="au-tabs" role="tablist"><button type="button" role="tab" data-au-tab="log">سجل العمليات</button><button type="button" role="tab" data-au-tab="bin">سلة المحذوفات</button></div></div><p id="auStatus" role="status"></p><div id="auBody"></div>';a.addEventListener('click',onClick);a.addEventListener('change',onChange);}
-  if(r&&r!==reports){reports=r;r.addEventListener('click',onReportClick);}
+  if(r&&r!==reports){reports=r;r.addEventListener('click',onReportClick);r.addEventListener('change',onReportChange);}
   return a&&r;
 }
 async function tick(){
@@ -123,15 +123,58 @@ async function restore(item){
     bin=bin.filter(x=>x!==item);paint();status('استُعيد العنصر: '+item.what);
   }catch(err){status(message(err));}finally{busy=false;}
 }
+// Weekly principal summary: one printable page per school week (Sunday to Thursday).
+const riyadhToday=()=>{const p=new Intl.DateTimeFormat('en',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());return ['year','month','day'].map(k=>p.find(x=>x.type===k).value).join('-');};
+const addDays=(d,n)=>{const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10);};
+const sundayOf=d=>{const x=new Date(d+'T12:00:00Z');return addDays(d,-x.getUTCDay());};
+const hijriDay=d=>{try{return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(new Date(d+'T12:00:00Z'));}catch(e){return d;}};
+let weeklyStart='',weeklyRows=null,weeklyBusy=false;
+async function weeklySummary(start){
+  const end=addDays(start,4),db=fs(),since=new Date(start+'T00:00:00+03:00'),until=new Date(addDays(start,7)+'T00:00:00+03:00');
+  const safe=async f=>{try{return await f();}catch(err){return null;}};
+  const [logs,att,acts,radio,ann]=await Promise.all([
+    safe(()=>db.collection('recordWeeks/'+start+'/logs').get()),
+    safe(()=>db.collection('studentAttendance').where('date','>=',start).where('date','<=',end).get()),
+    safe(()=>db.collection('absenceActions').where('createdAt','>=',since).where('createdAt','<',until).get()),
+    safe(()=>db.collection('radioPrograms').where('date','>=',start).where('date','<=',end).get()),
+    safe(()=>db.collection('announcements').get())]);
+  const rows=[],na='تعذّر التحميل';
+  const S=(root.__FUACC&&root.__FUACC.S)||[];
+  if(logs){const live=logs.docs.map(d=>d.data()).filter(x=>!x.cleared);const p=live.reduce((n,x)=>n+(+x.present||0),0),a=live.reduce((n,x)=>n+(+x.absent||0),0);
+    rows.push(['متابعة الحصص عن بُعد',live.length+(S.length?' من '+S.length+' حصة':'')+' مرصودة',live.length?'':'لا رصد في هذا الأسبوع (قد يكون حضوريًا أو إجازة)']);
+    rows.push(['حضور الطلاب في الحصص عن بُعد',(p+a)?Math.round(p*100/(p+a))+'%':'—',(p+a)?p+' حضور، '+a+' غياب':'']);
+  }else rows.push(['متابعة الحصص عن بُعد',na,'']);
+  rows.push(['سجلات حضور الطلاب المرصودة',att?att.size+' حصة':na,att?new Set(att.docs.map(d=>d.data().classId)).size+' فصل':'']);
+  rows.push(['إجراءات الغياب المسجلة',acts?acts.size+' إجراء':na,'']);
+  if(radio){const r=radio.docs.map(d=>d.data());rows.push(['الإذاعة المدرسية',r.filter(x=>x.status==='done').length+' نُفّذ من '+r.filter(x=>x.status!=='cancelled').length,r.filter(x=>x.status==='planned'&&x.date<riyadhToday()).length?r.filter(x=>x.status==='planned'&&x.date<riyadhToday()).length+' يوم لم يُسجّل تنفيذه':'']);}else rows.push(['الإذاعة المدرسية',na,'']);
+  if(ann){const a=ann.docs.map(d=>d.data()).filter(x=>x.active!==false&&(!x.start||x.start<=end)&&(!x.end||x.end>=start));rows.push(['الإعلانات الظاهرة',a.length+' إعلان',a.filter(x=>x.audience==='screen').length+' على شاشة العرض']);}
+  const inWeek=e=>+e.at>=+since&&+e.at<+until;
+  for(const [col,label] of SOURCES){if(['announcements','radioPrograms','formAccess','classRosters'].includes(col))continue;const list=events.filter(e=>e.col===col&&inWeek(e));rows.push([label,list.length+' عملية',list.filter(e=>e.created).length+' جديد، '+list.filter(e=>!e.created).length+' تعديل']);}
+  return rows;
+}
+async function paintWeekly(){
+  const box=$('auWeekly');if(!box)return;
+  const cur=sundayOf(riyadhToday()),weeks=Array.from({length:8},(_,i)=>addDays(cur,-7*i));
+  if(!weeklyStart)weeklyStart=cur;
+  box.innerHTML='<h3 class="au-group">الملخص الأسبوعي للمدير</h3><div class="au-bar"><label>الأسبوع<select id="auWeek">'+weeks.map(w=>'<option value="'+w+'"'+(w===weeklyStart?' selected':'')+'>'+esc(hijriDay(w))+' ('+w+')</option>').join('')+'</select></label><button type="button" data-au-weekly-print'+(weeklyRows?'':' disabled')+'>طباعة الملخص</button></div><div id="auWeeklyBody"><p class="au-hint">جارٍ التجميع…</p></div>';
+  if(weeklyBusy)return;weeklyBusy=true;const start=weeklyStart;
+  try{const rows=await weeklySummary(start);if(start!==weeklyStart)return;weeklyRows=rows;
+    $('auWeeklyBody').innerHTML='<div class="au-grid"><table><thead><tr><th>البند</th><th>الأسبوع</th><th>ملاحظة</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+esc(r[0])+'</td><td><b>'+esc(r[1])+'</b></td><td>'+esc(r[2])+'</td></tr>').join('')+'</tbody></table></div><p class="au-hint">أعداد العمليات في الأقسام مأخوذة من آخر 40 تعديلًا لكل قسم.</p>';
+    const p=box.querySelector('[data-au-weekly-print]');if(p)p.disabled=false;
+  }finally{weeklyBusy=false;}
+}
+function onReportChange(e){if(e.target.id==='auWeek'){weeklyStart=e.target.value;weeklyRows=null;paintWeekly();}}
 function paintReports(){
   const groups=REPORTS.map(g=>({group:g.group,items:g.items.filter(([id])=>$(id))})).filter(g=>g.items.length);
   reports.innerHTML='<div class="au-head"><h2>مركز التقارير</h2><p>كل التقارير القابلة للطباعة في المنصة في مكان واحد. اختر التقرير لينتقل بك إلى القسم الذي يُصدره.</p></div>'+
     groups.map(g=>'<h3 class="au-group">'+esc(g.group)+'</h3><div class="au-cards">'+g.items.map(([id,t,n])=>'<button type="button" class="au-card" data-au-go="'+esc(id)+'"><b>'+esc(t)+'</b><span>'+esc(n)+'</span></button>').join('')+'</div>').join('')+
-    '<h3 class="au-group">ملخص المنصة</h3><div class="au-cards"><button type="button" class="au-card" data-au-summary><b>تقرير ملخص الأقسام</b><span>عدد السجلات والعمليات في كل قسم خلال آخر 30 يومًا، للطباعة</span></button></div>';
+    '<h3 class="au-group">ملخص المنصة</h3><div class="au-cards"><button type="button" class="au-card" data-au-weekly><b>الملخص الأسبوعي للمدير</b><span>صفحة واحدة لكل أسبوع: الرصد والحضور والغياب والإذاعة والإعلانات والعمليات، للطباعة</span></button><button type="button" class="au-card" data-au-summary><b>تقرير ملخص الأقسام</b><span>عدد السجلات والعمليات في كل قسم خلال آخر 30 يومًا، للطباعة</span></button></div>'+'<div id="auWeekly"></div>';
 }
 function onReportClick(e){
   const b=e.target.closest('button');if(!b||!reports.contains(b))return;
   if(b.dataset.auGo){const t=$(b.dataset.auGo);if(t){t.click();root.scrollTo({top:0,behavior:'smooth'});}return;}
+  if(b.hasAttribute('data-au-weekly')){paintWeekly();const w=$('auWeekly');if(w)w.scrollIntoView({behavior:'smooth',block:'start'});return;}
+  if(b.hasAttribute('data-au-weekly-print')){if(!root.ReportKit||!weeklyRows)return;root.ReportKit.open({title:'الملخص الأسبوعي لمدير المدرسة',subtitle:'أسبوع '+hijriDay(weeklyStart),body:'<table><thead><tr><th>البند</th><th>الأسبوع</th><th>ملاحظة</th></tr></thead><tbody>'+weeklyRows.map(r=>'<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td><td>'+esc(r[2])+'</td></tr>').join('')+'</tbody></table><p>ملاحظات المدير:</p><p style="min-height:80px;border:1px solid #999"></p>',signatures:['مدير المدرسة']});return;}
   if(b.hasAttribute('data-au-summary')){
     if(!root.ReportKit)return;const since=Date.now()-30*864e5;
     const rows=SOURCES.map(([c,l])=>{const mine=events.filter(x=>x.col===c&&+x.at>=since);return '<tr><td>'+esc(l)+'</td><td>'+mine.filter(x=>x.created).length+'</td><td>'+mine.filter(x=>!x.created).length+'</td><td>'+new Set(mine.map(x=>x.by)).size+'</td></tr>';}).join('');
