@@ -82,3 +82,7 @@
 .school-sidebar .school-nav-group .school-group-toggle{min-height:46px;padding:8px 12px}
 .school-sidebar .school-sidebar-footer{padding:10px 16px 12px;gap:8px}
 .school-sidebar .school-sidebar-footer button{min-height:38px}
+
+/* Teacher page: keep inner padding on the approved-schedule card and balance the name heading. */
+.school-workspace-body>.card.next{padding:18px 22px}
+#account .welcome h2{font-size:26px;line-height:1.4}
