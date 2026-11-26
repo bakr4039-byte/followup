@@ -15,23 +15,25 @@ function plain(value){
   if(value&&typeof value==='object'){const out={};for(const k of Object.keys(value))out[k]=plain(value[k]);return out;}
   return value;
 }
-async function dump(ref){const snap=await ref.get(),out={};for(const d of snap.docs)out[d.id]=plain(d.data());return out;}
+// Large documents (copies of uploaded PDF files, about 21 MB) are skipped unless the big option is ticked.
+const LIMIT=300*1024;let large=[];
+async function dump(ref,all){const snap=await ref.get(),out={};for(const d of snap.docs){const v=plain(d.data());if(!all&&JSON.stringify(v).length>LIMIT){large.push(ref.path+'/'+d.id);continue;}out[d.id]=v;}return out;}
 async function run(){
   if(busy||!managerMode())return;busy=true;
   const say=t=>{const s=$('bkStatus');if(s)s.textContent=t;};const btn=$('bkRun');if(btn)btn.disabled=true;
-  const db=firebase.firestore(),data={},skipped=[];
+  const db=firebase.firestore(),data={},skipped=[],big=!!($('bkBig')&&$('bkBig').checked);large=[];
   try{
-    for(const col of CORE){say('جارٍ قراءة: '+col+'…');try{data[col]=await dump(db.collection(col));}catch(err){skipped.push(col);}}
-    if($('bkBig')&&$('bkBig').checked){
+    for(const col of CORE){say('جارٍ قراءة: '+col+'…');try{data[col]=await dump(db.collection(col),big);}catch(err){skipped.push(col);}}
+    if(big){
       say('جارٍ قراءة حضور الطلاب…');try{data.studentAttendance=await dump(db.collection('studentAttendance'));}catch(err){skipped.push('studentAttendance');}
       const sunday=d=>addDays(d,-new Date(d+'T12:00:00Z').getUTCDay());const start=sunday(today());
       for(let i=0;i<16;i++){const w=addDays(start,-7*i);say('جارٍ قراءة رصد أسبوع '+w+'…');try{const logs=await dump(db.collection('recordWeeks/'+w+'/logs'));if(Object.keys(logs).length)data['recordWeeks/'+w+'/logs']=logs;}catch(err){skipped.push('recordWeeks/'+w);}}
     }
     const count=Object.values(data).reduce((n,c)=>n+Object.keys(c).length,0);
-    const file={exportedAt:new Date().toISOString(),exportedBy:firebase.auth().currentUser.uid,project:'alsahafa-followup',note:'نسخة احتياطية للقراءة فقط. تحتوي بيانات شخصية للطلاب والمنسوبين: احفظها في مكان آمن ولا تشاركها.',skipped,collections:data};
+    const file={exportedAt:new Date().toISOString(),exportedBy:firebase.auth().currentUser.uid,project:'alsahafa-followup',largeSkipped:large,note:'نسخة احتياطية للقراءة فقط. تحتوي بيانات شخصية للطلاب والمنسوبين: احفظها في مكان آمن ولا تشاركها.',skipped,collections:data};
     const url=URL.createObjectURL(new Blob([JSON.stringify(file)],{type:'application/json'}));
     const a=document.createElement('a');a.href=url;a.download='followup-backup-'+today()+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
-    say('نُزّلت النسخة: '+count+' سجلًا من '+Object.keys(data).length+' مجموعة'+(skipped.length?' · تعذّرت قراءة: '+skipped.join('، '):'')+'.');
+    say('نُزّلت النسخة: '+count+' سجلًا من '+Object.keys(data).length+' مجموعة'+(skipped.length?' · تعذّرت قراءة: '+skipped.join('، '):'')+(large.length?' · استُبعد '+large.length+' ملفًا كبيرًا (نسخ ملفات PDF المرفوعة)':'')+'.');
   }catch(err){say('تعذّر إنشاء النسخة: '+(err&&err.message||err));}
   finally{busy=false;if(btn)btn.disabled=false;}
 }
@@ -42,7 +44,7 @@ function tick(){
   if(!card){
     card=document.createElement('details');card.id='auBackup';card.className='au-backup';
     card.innerHTML='<summary>النسخ الاحتياطي</summary><p>تنزيل نسخة من بيانات المنصة في ملف JSON واحد: الإعدادات والإعلانات والإذاعة والنماذج والزيارات والخطط والحسابات والتكليفات والمساءلات وسجل العمليات. يُنصح بتنزيلها أسبوعيًا وحفظها في مكان آمن، لأنها تحتوي بيانات شخصية.</p>'+
-      '<label class="au-chk"><input type="checkbox" id="bkBig"> تضمين حضور الطلاب ورصد الحصص لآخر 16 أسبوعًا (حجم كبير)</label><button type="button" id="bkRun">تنزيل نسخة احتياطية</button><p id="bkStatus" role="status"></p>';
+      '<label class="au-chk"><input type="checkbox" id="bkBig"> تضمين حضور الطلاب ورصد الحصص لآخر 16 أسبوعًا ونسخ ملفات PDF المرفوعة (حجم كبير)</label><button type="button" id="bkRun">تنزيل نسخة احتياطية</button><p id="bkStatus" role="status"></p>';
     host.append(card);$('bkRun').addEventListener('click',run);
     const css=document.createElement('style');css.textContent='.au-backup{background:#fff;border:1px solid #dae5df;border-radius:14px;padding:12px 16px;margin-top:14px}.au-backup summary{font-weight:700;color:#123e36;cursor:pointer}.au-backup p{color:#5b6b66;font-size:14px}.au-chk{display:flex;gap:6px;align-items:center;margin:8px 0}.au-backup button{font:inherit;padding:7px 12px;border:1px solid #17624d;border-radius:8px;background:#17624d;color:#fff;cursor:pointer}.au-backup button:disabled{opacity:.6}';document.head.append(css);
   }
