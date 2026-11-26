@@ -399,6 +399,34 @@ service cloud.firestore {
       request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
     allow update, delete: if false;
   }
+  // Classroom visits: final once saved. The manager records; report viewers and the visited teacher read.
+  match /classVisits/{visitId} {
+    function score(m, k) { return m.get(k, 0) is int && m.get(k, 0) >= 1 && m.get(k, 0) <= 4; }
+    allow get, list: if admin() || staff() && role() == 8 || teacher() && resource.data.teacher == teacherName();
+    allow create: if admin() && request.resource.data.keys().hasOnly(['teacher','classId','classLabel','subject','date','visitType','visitor','scores','strengths','improvements','recommendations','createdBy','createdAt']) &&
+      request.resource.data.teacher is string && request.resource.data.teacher.size() >= 1 && request.resource.data.teacher.size() <= 150 && request.resource.data.classId is string && request.resource.data.classId.matches('g[123]-s[1-9][0-9]?') && request.resource.data.classLabel is string && request.resource.data.classLabel.size() >= 1 && request.resource.data.classLabel.size() <= 80 &&
+      request.resource.data.subject is string && request.resource.data.subject.size() >= 1 && request.resource.data.subject.size() <= 100 && request.resource.data.date is string && request.resource.data.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}') && request.resource.data.visitType in ['principal','supervisor','peer'] && request.resource.data.visitor is string && request.resource.data.visitor.size() >= 1 && request.resource.data.visitor.size() <= 150 &&
+      request.resource.data.scores is map && request.resource.data.scores.keys().hasOnly(['c1','c2','c3','c4','c5','c6']) && score(request.resource.data.scores,'c1') && score(request.resource.data.scores,'c2') && score(request.resource.data.scores,'c3') && score(request.resource.data.scores,'c4') && score(request.resource.data.scores,'c5') && score(request.resource.data.scores,'c6') &&
+      request.resource.data.strengths is string && request.resource.data.strengths.size() >= 0 && request.resource.data.strengths.size() <= 600 && request.resource.data.improvements is string && request.resource.data.improvements.size() >= 0 && request.resource.data.improvements.size() <= 600 && request.resource.data.recommendations is string && request.resource.data.recommendations.size() >= 0 && request.resource.data.recommendations.size() <= 600 &&
+      request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+    allow update, delete: if false;
+  }
+  // Remedial plans: the plan is final; progress is appended as follow-up entries.
+  match /remedialPlans/{planId} {
+    allow get, list: if admin() || staff() && role() == 8;
+    allow create: if admin() && request.resource.data.keys().hasOnly(['studentId','studentName','classId','classLabel','reason','goals','actions','owner','startDate','reviewDate','createdBy','createdAt']) &&
+      request.resource.data.studentId is string && request.resource.data.studentId.size() >= 1 && request.resource.data.studentId.size() <= 80 && request.resource.data.studentName is string && request.resource.data.studentName.size() >= 1 && request.resource.data.studentName.size() <= 150 && request.resource.data.classId is string && request.resource.data.classId.matches('g[123]-s[1-9][0-9]?') && request.resource.data.classLabel is string && request.resource.data.classLabel.size() >= 1 && request.resource.data.classLabel.size() <= 80 &&
+      request.resource.data.reason in ['absence','achievement','behavior'] && request.resource.data.goals is string && request.resource.data.goals.size() >= 1 && request.resource.data.goals.size() <= 600 && request.resource.data.actions is string && request.resource.data.actions.size() >= 1 && request.resource.data.actions.size() <= 600 && request.resource.data.owner is string && request.resource.data.owner.size() >= 1 && request.resource.data.owner.size() <= 150 &&
+      request.resource.data.startDate is string && request.resource.data.startDate.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}') && request.resource.data.reviewDate is string && request.resource.data.reviewDate.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}') && request.resource.data.reviewDate >= request.resource.data.startDate &&
+      request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+    allow update, delete: if false;
+    match /updates/{updateId} {
+      allow get, list: if admin() || staff() && role() == 8;
+      allow create: if admin() && exists(/databases/$(database)/documents/remedialPlans/$(planId)) && request.resource.data.keys().hasOnly(['note','status','createdBy','createdAt']) &&
+        request.resource.data.note is string && request.resource.data.note.size() >= 1 && request.resource.data.note.size() <= 600 && request.resource.data.status in ['progress','done'] && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
   match /securityAudit/{event} { allow read: if admin(); allow write: if false; }
   match /securityLoginAttempts/{event} { allow read: if admin(); allow write: if false; }
   match /securityAlerts/{event} { allow read: if admin(); allow write: if false; }
