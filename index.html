@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head><script src="action-reminders.js?v=20261126-1"></script><script src="record-workflow.js?v=coordinator-20261110-2"></script><script src="week-modes.js?v=daily-20261108-1"></script><script src="onsite-schedule.js?v=20261109-1"></script>
-<meta charset="utf-8">
+<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://www.recaptcha.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://www.google.com https://api.github.com https://cdnjs.cloudflare.com https://www.gstatic.com data: blob:; worker-src 'self' blob: https://cdnjs.cloudflare.com; frame-src 'self' blob: data: https://www.google.com https://www.recaptcha.net https://alsahafa-followup.firebaseapp.com; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'"><meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="theme-color" content="#116c59">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="stylesheet" href="design-system.css?v=20261126-8"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#123e36"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="ثانوية الصحافة"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><script src="pwa.js?v=20261126-2" defer></script><script src="ui-kit.js?v=20261126-1"></script><script src="report-kit.js?v=20261126-1"></script><style>:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}
@@ -625,10 +625,10 @@ body{padding-bottom:40px}.gate{padding-bottom:56px}.drawer{bottom:32px!important
 <div class="busy" id="busy" hidden><div id="busyTxt">جارٍ تجهيز الملف…</div></div>
 <div class="pdfhost" id="pdfhost" aria-hidden="true"></div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js"></script><script src="app-check.js?v=20261013"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" integrity="sha384-AQ3POAMqIhwS81FrUH95ekxqBZHeP5tG2JfEL3+7GuTtfRLWnrRh32UxwzM+//A9" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js" integrity="sha384-E3vxFxXu8FhW5kvqdQJ5Yf8ugrV7iCJP8jgnItRH2Rk8Q08cJzJGTi/oMC3FEp3j" crossorigin="anonymous"></script><script src="app-check.js?v=20261013"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" integrity="sha384-TnlRYaR4JYz/lpaGuaiU61PjNberSA4vjLjtF+oRC/IkohkJqnWxw5EmDSOt1vA1" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" integrity="sha384-qn4Jh88HhJA8dplNQyGjOh9OGI4izVhrfj/qIFgaKcdgOE06pXqIKGlsCILZcLAC" crossorigin="anonymous"></script>
 <script src="protected-records.js?v=profiles-20261109-1"></script>
 <script>
 /* ===== إعدادات Firebase: الصق هنا بيانات مشروعك من Firebase Console ← Project settings ← Your apps ===== */
@@ -703,8 +703,8 @@ window.FIREBASE_CONFIG = {
   }};
 })();
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
 <script src="department-personnel.js?v=linked-identities-20261109-1"></script>
 <script src="accountability.js?v=teacher-signature-20261119"></script>
 <script>
@@ -1794,7 +1794,7 @@ function showBanner(t){const b=$('banner');b.textContent=t;b.hidden=false}
 
 <script src="staff-settings.js?v=personnel-4"></script>
 <script src="accountability-admin.js?v=teacher-signature-20261119"></script>
-<script src="security-audit.js?v=login-20261014"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script src="document-signing.js?v=reminders-20261118-1"></script><script src="employee-accounts.js?v=coordinator-20261110-2"></script><script src="assignment-signing.js?v=manager-sign-image-20261119"></script>
+<script src="security-audit.js?v=login-20261014"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js" integrity="sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script><script src="document-signing.js?v=reminders-20261118-1"></script><script src="employee-accounts.js?v=coordinator-20261110-2"></script><script src="assignment-signing.js?v=manager-sign-image-20261119"></script>
 <script src="recorder-accounts.js?v=20261108-1"></script>
 <script src="personnel-tasks-admin.js?v=bounded-save-20261110-1"></script>
 <script src="teacher-provision.js?v=personnel-3"></script><script src="duty-fields.js?v=20261109-1"></script><script src="written-duties.js?v=coordinator-20261110-2"></script><script src="school-operations.js?v=student-import-1"></script><link rel="stylesheet" href="school-navigation.css?v=20261109-1"><link rel="stylesheet" href="ui-polish.css?v=20261126-side"><script src="school-navigation.js?v=attendance-inline-1"></script><script src="pending-assignments.js?v=linked-identities-20261109-1"></script><script src="home-dashboard.js?v=20261126-1"></script><script src="school-timetable.js?v=20261126-3"></script>
