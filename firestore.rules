@@ -427,6 +427,30 @@ service cloud.firestore {
       allow update, delete: if false;
     }
   }
+  // Official school forms: the manager assigns form groups to employees (formAccess); members fill and finalise records of their groups.
+  function formRoles() { return get(/databases/$(database)/documents/formAccess/$(request.auth.uid)).data.get('roles', []); }
+  function formMember(owner) { return employee() && exists(/databases/$(database)/documents/formAccess/$(request.auth.uid)) && owner in formRoles(); }
+  match /formAccess/{uid} {
+    allow get: if admin() || request.auth != null && request.auth.uid == uid;
+    allow list: if admin();
+    allow create, update: if admin() && request.resource.data.keys().hasOnly(['roles','name','updatedBy','updatedAt']) && request.resource.data.roles is list && request.resource.data.roles.size() <= 12 && request.resource.data.roles.hasOnly(['lab','lrc','activity','deputy','exams','counselor','quality','studentAffairs']) &&
+      request.resource.data.name is string && request.resource.data.name.size() <= 150 && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+    allow delete: if false;
+  }
+  match /formRecords/{recordId} {
+    function validForm(f) {
+      return f.keys().hasOnly(['formCode','owner','title','header','rows','status','revision','createdBy','createdAt','updatedBy','updatedAt']) &&
+        f.formCode is string && f.formCode.size() > 0 && f.formCode.size() <= 40 && f.owner in ['lab','lrc','activity','deputy','exams','counselor','quality','studentAffairs'] &&
+        f.title is string && f.title.size() <= 200 && f.header is map && f.header.size() <= 40 && f.rows is list && f.rows.size() <= 300 &&
+        f.status in ['draft','final'] && f.revision is int && f.updatedBy == request.auth.uid && f.updatedAt == request.time;
+    }
+    allow get, list: if admin() || staff() && role() == 8 || formMember(resource.data.owner);
+    allow create: if (admin() || formMember(request.resource.data.owner)) && validForm(request.resource.data) && request.resource.data.revision == 1 && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+    allow update: if (admin() || formMember(resource.data.owner)) && resource.data.status == 'draft' && validForm(request.resource.data) &&
+      request.resource.data.owner == resource.data.owner && request.resource.data.formCode == resource.data.formCode && request.resource.data.createdBy == resource.data.createdBy &&
+      request.resource.data.createdAt == resource.data.createdAt && request.resource.data.revision == resource.data.revision + 1;
+    allow delete: if false;
+  }
   match /securityAudit/{event} { allow read: if admin(); allow write: if false; }
   match /securityLoginAttempts/{event} { allow read: if admin(); allow write: if false; }
   match /securityAlerts/{event} { allow read: if admin(); allow write: if false; }
