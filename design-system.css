@@ -66,3 +66,20 @@ canvas.as-pad,.acc-sign canvas{background-color:#fff;border:1.5px dashed var(--a
 .pwa-go{font:inherit;font-weight:700;border:0;border-radius:10px;padding:8px 16px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
 .pwa-close{font:inherit;font-size:20px;line-height:1;border:0;background:none;color:var(--muted);cursor:pointer;padding:4px 8px}
 @media print{.pwa-hint{display:none}}
+
+/* Notification bell and list in the sidebar (action-reminders.js). */
+.school-sidebar .school-sidebar-links>.nc-bell{width:100%;min-height:46px;box-sizing:border-box;display:flex;align-items:center;gap:10px;text-align:right;background:#ffffff0d;border:1px solid #ffffff24;color:#e2eee8;padding:10px 13px;border-radius:12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px}
+.school-sidebar .school-sidebar-links>.nc-bell:before{content:'\1F514';font-size:14px;width:18px;text-align:center}
+.school-sidebar .school-sidebar-links>.nc-bell:hover{background:#ffffff17}
+.nc-bell span{flex:1}
+.nc-count{min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#e0a33a;color:#14231f;font-size:12px;display:inline-grid;place-items:center}
+.school-sidebar .school-sidebar-links>.nc-panel{background:#0e322b;border:1px solid #ffffff1f;border-radius:12px;padding:8px;margin:0 0 10px;display:grid;gap:8px;max-height:46vh;overflow:auto}
+.school-sidebar .school-sidebar-links>.nc-panel[hidden]{display:none}
+.nc-item{background:#ffffff0d;border-radius:10px;padding:9px 10px;color:#e8f2ee;font-size:12.5px;line-height:1.6}
+.nc-item p{margin:0 0 6px}
+.nc-actions{display:flex;gap:6px;flex-wrap:wrap}
+.nc-actions button,.nc-actions a{font:inherit;font-size:12px;font-weight:600;border-radius:8px;padding:4px 12px;border:1px solid #ffffff30;background:#e5f1ea;color:#143e32;text-decoration:none;cursor:pointer}
+.nc-actions a{background:#25D366;border-color:#25D366;color:#073b1c}
+.nc-empty{margin:4px;color:#b9d2c5;font-size:12.5px}
+.nc-enable{font:inherit;font-size:12px;border-radius:8px;padding:7px 10px;border:1px dashed #ffffff50;background:none;color:#e2eee8;cursor:pointer}
+.school-sidebar-toggle[data-count]:after{content:attr(data-count);margin-inline-start:8px;background:#e0a33a;color:#14231f;border-radius:10px;padding:0 7px;font-size:12px}

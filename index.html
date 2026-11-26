@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
-<head><script src="action-reminders.js?v=20261118-1"></script><script src="record-workflow.js?v=coordinator-20261110-2"></script><script src="week-modes.js?v=daily-20261108-1"></script><script src="onsite-schedule.js?v=20261109-1"></script>
+<head><script src="action-reminders.js?v=20261126-1"></script><script src="record-workflow.js?v=coordinator-20261110-2"></script><script src="week-modes.js?v=daily-20261108-1"></script><script src="onsite-schedule.js?v=20261109-1"></script>
 <meta charset="utf-8">
 <meta name="theme-color" content="#116c59">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<link rel="stylesheet" href="design-system.css?v=20261126-4"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#123e36"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="الصحافة"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><script src="pwa.js?v=20261126-1" defer></script><script src="ui-kit.js?v=20261126-1"></script><script src="report-kit.js?v=20261126-1"></script><style>:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}
+<link rel="stylesheet" href="design-system.css?v=20261126-5"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#123e36"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="ثانوية الصحافة"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><script src="pwa.js?v=20261126-1" defer></script><script src="ui-kit.js?v=20261126-1"></script><script src="report-kit.js?v=20261126-1"></script><style>:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}
 /* charts */
 .cgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .cgrid .c-days{grid-column:span 2}
@@ -1210,7 +1210,7 @@ $('fsBtn').onclick=async()=>{const el=$('boardView');try{if(document.fullscreenE
 const dueSeen=new Set();let dueInit=false,dueHide=0,dueExpanded=false;
 function overdueList(){if(state.week!==CUR_WEEK||state.role==null||isMon()||!state.db)return [];const ti=todayIdx();if(ti<0)return [];const now=riyadh().min;
   return scope().filter(s=>(state.role<0||s.sup===state.role)&&!(state.logs[s.id]&&ST[state.logs[s.id].status])&&(s.day<ti||(s.day===ti&&now>=toMin(SLOTS[s.slot][2])+10)))}
-function renderDue(){if(!onlineWeek()){$("dueBar").hidden=true;return;}const list=overdueList(),bar=$('dueBar');const ti=todayIdx();
+function renderDue(){if(!onlineWeek()){$("dueBar").hidden=true;window.ActionReminders&&window.ActionReminders.set('overdue-lessons',[]);return;}const list=overdueList(),bar=$('dueBar');window.ActionReminders&&window.ActionReminders.set('overdue-lessons',list.length?[{label:'لم تُرصد بعد: '+list.length+' حصة انتهت',open:()=>{const b=$('vSchedule');if(b)b.click()}}]:[]);const ti=todayIdx();
   const fresh=list.filter(s=>s.day===ti&&!dueSeen.has(s.id));fresh.forEach(s=>dueSeen.add(s.id));
   if(dueInit&&fresh.length&&'Notification' in window&&Notification.permission==='granted'){try{new Notification('حصص انتهت ولم تُرصد',{body:fresh.slice(0,4).map(s=>`${s.label} · ${s.subj} · ${s.teacher}`).join('\n'),tag:'due-'+fresh[0].id})}catch(e){}dueHide=0}
   dueInit=true;
