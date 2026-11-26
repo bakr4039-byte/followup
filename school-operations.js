@@ -41,7 +41,21 @@ $('soBack').onclick=()=>{if(standalone){const u=new URL(location.href);u.searchP
 main.querySelector('nav').onclick=e=>{const b=e.target.closest('[data-so-tab]');if(!b)return;section=b.dataset.soTab;paint()};
 const fileCache=new Map();
 const names=()=>[...new Set((data?.lessons||[]).map(l=>l.scheduleName))].sort((a,b)=>a.localeCompare(b,'ar'));
-function paint(){if(!actor)return;rosterTurn++;main.querySelectorAll('[data-so-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.soTab===section)));if(actor.admin&&section==='classes'){paintClasses();return}if(!data){$('soBody').innerHTML='<div class="so-card">لم تُرفع ملفات المناوبات والجدول الحضوري بعد.</div>';return}if(!actor.admin&&['classes','whatsapp'].includes(section))section='schedule';
+// In the manager workspace, each sidebar entry opens only its own part of this page:
+// "المناوبات والإشراف" shows duty + teachers' WhatsApp; "الجدول الحضوري والفصول" shows the onsite timetable + classes.
+const SO_GROUP={duty:'duty',whatsapp:'duty',schedule:'schedule',classes:'schedule'};
+const SO_TITLE={duty:['المناوبات والإشراف','المناوبات الصباحية والمسائية ومناوبات الفسح، والتواصل مع المعلمين'],schedule:['الجدول الحضوري والفصول','الجدول الحضوري المعتمد وملفاته، وطلاب كل فصل']};
+function scope(){
+  const inWorkspace=!personal&&!!main.closest('#schoolWorkspace'),g=SO_GROUP[section]||'schedule';
+  if(!inWorkspace){if(main.dataset.soGroup)delete main.dataset.soGroup;return}
+  if(!document.getElementById('soScopeCss')){const css=document.createElement('style');css.id='soScopeCss';css.textContent='#schoolMain[data-so-group=duty] [data-so-tab=schedule],#schoolMain[data-so-group=duty] [data-so-tab=classes],#schoolMain[data-so-group=duty] #soGridLink,#schoolMain[data-so-group=schedule] [data-so-tab=duty],#schoolMain[data-so-group=schedule] [data-so-tab=whatsapp]{display:none!important}#soGridLink{margin-inline-start:auto}';document.head.append(css)}
+  if(main.dataset.soGroup!==g)main.dataset.soGroup=g;
+  const head=main.querySelector('header');if(head&&!head.hidden)head.hidden=true;
+  const nav=main.querySelector('nav');if(nav&&!document.getElementById('soGridLink')){const link=document.createElement('button');link.type='button';link.id='soGridLink';link.textContent='عرضه شبكةً أسبوعية ←';link.title='يفتح «الجدول المدرسي» بنوعيه عن بُعد وحضوري';link.onclick=()=>{const t=document.getElementById('vTimetable');if(t)t.click()};nav.append(link)}
+  const region=document.getElementById('schoolSection-duty');
+  if(region){const t=region.querySelector('.school-workspace-title'),n=region.querySelector('summary small');if(t&&t.textContent!==SO_TITLE[g][0])t.textContent=SO_TITLE[g][0];if(n&&n.textContent!==SO_TITLE[g][1])n.textContent=SO_TITLE[g][1]}
+}
+function paint(){if(!actor)return;rosterTurn++;main.querySelectorAll('[data-so-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.soTab===section)));scope();if(actor.admin&&section==='classes'){paintClasses();return}if(!data){$('soBody').innerHTML='<div class="so-card">لم تُرفع ملفات المناوبات والجدول الحضوري بعد.</div>';return}if(!actor.admin&&['classes','whatsapp'].includes(section))section='schedule';
  if(section==='duty'){WrittenDuties.mount($('soBody'),actor,data.files.find(f=>f.key==='duty')?.hash,key=>viewFile(key,false).catch(e=>tell(error(e))));return}
  if(section==='whatsapp'){paintWhatsapp();return}
  const classes=data.classes,filtered=selectLessons(data,{classId:selectedClass,teacher:selectedTeacher,day:selectedDay});
