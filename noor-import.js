@@ -21,9 +21,9 @@ function convert(text){
   const out=[],skipped=[];
   for(const r of rows.slice(at+1)){
     const name=String(r[col.name]||'').trim();if(!name)continue;
-    let grade=col.grade>=0?gradeOf(r[col.grade]):'',section=col.section>=0?digits(r[col.section]).replace(/\D/g,''):'';
-    const combo=/([123])\s*[\/\-ث]\s*(\d{1,2})/.exec(digits((col.section>=0?r[col.section]:'')+' '+(col.grade>=0?r[col.grade]:'')));
-    if((!grade||!section)&&combo){grade=grade||combo[1];section=section||combo[2];}
+    const secRaw=col.section>=0?digits(r[col.section]):'',grRaw=col.grade>=0?String(r[col.grade]||''):'';
+    const combo=/([123])\s*[\/\-ث]\s*(\d{1,2})/.exec(secRaw)||/([123])\s*[\/\-ث]\s*(\d{1,2})/.exec(digits(grRaw));
+    const grade=combo?combo[1]:gradeOf(grRaw),section=combo?combo[2]:secRaw.replace(/\D/g,'');
     if(!grade||!section||+section<1){skipped.push(name);continue;}
     const id=col.id>=0?digits(r[col.id]).replace(/\D/g,''):'',phone=col.phone>=0?digits(r[col.phone]).replace(/[^\d+]/g,''):'';
     out.push([name,grade+'/'+(+section),id,phone].join('\t'));
