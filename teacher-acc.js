@@ -117,7 +117,7 @@
     else if(b.hasAttribute('data-send')){if(a.archivedAt||A.statusFor(a)!=='sent')return;const t=el.querySelector('[data-reply]').value.trim();if(t.length<3){toast('اكتب السبب أولاً.');return}
       const signature=signatureDrafts.get(el.id);
       if(A.isAbsence(a)&&!signature){el.querySelector('.acc-sign [role=status]').textContent='ارسم توقيعك أو ارفع صورته قبل إرسال الرد.';return}
-      if(!confirm('سيتم إرسال ردك للإدارة ولا يمكن تعديله بعد الإرسال. متابعة؟'))return;
+      if(!await (typeof UIKit!=='undefined'?UIKit:{confirm:async m=>confirm(m)}).confirm('سيتم إرسال ردك للإدارة ولا يمكن تعديله بعد الإرسال. متابعة؟'))return;
       b.disabled=true;b.textContent='جارٍ الإرسال…';
       try{await rawDb.collection(A.COL).doc(a.id).update({reply:t,replyAt:firebase.firestore.FieldValue.serverTimestamp(),replyUid:uid,...(auth.currentUser?.managerAccess?{replyActorUid:auth.currentUser.actorUid}:{}),status:'replied',...(A.isAbsence(a)?{replySignatureImage:signature}:{})});signatureDrafts.delete(el.id)}
       catch(err){console.error(err);b.disabled=false;b.textContent='إرسال الرد';toast('تعذّر إرسال الرد، حاول مرة أخرى.')}}
