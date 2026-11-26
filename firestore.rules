@@ -88,6 +88,15 @@ service cloud.firestore {
     allow update,delete: if false;
   }
   function teacherName() { return get(/databases/$(database)/documents/teacherProfiles/$(request.auth.uid)).data.get('scheduleName', '-'); }
+  // Names-only class lists for teacher recording (no guardian phones or civil IDs). The manager publishes them; a teacher reads the classes they teach.
+  match /classRosters/{classId} {
+    allow get, list: if admin() || staff() && role() == 8 || teacher() && teacherName() in resource.data.teachers;
+    allow create, update: if admin() && classId.matches('g[123]-s[1-9][0-9]?') && request.resource.data.keys().hasOnly(['classId','classLabel','students','teachers','lessons','updatedBy','updatedAt']) &&
+      request.resource.data.classId == classId && request.resource.data.classLabel is string && request.resource.data.classLabel.size() <= 80 && request.resource.data.students is list && request.resource.data.students.size() <= 80 &&
+      request.resource.data.teachers is list && request.resource.data.teachers.size() <= 60 && request.resource.data.lessons is list && request.resource.data.lessons.size() <= 120 &&
+      request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+    allow delete: if false;
+  }
   match /studentAttendance/{recordId} {
     allow get, list: if admin() || staff() && role() == 8 ||
       teacher() && resource.data.teacher == teacherName();
@@ -106,6 +115,16 @@ service cloud.firestore {
     }
     allow create: if admin() && validAttendance() && request.resource.data.revision == 1;
     allow update: if admin() && validAttendance() && request.resource.data.revision == resource.data.revision + 1;
+    // Teachers record their own onsite lessons for classes they teach, for today or yesterday only.
+    function teacherCanRecord(d) {
+      let roster = get(/databases/$(database)/documents/classRosters/$(d.classId)).data;
+      let day = timestamp.date(int(d.date[0:4]), int(d.date[5:7]), int(d.date[8:10]));
+      return teacher() && d.teacher == teacherName() && teacherName() in roster.teachers &&
+        day > request.time - duration.value(2, 'd') && day <= request.time;
+    }
+    allow get: if teacher() && resource == null;
+    allow create: if teacherCanRecord(request.resource.data) && validAttendance() && request.resource.data.revision == 1;
+    allow update: if teacherCanRecord(request.resource.data) && resource.data.teacher == teacherName() && validAttendance() && request.resource.data.revision == resource.data.revision + 1;
     allow delete: if false;
   }
   function employee() { return signed() && accountEnabled() && exists(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)) && get(/databases/$(database)/documents/employeeProfiles/$(request.auth.uid)).data.active == true; }
