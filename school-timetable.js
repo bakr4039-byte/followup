@@ -59,10 +59,21 @@ async function load(force){
   finally{loading=false;render()}
 }
 function times(type,i,classId){return periodTime(type,i+1,classId)}
+// Onsite day layout with assembly, breaks and prayer in place, per grade (approved bell schedule).
+const ONSITE_LAYOUT={
+  1:[{b:'الطابور',t:'6:45 – 7:00',k:'line'},1,2,{b:'الفسحة الأولى',t:'8:40 – 9:05',k:'break'},3,4,5,6,{b:'الفسحة الثانية · الصلاة',t:'12:20 – 12:30',k:'prayer'},7],
+  3:[{b:'الطابور',t:'6:45 – 7:00',k:'line'},1,2,3,{b:'الفسحة الأولى',t:'9:30 – 9:55',k:'break'},4,5,6,{b:'الفسحة الثانية · الصلاة',t:'12:20 – 12:30',k:'prayer'},7]
+};
+ONSITE_LAYOUT[2]=ONSITE_LAYOUT[1];
 function gridHtml(type,sessions,data){
   const headClass=teacherSel?'':classSel;
-  const head='<thead><tr><th>اليوم</th>'+PERIODS.map((p,i)=>{const t=(type==='remote'||headClass)?times(type,i,headClass):'';return '<th>'+p+(t?'<small>'+t+'</small>':'')+'</th>'}).join('')+'</tr></thead>';
-  const body=DAYS.map((d,di)=>'<tr><th>'+d+'</th>'+PERIODS.map((p,pi)=>{const here=sessions.filter(s=>s.day===di&&s.period===pi+1);
+  const layout=(type==='onsite'&&headClass&&ONSITE_LAYOUT[gradeOf(headClass)])||[1,2,3,4,5,6,7];
+  const head='<thead><tr><th>اليوم</th>'+layout.map(c=>{
+    if(typeof c==='object')return '<th class="tt-break tt-'+c.k+'">'+c.b+'<small>'+c.t+'</small></th>';
+    const t=(type==='remote'||headClass)?times(type,c-1,headClass):'';return '<th>'+PERIODS[c-1]+(t?'<small>'+t+'</small>':'')+'</th>'}).join('')+'</tr></thead>';
+  const body=DAYS.map((d,di)=>'<tr><th>'+d+'</th>'+layout.map(c=>{
+    if(typeof c==='object')return di===0?'<td class="tt-break tt-'+c.k+'" rowspan="'+DAYS.length+'"><span>'+c.b+'</span></td>':'';
+    const here=sessions.filter(s=>s.day===di&&s.period===c);
     return '<td class="tt-cell">'+(here.length?here.map(s=>'<b>'+esc(s.subject)+'</b><small>'+esc(teacherSel?s.classIds.map(id=>classLabel(type,id,data)).join('، '):s.teacher)+'</small>'+(teacherSel&&type==='onsite'?'<small>'+esc(periodTime(type,s.period,s.classIds[0]))+'</small>':'')).join('<hr>'):'<span class="tt-empty">—</span>')+'</td>'}).join('')+'</tr>').join('');
   return '<table class="tt-grid">'+head+'<tbody>'+body+'</tbody></table>';
 }
@@ -90,7 +101,7 @@ function render(){
   html+='<div class="tt-bar"><label>الفصل<select data-f="class"'+(teacherSel?' disabled':'')+'>'+classes.map(id=>'<option value="'+esc(id)+'"'+(id===classSel?' selected':'')+'>'+esc(classLabel(type,id,data))+'</option>').join('')+'</select></label>'+
     '<label>أو المعلم<select data-f="teacher"><option value="">— حسب الفصل —</option>'+teachers.map(t=>'<option'+(t===teacherSel?' selected':'')+'>'+esc(t)+'</option>').join('')+'</select></label>'+
     '<div class="tt-actions"><button type="button" data-print>طباعة</button><button type="button" data-reload>تحديث</button></div></div>';
-  html+='<p class="tt-sum">جدول '+TYPES[type]+' · '+(teacherSel?esc(teacherSel):esc(classLabel(type,classSel,data)))+' · '+shown.length+' حصة أسبوعيًا · مجموع الجدول: '+sessions.length+' حصة، '+classes.length+' فصل، '+teachers.length+' معلم'+'</p>'+(type==='onsite'&&!teacherSel&&ONSITE_BREAKS[gradeOf(classSel)]?'<p class="tt-note">'+ONSITE_BREAKS[gradeOf(classSel)]+'</p>':'');
+  html+='<p class="tt-sum">جدول '+TYPES[type]+' · '+(teacherSel?esc(teacherSel):esc(classLabel(type,classSel,data)))+' · '+shown.length+' حصة أسبوعيًا · مجموع الجدول: '+sessions.length+' حصة، '+classes.length+' فصل، '+teachers.length+' معلم'+'</p>'+(type==='onsite'&&teacherSel?'<p class="tt-note">الطابور 6:45 – 7:00 · الفسحة الأولى: الأول والثاني 8:40 – 9:05، الثالث 9:30 – 9:55 · الصلاة 12:20 – 12:30</p>':'');
   html+=sessions.length?'<div class="tt-wrap">'+gridHtml(type,shown,data)+'</div>':'<p class="tt-note">لا توجد حصص في هذا الجدول بعد.</p>';
   box.innerHTML=html;
 }
