@@ -203,6 +203,8 @@
   const periods=['الأولى','الثانية','الثالثة','الرابعة','الخامسة','السادسة','السابعة'];
   const TABS=[['record','رصد الحصص'],['reports','التقارير'],['absence','الغياب والإشعارات'],['import','الاستيراد']];
   let tab='record';
+  const actionLabels={call:'اتصال بولي الأمر',pledge:'تعهد من الطالب',summon:'استدعاء ولي الأمر',referral:'إحالة إلى لجنة التوجيه',note:'ملاحظة متابعة'};
+  const levelValue=count=>count>=20?20:count>=10?10:5;
   const button=document.createElement('button');
   button.type='button';button.id='vStudentAttendance';button.className='btn ghost';
   button.textContent='سجل حضور الطلاب';button.hidden=true;
@@ -275,6 +277,9 @@
 #studentAttendance .sa-level.l1{background:#fff4dc;color:#7a4d00}
 #studentAttendance .sa-level.l2{background:#ffe6d5;color:#8a3b00}
 #studentAttendance .sa-level.l3{background:#faebea;color:#9f2727}
+#studentAttendance .sa-missing{color:#9f2727}
+#studentAttendance .sa-action-form{display:grid;gap:8px;text-align:start;white-space:normal;padding:8px}
+#studentAttendance .sa-action-form textarea{font:inherit;padding:7px 9px;border:1px solid #a5c5ba;border-radius:8px;width:100%}
   @media print{#studentAttendance .sa-tabs,#saCards,#saQuick,#saFilters,#saClose,#saStatus,#saStudentEditor,#studentAttendance button,#studentAttendance .sa-actions{display:none!important}#studentAttendance .sa-grid{overflow:visible}}
   `;
   document.head.append(style);
@@ -576,7 +581,7 @@
     const level=count=>count>=20?['l3','20 يومًا فأكثر: إحالة إلى لجنة التوجيه والإرشاد']:count>=10?['l2','10 أيام: إنذار واستدعاء ولي الأمر']:count>=5?['l1','5 أيام: تنبيه أول والتواصل مع ولي الأمر']:null;
     const escalated=totals.filter(row=>level(row.absent));
     const escalation='<h3>متابعة الغياب المتراكم للفترة</h3><p>تُحسب أيام الغياب الكامل خلال الفترة المختارة. اختر «هذا الشهر» أو فترة أطول لمتابعة التراكم.</p>'+
-      (escalated.length?table(['الطالب','الفصل','أيام الغياب الكامل','الإجراء المقترح'],escalated.map(row=>{const [tone,text]=level(row.absent);return '<tr><td>'+escape(row.name)+'</td><td>'+escape([...row.classes].map(className).join('، '))+'</td><td>'+row.absent+'</td><td><span class="sa-level '+tone+'">'+escape(text)+'</span></td></tr>';}).join('')):'<p>لا يوجد طلاب بلغوا 5 أيام غياب كامل في الفترة المختارة.</p>');
+      (escalated.length?table(['الطالب','الفصل','أيام الغياب الكامل','الإجراء المقترح','الإجراءات المسجلة'],escalated.map(row=>{const [tone,text]=level(row.absent);const done=book.actions?.get(row.id)||[],last=done[done.length-1],covered=done.some(item=>item.level>=levelValue(row.absent));return '<tr><td>'+escape(row.name)+'</td><td>'+escape([...row.classes].map(className).join('، '))+'</td><td>'+row.absent+'</td><td><span class="sa-level '+tone+'">'+escape(text)+'</span></td><td>'+(done.length?escape(done.length+' إجراء · آخرها: '+(actionLabels[last.action]||last.action)+(last.day?' '+last.day:'')):'<b class="sa-missing">لم يُسجَّل إجراء</b>')+(done.length&&!covered?' <b class="sa-missing">· لا يوجد إجراء لهذا المستوى</b>':'')+(context?.edit?' <button type="button" data-sa-act="'+escape(row.id)+'">تسجيل إجراء</button>':'')+'</td></tr>';}).join('')):'<p>لا يوجد طلاب بلغوا 5 أيام غياب كامل في الفترة المختارة.</p>');
     const todayRows=days.filter(row=>row.date===reportDate&&row.absentLessons>0);
     const absent=table(['الطالب','الفصل','حصص الغياب','حالة اليوم','إشعار ولي الأمر'],todayRows.map(row=>{
       const text='ولي أمر الطالب '+row.name+'، السلام عليكم ورحمة الله. نحيطكم برصد غياب الطالب عن '+row.absentLessons+' حصة بتاريخ '+reportDate+' في ثانوية الصحافة الأهلية. نأمل التواصل مع المدرسة وبيان العذر. شكرًا لتعاونكم.';
@@ -611,6 +616,36 @@
       };
       heading.insertAdjacentElement('afterend',share);
     }
+    for(const control of host.querySelectorAll('[data-sa-act]'))control.onclick=()=>{
+      const row=escalated.find(item=>item.id===control.dataset.saAct);
+      if(!row||!manager()||busy)return;
+      host.querySelector('.sa-action-form')?.closest('tr')?.remove();
+      const line=document.createElement('tr'),cell=document.createElement('td');
+      cell.colSpan=5;line.append(cell);
+      cell.innerHTML='<form class="sa-action-form"><b>'+escape(row.name)+' · '+row.absent+' أيام غياب كامل · مستوى '+levelValue(row.absent)+'</b>'+
+        '<label>الإجراء<select name="kind">'+Object.entries(actionLabels).map(([key,label])=>'<option value="'+key+'">'+label+'</option>').join('')+'</select></label>'+
+        '<label>تفاصيل الإجراء ونتيجته<textarea name="note" maxlength="600" rows="2"></textarea></label>'+
+        '<div class="sa-actions"><button type="submit">حفظ الإجراء</button><button type="button" data-sa-cancel>إلغاء</button></div></form>';
+      control.closest('tr').after(line);
+      const form=cell.querySelector('form');
+      form.querySelector('[data-sa-cancel]').onclick=()=>line.remove();
+      form.onsubmit=async event=>{
+        event.preventDefault();
+        if(busy||!manager())return;
+        const entry={studentId:row.id,studentName:row.name,classLabel:[...row.classes].map(className).join('، ').slice(0,120),level:levelValue(row.absent),
+          action:form.elements.kind.value,note:form.elements.note.value.trim().slice(0,600),absentDays:row.absent,from:book.from,to:book.to,
+          createdBy:auth.currentUser.uid,createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+        setBusy(true);
+        try{
+          await db.collection('absenceActions').add(entry);
+          const list=book.actions.get(row.id)||[];
+          list.push({...entry,day:today()});book.actions.set(row.id,list);
+          paintReports();status('تم حفظ الإجراء في سجل متابعة الغياب.');
+        }catch(err){status(message(err));}
+        finally{setBusy(false);}
+      };
+      form.elements.kind.focus();
+    };
     $('saReportPrint').onclick=()=>{
       if(root.ReportKit){if(!root.ReportKit.open({title:'تقارير حضور الطلاب',subtitle:'من '+book.from+' إلى '+book.to,body:host.innerHTML,landscape:true}))status('اسمح بفتح نافذة الطباعة ثم حاول مجددًا.');return;}
       const printWindow=root.open('','_blank');
@@ -659,6 +694,20 @@
         if(mode!=='remote'&&!records.some(record=>record.date===date)){skipped.set(date,mode);dateList.splice(dateList.indexOf(date),1);}
       }
       if(token!==sequence)return;
+      // Documented absence follow-up actions (absenceActions), readable by the manager and report viewers.
+      const actions=new Map();
+      if(app){
+        try{
+          const snap=await db.collection('absenceActions').get();
+          for(const doc of snap.docs){
+            const item=doc.data(),list=actions.get(item.studentId)||[];
+            list.push({...item,day:item.createdAt?.toDate?item.createdAt.toDate().toISOString().slice(0,10):''});
+            actions.set(item.studentId,list);
+          }
+          for(const list of actions.values())list.sort((a,b)=>String(a.day).localeCompare(String(b.day)));
+        }catch{}
+        if(token!==sequence)return;
+      }
       let onsiteLessons=[];
       if(dateList.some(date=>dayModeOf(modes,date)==='onsite')){
         try{onsiteLessons=(await db.doc('config/subs-onsite-data').get()).data()?.lessons||[];}catch{onsiteLessons=[];}
@@ -685,7 +734,7 @@
       }
       if(token!==sequence)return;
       const dailyRecords=records.filter(record=>(!grade||gradeOf(record.classId)===grade)&&(!classId||record.classId===classId));
-      activeSheet={records:selected,dailyRecords,items,rosters,period,teacher,from,to,dates:dateList,skipped,modes,onsiteLessons};
+      activeSheet={records:selected,dailyRecords,items,rosters,period,teacher,from,to,dates:dateList,skipped,modes,onsiteLessons,actions};
       $('saResults').innerHTML='<div id="saSheet"></div><div id="saPeriodTotals"></div>';
       paintSheet();
       status('');
