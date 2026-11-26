@@ -11,7 +11,7 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 function norm(n){return String(n||'').normalize('NFKC').replace(/[ً-ٰٟـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,'')}
 function remoteSessions(S){return (S||[]).map(s=>({id:s.id,type:'remote',day:s.day,period:s.slot+1,classIds:[s.cls],subject:s.subj,teacher:s.teacher}))}
 function onsiteSessions(data){return ((data&&data.lessons)||[]).map(l=>({id:l.classId+'-d'+l.day+'-p'+l.period,type:'onsite',day:l.day,period:l.period,classIds:[l.classId],subject:l.subject,teacher:l.scheduleName||l.teacher}))}
-function classLabel(type,id,data){if(type==='remote')return REMOTE_CLASSES[id]||id;const c=data&&data.classes&&data.classes.find(x=>x.id===id);return c?(c.label||GRADES[c.grade]+' · شعبة '+c.section):id}
+function classLabel(type,id,data){if(type==='remote')return REMOTE_CLASSES[id]||id;const c=data&&data.classes&&data.classes.find(x=>x.id===id);return c&&GRADES[c.grade]?GRADES[c.grade]+' · شعبة '+c.section:(c&&c.label)||id}
 const ORDER={missing:0,near:1,inactive:2,linked:3};
 function teacherLinks(sessions,profiles){
   const names=new Map();
@@ -47,7 +47,8 @@ async function load(force){
   catch(e){error='تعذّر تحميل الجدول الحضوري أو حسابات المعلمين. حدّث الصفحة وحاول مجددًا.'}
   finally{loading=false;render()}
 }
-function times(type,i){if(type!=='remote'||typeof SLOTS==='undefined'||!SLOTS[i])return '';return SLOTS[i][1]+' – '+SLOTS[i][2]}
+const REMOTE_TIMES=[['7:00','7:40'],['7:40','8:20'],['8:20','9:00'],['9:15','9:55'],['9:55','10:35'],['10:35','11:15'],['11:15','11:55']];
+function times(type,i){const t=type==='remote'&&REMOTE_TIMES[i];return t?t[0]+' – '+t[1]:''}
 function gridHtml(type,sessions,data){
   const head='<thead><tr><th>اليوم</th>'+PERIODS.map((p,i)=>'<th>'+p+(times(type,i)?'<small>'+times(type,i)+'</small>':'')+'</th>').join('')+'</tr></thead>';
   const body=DAYS.map((d,di)=>'<tr><th>'+d+'</th>'+PERIODS.map((p,pi)=>{const here=sessions.filter(s=>s.day===di&&s.period===pi+1);
