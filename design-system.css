@@ -52,3 +52,7 @@ canvas.as-pad,.acc-sign canvas{background-color:#fff;border:1.5px dashed var(--a
 .hd-link{display:grid;gap:2px;text-align:right;font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;color:var(--ink)}
 .hd-link b{font-size:14px}.hd-link small{color:var(--muted);font-size:12px}
 .hd-link:hover{border-color:var(--accent);background:var(--accent-soft)}
+.school-sidebar .school-sidebar-links>.school-home-link{width:100%;min-height:46px;box-sizing:border-box;display:flex;align-items:center;gap:10px;text-align:right;background:#ffffff0d;border:1px solid #ffffff24;color:#e2eee8;padding:10px 13px;border-radius:12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px}
+.school-sidebar .school-sidebar-links>.school-home-link:before{content:'⌂';font-size:16px;color:#dfc788;width:18px;text-align:center}
+.school-sidebar .school-sidebar-links>.school-home-link:hover{background:#ffffff17}
+.school-sidebar .school-sidebar-links>.school-home-link[hidden]{display:none}
