@@ -220,7 +220,7 @@
     '<label>الشعبة<select id="saClass"><option value="">كل الشعب</option></select></label>'+
     '<label>الحصة<select id="saPeriod"><option value="">جميع الحصص</option>'+periods.map((period,i)=>'<option value="'+(i+1)+'">'+period+'</option>').join('')+'</select></label>'+
     '<label>المعلم<select id="saTeacher"><option value="">الجميع</option></select></label>'+
-    '<label id="saKindField">التقرير<select id="saReportKind"><option value="all">جميع التقارير</option><option value="students">أيام حضور وغياب الطلاب</option><option value="daily">الحضور والغياب اليومي</option><option value="teachers">أعلى المعلمين حضورًا للطلاب</option></select></label>'+
+    '<label id="saKindField">التقرير<select id="saReportKind"><option value="all">جميع التقارير</option><option value="students">أيام حضور وغياب الطلاب</option><option value="daily">الحضور والغياب اليومي</option><option value="teachers">أعلى المعلمين حضورًا للطلاب</option><option value="classes">متابعة الفصول أسبوعيًا</option></select></label>'+
     '<button type="submit">عرض السجل</button></form>'+
     '<p id="saStatus" role="status"></p><div id="saCards" class="sa-cards" aria-live="polite"></div><div id="saQuick" class="sa-actions" hidden></div><div id="saTeacherPanel" hidden></div><section id="saReports"></section><div id="saResults"></div><section id="saBody"></section>';
   let navigation;
@@ -656,6 +656,33 @@
     const dailyRows=book.dates.map(date=>{const rows=days.filter(row=>row.date===date);return cells([date,rows.length,rows.filter(row=>row.status==='present').length,rows.filter(row=>row.status==='absent').length,rows.filter(row=>row.status==='unmarked').length]);}).join('');
     const daily=table(['التاريخ','عدد الطلاب','حاضر خلال اليوم','غائب اليوم كاملًا','غير مكتمل الرصد'],dailyRows);
     const ranking=table(['الصف','المعلم','الحصص المرصودة','حالات الحضور','حالات الغياب','غير مرصود','نسبة الحضور'],teacherRanking(book.records).map(row=>cells([grades[row.grade]||'—',root.StaffSettings?.displayName(row.teacher)||row.teacher,row.lessons,row.present,row.absent,row.unmarked,row.rate===null?'—':(row.rate*100).toFixed(1)+'%'])).join(''));
+    // Weekly class follow-up: attendance-day rate per class per week, and students absent from more than half of their lessons.
+    const weekOf=date=>{const d=new Date(date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-d.getUTCDay());return d.toISOString().slice(0,10);};
+    const weeks=[...new Set(days.map(row=>weekOf(row.date)))].sort().slice(-6);
+    const byClass=new Map();
+    for(const row of days){
+      if(!byClass.has(row.classId))byClass.set(row.classId,{weeks:new Map(),students:new Map()});
+      const item=byClass.get(row.classId),key=weekOf(row.date),week=item.weeks.get(key)||{present:0,absent:0};
+      if(row.status==='present')week.present++;else if(row.status==='absent')week.absent++;
+      item.weeks.set(key,week);
+      const student=item.students.get(row.id)||{name:row.name,phone:row.guardianPhone||'',absent:0,expected:0};
+      student.absent+=row.absentLessons||0;student.expected+=row.expected||0;item.students.set(row.id,student);
+    }
+    const weekRate=week=>week&&(week.present+week.absent)?Math.round(week.present*100/(week.present+week.absent)):null;
+    const halfRows=[];
+    const classWeekly=table(['الفصل',...weeks.map(week=>'أسبوع '+week),'التغير عن الأسبوع السابق','غابوا عن أكثر من نصف حصصهم'],[...byClass.keys()].sort((a,b)=>a.localeCompare(b,'en',{numeric:true})).map(id=>{
+      const item=byClass.get(id),values=weeks.map(week=>weekRate(item.weeks.get(week))),known=values.filter(value=>value!==null);
+      const change=known.length>1?known[known.length-1]-known[known.length-2]:null;let half=0;
+      for(const student of item.students.values())if(student.expected&&student.absent/student.expected>0.5){half++;halfRows.push({...student,classId:id});}
+      return cells([className(id),...values.map(value=>value===null?'—':value+'%'),change===null?'—':(change>0?'+':'')+change+'%',half]);
+    }).join(''));
+    halfRows.sort((a,b)=>b.absent/b.expected-a.absent/a.expected);
+    const halfList=halfRows.length?'<div class="sa-grid"><table><thead><tr><th>الطالب</th><th>الفصل</th><th>حصص الغياب</th><th>النسبة</th><th>ولي الأمر</th></tr></thead><tbody>'+halfRows.map(student=>{
+      const text='ولي أمر الطالب '+student.name+'، السلام عليكم ورحمة الله. نفيدكم بأن الطالب غاب عن '+student.absent+' من '+student.expected+' حصة عن بُعد خلال الفترة من '+book.from+' إلى '+book.to+' في ثانوية الصحافة الأهلية. نأمل متابعته والتواصل مع المدرسة. شكرًا لتعاونكم.';
+      const link=guardianLink(student.phone,text);
+      return '<tr><td>'+escape(student.name)+'</td><td>'+escape(className(student.classId))+'</td><td>'+student.absent+' / '+student.expected+'</td><td>'+Math.round(student.absent*100/student.expected)+'%</td><td>'+(link?'<a target="_blank" rel="noopener noreferrer" href="'+escape(link)+'">رسالة واتساب لولي الأمر</a>':'جوال ولي الأمر غير مسجّل')+'</td></tr>';
+    }).join('')+'</tbody></table></div>':'<p>لا يوجد طلاب غابوا عن أكثر من نصف حصصهم في الفترة المختارة.</p>';
+    const halfSection='<h3>طلاب غابوا عن أكثر من نصف حصصهم في الفترة</h3>'+halfList;
     const reportDate=cardDay;
     const level=count=>count>=20?['l3','20 يومًا فأكثر: إحالة إلى لجنة التوجيه والإرشاد']:count>=10?['l2','10 أيام: إنذار واستدعاء ولي الأمر']:count>=5?['l1','5 أيام: تنبيه أول والتواصل مع ولي الأمر']:null;
     const escalated=totals.filter(row=>level(row.absent));
@@ -669,9 +696,9 @@
     }).join(''));
     host.innerHTML='<h3>تقارير الطلاب للفترة '+escape(book.from)+' إلى '+escape(book.to)+'</h3><p>يحسب حضور اليوم من حضور حصة واحدة على الأقل، ويحسب غياب اليوم الكامل بعد رصد كل الحصص المطلوبة بالغياب. المتأخرون ضمن الحضور. الأيام غير المكتملة تحتاج استكمال الرصد. إحصاءات الأيام تشمل جميع حصص الطالب، وفلاتر المعلم والحصة تطبق على ترتيب المعلمين وسجل الحصص.</p><div class="sa-actions"><button type="button" id="saReportPrint">طباعة التقارير / حفظ PDF</button><button type="button" id="saReportExport">تنزيل التقارير Excel (CSV)</button></div>'+
       ((kind==='all'||kind==='students')?'<h3>سجل أيام حضور وغياب كل طالب</h3>'+students:'')+
-      (kind==='absence'?'<h3>غياب يوم '+escape(reportDate)+'</h3><p>طلاب رُصد لهم غياب في حصة واحدة على الأقل: '+todayRows.length+' · غياب اليوم الكامل: '+todayRows.filter(row=>row.status==='absent').length+'</p>'+absent+escalation:'')+
+      (kind==='absence'?'<h3>غياب يوم '+escape(reportDate)+'</h3><p>طلاب رُصد لهم غياب في حصة واحدة على الأقل: '+todayRows.length+' · غياب اليوم الكامل: '+todayRows.filter(row=>row.status==='absent').length+'</p>'+absent+escalation:'')+(kind==='absence'?halfSection:'')+
       ((kind==='all'||kind==='daily')?'<h3>تقرير الحضور والغياب اليومي</h3>'+daily:'')+
-      ((kind==='all'||kind==='teachers')?'<h3>أعلى المعلمين حضورًا للطلاب لكل صف</h3><p>الترتيب حسب نسبة الحضور من الحالات المرصودة في الحصص، وتطبق فلاتر الصف والشعبة والحصة والمعلم.</p>'+ranking:'');
+      ((kind==='all'||kind==='teachers')?'<h3>أعلى المعلمين حضورًا للطلاب لكل صف</h3><p>الترتيب حسب نسبة الحضور من الحالات المرصودة في الحصص، وتطبق فلاتر الصف والشعبة والحصة والمعلم.</p>'+ranking:'')+((kind==='all'||kind==='classes')?'<h3>متابعة الفصول أسبوعيًا</h3><p>نسبة أيام الحضور لكل فصل في آخر ستة أسابيع من الفترة، والتغير عن الأسبوع السابق، وعدد الطلاب الذين غابوا عن أكثر من نصف حصصهم.</p>'+classWeekly+halfSection:'');
     for(const heading of host.querySelectorAll('h3')){
       const next=heading.nextElementSibling;
       const grid=next?.matches('.sa-grid')?next:next?.nextElementSibling;
