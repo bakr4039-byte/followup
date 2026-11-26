@@ -83,3 +83,27 @@ canvas.as-pad,.acc-sign canvas{background-color:#fff;border:1.5px dashed var(--a
 .nc-empty{margin:4px;color:#b9d2c5;font-size:12.5px}
 .nc-enable{font:inherit;font-size:12px;border-radius:8px;padding:7px 10px;border:1px dashed #ffffff50;background:none;color:#e2eee8;cursor:pointer}
 .school-sidebar-toggle[data-count]:after{content:attr(data-count);margin-inline-start:8px;background:#e0a33a;color:#14231f;border-radius:10px;padding:0 7px;font-size:12px}
+
+/* School timetable: remote and onsite types, teacher links (school-timetable.js). */
+.tt{display:grid;gap:14px}
+.tt-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tt-tabs button{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 16px;cursor:pointer}
+.tt-tabs button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tt-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.tt-bar label{display:grid;gap:4px;font-size:12.5px;color:var(--muted)}
+.tt-bar select{font:inherit;min-height:40px;border:1px solid var(--line);border-radius:10px;padding:6px 10px;background:var(--surface);color:var(--ink);min-width:210px;max-width:100%}
+.tt-actions,.tt-actions-row{display:flex;gap:8px;margin-inline-start:auto}
+.tt-actions button,.tt-actions-row button{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:10px;padding:8px 14px;cursor:pointer}
+.tt-sum{color:var(--muted);font-size:13px;margin:0;line-height:1.8}
+.tt-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.tt-grid{width:100%;border-collapse:collapse;min-width:760px;font-size:13px}
+.tt-grid th,.tt-grid td{border:1px solid var(--line);padding:8px;text-align:center;vertical-align:top}
+.tt-grid thead th{background:var(--accent-soft);color:var(--ink);font-weight:700}
+.tt-grid thead small{display:block;font-weight:400;color:var(--muted);font-size:11px}
+.tt-grid tbody th{background:var(--surface-2);white-space:nowrap}
+.tt-links{min-width:560px}.tt-links tbody th{text-align:right}
+.tt-cell b{display:block;font-weight:600}.tt-cell small{display:block;color:var(--muted);font-size:11.5px}.tt-cell hr{border:0;border-top:1px dashed var(--line);margin:4px 0}
+.tt-empty{color:var(--idle)}
+.tt-badge{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600}
+.tt-badge.linked{background:var(--ok-soft);color:var(--ok)}.tt-badge.near{background:var(--warn-soft);color:var(--warn)}.tt-badge.missing{background:var(--bad-soft);color:var(--bad)}.tt-badge.inactive{background:var(--idle-soft);color:var(--idle)}
+.tt-note{background:var(--surface-2);border-radius:12px;padding:10px 14px;font-size:13px;color:var(--muted);margin:0;line-height:1.8}
