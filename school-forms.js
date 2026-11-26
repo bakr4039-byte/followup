@@ -9,8 +9,8 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const DAYS=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس'];
 const KIND=['مستهلك','مستديم'];
-const ROLES={lab:'المختبر والمستودع',lrc:'مصادر التعلم',activity:'النشاط الطلابي'};
-const ROLE_HINTS={lab:/مختبر|مستودع/,lrc:/مصادر التعلم/,activity:/النشاط/};
+const ROLES={deputy:'الوكالة (الشؤون المدرسية والطلابية)',exams:'الاختبارات',lab:'المختبر والمستودع',lrc:'مصادر التعلم',activity:'النشاط الطلابي'};
+const ROLE_HINTS={deputy:/وكيل/,exams:/وكيل الشؤون التعليمية|اختبار/,lab:/مختبر|مستودع/,lrc:/مصادر التعلم/,activity:/النشاط/};
 const YEAR={key:'year',label:'العام الدراسي',def:'year'};
 const TERM={key:'term',label:'الفصل الدراسي',type:'select',options:['الأول','الثاني','الثالث']};
 const NO={key:'no',label:'رقم الصنف'},NAME={key:'name',label:'اسم الصنف'},UNIT={key:'unit',label:'الوحدة'},QTY={key:'qty',label:'الكمية',type:'number'},NOTES={key:'notes',label:'ملاحظات'};
@@ -54,7 +54,72 @@ const FORMS=[
   {code:'و.ط.ع.ن-05-02',owner:'activity',title:'موافقة ولي أمر الطالب لمشاركة ابنه في نشاط مدرسي',layout:'letter',
     header:[YEAR,TERM,{key:'type',label:'نوع النشاط',type:'select',options:['رحلة','زيارة','مشاركة','أخرى']},{key:'other',label:'تفاصيل النشاط'},{key:'place',label:'المكان'},{key:'lead',label:'مشرف الرحلة'},{key:'leadPhone',label:'رقم جوال المشرف'},
       {key:'day',label:'اليوم',type:'select',options:DAYS},{key:'date',label:'التاريخ',type:'date'},{key:'start',label:'ساعة الانطلاق',type:'time'},{key:'end',label:'ساعة العودة',type:'time'}],
-    sections:[{key:'students',title:'الطلاب المرشّحون (يُطبع خطاب لكل طالب)',columns:[{key:'student',label:'اسم الطالب'},{key:'cls',label:'الصف'}]}],signatures:false}
+    sections:[{key:'students',title:'الطلاب المرشّحون (يُطبع خطاب لكل طالب)',columns:[{key:'student',label:'اسم الطالب'},{key:'cls',label:'الصف'}]}],signatures:false},
+  {code:'و.ت.ع.ن-01-02أ',owner:'deputy',title:'جدول المناوبة والإشراف اليومي',landscape:true,header:[YEAR,TERM],
+    statement:'لا يُشترط أن يُكلّف الموظف بالمناوبة والإشراف في يوم واحد، ولا يقل الحد الأدنى للمناوبة والإشراف عن موظفين ويمكن زيادة العدد حسب الاحتياج.',
+    sections:[{key:'days',columns:[{key:'week',label:'الأسبوع'},{key:'day',label:'اليوم',type:'select',options:DAYS},{key:'date',label:'التاريخ',type:'date'},{key:'duty',label:'المناوبة (الاسم)'},{key:'dutySign',label:'التوقيع',type:'blank'},{key:'sup',label:'الإشراف (الاسم)'},{key:'supSign',label:'التوقيع',type:'blank'},{key:'notes',label:'ملاحظات'}]}],
+    signatures:['وكيل الشؤون التعليمية','مدير المدرسة']},
+  {code:'و.ت.ع.ن-01-03',owner:'deputy',title:'تقرير المناوبة اليومي',header:[YEAR,TERM,{key:'day',label:'اليوم',type:'select',options:DAYS},{key:'date',label:'التاريخ',type:'date'}],
+    statement:'يتم تسليم هذا التقرير إلى وكيل الشؤون التعليمية في اليوم التالي للمناوبة.',
+    sections:[{key:'staff',title:'الموظفون المناوبون',columns:[{key:'name',label:'اسم الموظف المناوب'},{key:'sign',label:'التوقيع',type:'blank'},{key:'notes',label:'ملحوظات'}]},
+      {key:'late',title:'أسماء الطلاب المتأخرين',columns:[{key:'name',label:'الاسم'},{key:'cls',label:'الفصل'},{key:'time',label:'الزمن',type:'time'},{key:'action',label:'الإجراء المتخذ'},{key:'notes',label:'ملحوظات'}]},
+      {key:'violations',title:'أسماء الطلاب المخالفين',columns:[{key:'name',label:'الاسم'},{key:'cls',label:'الفصل'},{key:'time',label:'الزمن',type:'time'},{key:'action',label:'الإجراء المتخذ'},{key:'notes',label:'ملحوظات'}]}],
+    signatures:['المناوب','وكيل الشؤون التعليمية']},
+  {code:'و.م.ع.ن-02-04',owner:'deputy',title:'مساءلة غياب',link:'vAcc',linkLabel:'قسم المساءلات',sections:[]},
+  {code:'و.م.ع.ن-02-06',owner:'deputy',title:'سجل استئذان الموظفين',landscape:true,
+    header:[{key:'person',label:'الاسم'},{key:'civil',label:'السجل المدني'},{key:'major',label:'التخصص'},{key:'level',label:'المستوى / المرتبة'},{key:'grade',label:'الدرجة'},{key:'jobNo',label:'رقم الوظيفة'},{key:'work',label:'العمل الحالي'}],
+    sections:[{key:'exits',columns:[{key:'day',label:'اليوم',type:'select',options:DAYS},{key:'date',label:'التاريخ',type:'date'},{key:'out',label:'زمن الخروج',type:'time'},{key:'sign1',label:'التوقيع',type:'blank'},{key:'reason',label:'مبررات الخروج'},{key:'back',label:'زمن العودة',type:'time'},{key:'sign2',label:'التوقيع',type:'blank'},{key:'notes',label:'ملاحظات'}]}],
+    signatures:['الموظف','الرئيس المباشر']},
+  {code:'و.ط.ع.ن-03-01',owner:'deputy',title:'سجل بأسماء الطلاب المتأخرين صباحًا',header:[{key:'day',label:'اليوم',type:'select',options:DAYS},{key:'date',label:'التاريخ',type:'date'}],
+    sections:[{key:'late',columns:[{key:'student',label:'اسم الطالب'},{key:'cls',label:'الصف والشعبة'},{key:'minutes',label:'مقدار التأخر (دقيقة)',type:'number'},{key:'reason',label:'أسباب التأخر'},{key:'sign',label:'توقيع الطالب',type:'blank'}]}],
+    signatures:['المسؤول']},
+  {code:'و.ط.ع.ن-03-04',owner:'deputy',title:'سجل استئذان الطلاب أثناء الدوام الرسمي',landscape:true,
+    statement:'لا بد من حضور ولي الأمر في حال خروج الطالب أثناء الدوام الرسمي، خلاف ذلك يُمنع خروج الطالب من المدرسة حسب لوائح وزارة التعليم.',
+    sections:[{key:'exits',columns:[{key:'student',label:'اسم الطالب'},{key:'cls',label:'الفصل'},{key:'date',label:'التاريخ',type:'date'},{key:'out',label:'وقت الخروج',type:'time'},{key:'reason',label:'سبب الاستئذان'},{key:'guardian',label:'اسم ولي الأمر'},{key:'sign',label:'التوقيع',type:'blank'}]}],
+    signatures:['وكيل شؤون الطلاب']},
+  {code:'و.م.ع.ن-04-01',owner:'deputy',title:'استمارة موافقة ولي أمر الطالب للاشتراك في النقل المدرسي',header:[YEAR],
+    letter:(h,st)=>'<p>المكرم ولي أمر الطالب: <b>'+esc(st.student||'....................')+'</b> '+(st.cls?'(الصف: '+esc(st.cls)+')':'')+' المحترم</p><p>السلام عليكم ورحمة الله وبركاته، وبعد:</p>'+
+      '<p>تقوم المدرسة بتسجيل الطلاب الراغبين في الاشتراك في النقل المدرسي، وعليه نأمل موافاتنا بموافقتكم أو عدمها ليتسنّى لنا إجراء اللازم.</p>'+
+      '<p>☐ موافق    ☐ غير موافق</p><p><b>اسم ولي الأمر:</b> ................................ <b>التوقيع:</b> ....................</p><p><b>هاتف المنزل:</b> .................... <b>الجوال:</b> ....................</p>'+
+      '<p style="text-align:left"><b>مدير المدرسة</b><br>حسن بن محمد العمري</p>',
+    sections:[{key:'students',title:'الطلاب (يُطبع خطاب لكل طالب)',columns:[{key:'student',label:'اسم الطالب'},{key:'cls',label:'الصف'}]}],signatures:false},
+  {code:'و.ط.ع.ن-04-03',owner:'deputy',title:'تحويل طالب لوكيل شؤون الطلاب',
+    header:[{key:'student',label:'اسم الطالب'},{key:'cls',label:'الصف'},{key:'subject',label:'المادة'},{key:'period',label:'الحصة الدراسية'},{key:'date',label:'التاريخ',type:'date'},
+      {key:'reason',label:'سبب التحويل',type:'select',options:['عدم أداء الواجب','مشاغبة','تأخر عن الحصة','ضعف دراسي','أخرى']},{key:'other',label:'أخرى (تُذكر)'},{key:'problem',label:'إيضاح المشكلة',type:'long'},{key:'action',label:'الإجراء المتخذ',type:'long'}],
+    sections:[],signatures:['المعلم','وكيل شؤون الطلاب']},
+  {code:'و.ط.ع.ن-03-30',owner:'deputy',title:'كشف حضور وغياب طلاب المدرسة',link:'vStudentAttendance',linkLabel:'سجل حضور الطلاب',sections:[]},
+  {code:'و.م.ع.ن-03-01',owner:'deputy',title:'طلب صيانة',
+    header:[YEAR,TERM,{key:'type',label:'نوع الصيانة المطلوبة',type:'select',options:['كهرباء','نجارة','سباكة','تبريد','تكييف','صيانة (كراسي وطاولات)','أخرى']},{key:'other',label:'أخرى تُذكر'},
+      {key:'urgency',label:'نوع الطلب',type:'select',options:['عاجل','عاجل جدًا']},{key:'when',label:'متى يمكن إجراء الصيانة',type:'select',options:['في الصباح فقط','في الصباح أو المساء']}],
+    statement:'اسم المدرسة: ثانوية الصحافة الأهلية · المرحلة: الثانوية. ملحوظة: عند اختيار الصيانة في وقت الصباح فقط قد يؤخر ذلك إجراء الصيانة.',
+    sections:[{key:'works',title:'آمل تكليف فريق الصيانة بعمل ما يلي',columns:[{key:'work',label:'العمل المطلوب'},{key:'place',label:'الموقع'}]}],
+    signatures:['وكيل الشؤون المدرسية','مدير المدرسة']},
+  {code:'و.ت.ع.ن-05-01',owner:'exams',title:'مهام لجان الاختبار الفرعية',header:[YEAR,{key:'round',label:'الدور',type:'select',options:['الأول','الثاني']},TERM],
+    sections:[{key:'control',title:'لجنة التحكيم والضبط',columns:[{key:'name',label:'الاسم'},{key:'role',label:'الصفة',type:'select',options:['رئيس','عضو']},{key:'task',label:'المهمة'},{key:'sign',label:'التوقيع',type:'blank'}]},{key:'supervision',title:'لجنة الإشراف والملاحظة',columns:[{key:'name',label:'الاسم'},{key:'role',label:'الصفة',type:'select',options:['رئيس','عضو']},{key:'task',label:'المهمة'},{key:'sign',label:'التوقيع',type:'blank'}]},{key:'correction',title:'لجنة التصحيح والمراجعة',columns:[{key:'name',label:'الاسم'},{key:'role',label:'الصفة',type:'select',options:['رئيس','عضو']},{key:'task',label:'المهمة'},{key:'sign',label:'التوقيع',type:'blank'}]},{key:'results',title:'لجنة الرصد وإخراج النتائج',columns:[{key:'name',label:'الاسم'},{key:'role',label:'الصفة',type:'select',options:['رئيس','عضو']},{key:'task',label:'المهمة'},{key:'sign',label:'التوقيع',type:'blank'}]}],
+    signatures:['مدير المدرسة']},
+  {code:'و.ت.ع.ن-05-02',owner:'exams',title:'محضر فتح مظروف أسئلة',
+    header:[{key:'day',label:'اليوم',type:'select',options:DAYS},{key:'date',label:'التاريخ',type:'date'},{key:'session',label:'الفترة'},{key:'subject',label:'المادة'},{key:'grade',label:'الصف'},{key:'round',label:'الدور',type:'select',options:['الأول','الثاني']},TERM,{key:'time',label:'تم فتح المظروف عند الساعة',type:'time'},{key:'found',label:'ووُجد',type:'long'}],
+    statement:'وتم تحرير محضر بذلك.',
+    sections:[{key:'members',title:'أعضاء اللجنة',columns:[{key:'name',label:'أعضاء اللجنة'},{key:'role',label:'الصفة',type:'select',options:['رئيس','عضو']},{key:'sign',label:'التوقيع',type:'blank'}]}],signatures:['مدير المدرسة']},
+  {code:'و.ت.ع.ن-05-03',owner:'exams',title:'محضر مخالفة الأنظمة والتعليمات',
+    header:[YEAR,TERM,{key:'subject',label:'المادة'},{key:'day',label:'اليوم',type:'select',options:DAYS},{key:'date',label:'التاريخ',type:'date'},{key:'session',label:'الفترة'},
+      {key:'student',label:'اسم الطالب'},{key:'seat',label:'رقم الجلوس'},{key:'cls',label:'الصف / الفصل'},{key:'repeat',label:'تكرار المخالفة',type:'select',options:['المرة الأولى','المرة الثانية','المرة الثالثة']},{key:'kind',label:'نوع المخالفة',type:'select',options:['فردي','جماعي']},{key:'desc',label:'وصف المخالفة',type:'long'},{key:'decision',label:'الإجراء / القرار',type:'long'}],
+    sections:[],signatures:['الطالب','الملاحظ','رئيس اللجنة','مدير المدرسة']},
+  {code:'و.ت.ع.ن-05-04',owner:'exams',title:'كشف الغياب اليومي للطلاب في الاختبارات',landscape:true,
+    header:[{key:'day',label:'اليوم',type:'select',options:DAYS},{key:'date',label:'التاريخ',type:'date'},YEAR,TERM,{key:'round',label:'الدور',type:'select',options:['الأول','الثاني']},{key:'registered',label:'عدد المسجلين',type:'number'},{key:'absent',label:'عدد الغائبين',type:'number'}],
+    sections:[{key:'absent',columns:[{key:'cls',label:'الصف'},{key:'student',label:'اسم الطالب'},{key:'seat',label:'رقم الجلوس'},{key:'session',label:'الفترة'},{key:'subject',label:'المادة'},{key:'notes',label:'ملاحظات'}]}],signatures:['رئيس لجنة التحكيم والضبط','مدير المدرسة']},
+  {code:'و.ت.ع.ن-05-05',owner:'exams',title:'كشف تسليم أوراق الإجابة',landscape:true,
+    header:[{key:'week',label:'الأسبوع'},{key:'from',label:'من',type:'date'},{key:'to',label:'إلى',type:'date'}],
+    sections:[{key:'delivery',columns:[{key:'name',label:'اسم الملاحظ'},{key:'day',label:'اليوم',type:'select',options:DAYS},{key:'subject1',label:'مادة 1'},{key:'sign1',label:'التوقيع',type:'blank'},{key:'subject2',label:'مادة 2'},{key:'sign2',label:'التوقيع',type:'blank'}]}],signatures:['رئيس لجنة التحكيم والضبط']},
+  {code:'و.ت.ع.ن-05-06',owner:'exams',title:'بيان تسليم واستلام أوراق إجابات اختبار',landscape:true,header:[TERM,YEAR,{key:'grade',label:'للصف'}],
+    sections:[{key:'sheets',columns:[{key:'date',label:'اليوم والتاريخ',type:'date'},{key:'subject',label:'المادة'},{key:'room',label:'رقم اللجنة'},{key:'present',label:'عدد الحضور',type:'number'},{key:'absent',label:'عدد الغياب',type:'number'},{key:'total',label:'المجموع',type:'number'},{key:'papers',label:'عدد أوراق الإجابة',type:'number'},
+      {key:'r1',label:'التحكيم والضبط (استلام) — اسم المستلم'},{key:'r2',label:'التصحيح والمراجعة — اسم المستلم'},{key:'r3',label:'الرصد وإخراج النتائج — اسم المستلم'},{key:'r4',label:'التحكيم والضبط (حفظ) — اسم المستلم'},{key:'notes',label:'ملاحظات'}]}],
+    statement:'يوقّع كل مستلم أمام اسمه عند التسليم والاستلام.',signatures:['رئيس لجنة التحكيم والضبط','مدير المدرسة']},
+  {code:'و.ت.ع.ن-05-07',owner:'exams',title:'تعديل درجة',landscape:true,
+    header:[{key:'person',label:'اسم مقدّم الطلب'},{key:'date',label:'التاريخ',type:'date'},{key:'decision',label:'رأي مدير المدرسة',type:'select',options:['الموافقة','عدم الموافقة']}],
+    statement:'المكرم مدير المدرسة، السلام عليكم ورحمة الله وبركاته. آمل التكرم بتعديل الدرجة / الدرجات للطلاب التالية أسماؤهم، مع جزيل الشكر.',
+    sections:[{key:'grades',columns:[{key:'subject',label:'المادة'},{key:'student',label:'اسم الطالب'},{key:'cls',label:'الصف'},{key:'before',label:'الدرجة قبل التعديل'},{key:'after',label:'الدرجة بعد التعديل'},{key:'reason',label:'سبب التعديل'},{key:'registrar',label:'مسجّل المعلومات'},{key:'changed',label:'تاريخ التعديل',type:'date'},{key:'sign',label:'التوقيع',type:'blank'}]}],
+    signatures:['مقدّم الطلب','مسجّل المعلومات','مدير المدرسة']}
 ];
 const byCode=new Map(FORMS.map(f=>[f.code,f]));
 const signedIn=()=>!!(root.firebase&&firebase.apps.length&&firebase.auth().currentUser);
@@ -105,7 +170,7 @@ function paint(){
   else if(view==='record')body.innerHTML=recordView();
 }
 function homeView(){
-  const groups=roles.map(r=>'<section class="fm-group"><h3>'+esc(ROLES[r])+'</h3><div class="fm-list">'+FORMS.filter(f=>f.owner===r).map(f=>'<button type="button" class="fm-card" data-fm-open="'+esc(f.code)+'"><b>'+esc(f.title)+'</b><small>رمز النموذج: '+esc(f.code)+'</small></button>').join('')+'</div></section>').join('');
+  const groups=roles.map(r=>'<section class="fm-group"><h3>'+esc(ROLES[r])+'</h3><div class="fm-list">'+FORMS.filter(f=>f.owner===r).map(f=>'<button type="button" class="fm-card" '+(f.link?'data-fm-link':'data-fm-open')+'="'+esc(f.code)+'"><b>'+esc(f.title)+'</b><small>رمز النموذج: '+esc(f.code)+'</small></button>').join('')+'</div></section>').join('');
   return (mode==='manager'?'<div class="fm-bar"><button type="button" data-fm-access>صلاحيات الموظفين على النماذج</button></div><div id="fmAccess"></div>':'')+(groups||'<p class="fm-hint">لا توجد نماذج مخصصة لك.</p>');
 }
 function formView(){
@@ -113,10 +178,11 @@ function formView(){
   return '<button type="button" class="fm-back" data-fm-home>→ كل النماذج</button><div class="fm-bar"><div><h3>'+esc(form.title)+'</h3><small>رمز النموذج: '+esc(form.code)+'</small></div><button type="button" class="fm-primary" data-fm-new>سجل جديد</button></div>'+
     (rows?'<div class="fm-grid"><table><thead><tr><th>السجل</th><th>آخر تحديث</th><th>الصفوف</th><th>الحالة</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="fm-hint">لا توجد سجلات لهذا النموذج بعد.</p>');
 }
-const recordLabel=r=>{const h=r.header||{};return [h.year,h.term&&('الفصل '+h.term),h.person,h.field,h.date&&hijri(h.date),h.from&&('من '+hijri(h.from))].filter(Boolean).join(' · ')||'سجل';};
+const recordLabel=r=>{const h=r.header||{};return [h.year,h.term&&('الفصل '+h.term),h.person,h.student,h.subject,h.field,h.date&&hijri(h.date),h.from&&('من '+hijri(h.from))].filter(Boolean).join(' · ')||'سجل';};
 function input(col,value,name,locked){
   const v=value==null?'':String(value),dis=locked?' disabled':'';
   if(col.type==='blank')return '<span class="fm-blank">تُوقّع بعد الطباعة</span>';
+  if(col.type==='long')return '<textarea name="'+name+'" rows="3" maxlength="1200"'+dis+'>'+esc(v)+'</textarea>';
   if(col.type==='select')return '<select name="'+name+'"'+dis+'>'+(col.options.includes('')?'':'<option value=""></option>')+col.options.map(o=>'<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>').join('')+'</select>';
   const type=col.type==='number'?'number':col.type==='date'?'date':col.type==='time'?'time':'text';
   return '<input type="'+type+'" name="'+name+'" value="'+esc(v)+'" maxlength="300"'+dis+'>';
@@ -140,7 +206,7 @@ function collect(){
   for(const el of f.elements){
     if(!el.name)continue;
     const parts=el.name.split(':');
-    if(parts[0]==='h')record.header[parts[1]]=el.value.trim().slice(0,300);
+    if(parts[0]==='h')record.header[parts[1]]=el.value.trim().slice(0,1200);
     else if(parts[0]==='r'&&record.rows[Number(parts[1])])record.rows[Number(parts[1])][parts[2]]=el.value.trim().slice(0,300);
   }
 }
@@ -193,7 +259,10 @@ function printRecord(){
   if(!root.ReportKit){status('أداة الطباعة غير متاحة.');return;}
   const fields=(f.header||[]).filter(c=>c.key!=='other'||h.type==='أخرى');
   let body='<p><b>رمز النموذج:</b> '+esc(f.code)+'</p>';
-  if(f.layout==='letter'){
+  if(f.letter){
+    const list=r.rows.filter(x=>x.student);
+    body=(list.length?list:[{}]).map(st=>'<div style="page-break-after:always"><p><b>رمز النموذج:</b> '+esc(f.code)+(h.year?' · العام الدراسي '+esc(h.year):'')+'</p>'+f.letter(h,st)+'</div>').join('');
+  }else if(f.layout==='letter'){
     const students=r.rows.filter(x=>x.s==='students'&&x.student);
     const kind=h.type==='أخرى'?(h.other||'نشاط'):(h.type||'نشاط');
     body=(students.length?students:[{}]).map(st=>'<div style="page-break-after:always"><p><b>رمز النموذج:</b> '+esc(f.code)+' · العام الدراسي '+esc(h.year||'')+' · الفصل '+esc(h.term||'')+'</p>'+
@@ -215,7 +284,7 @@ function printRecord(){
       }else body+=table(s.columns,rows,8);
     }
   }
-  const sub=f.layout==='letter'?(h.year||''):[h.year,h.term&&('الفصل '+h.term)].filter(Boolean).join(' · ');
+  const sub=(f.layout==='letter'||f.letter)?(h.year||''):[h.year,h.term&&('الفصل '+h.term)].filter(Boolean).join(' · ');
   if(!root.ReportKit.open({title:f.title,subtitle:sub||('رمز النموذج: '+f.code),body,landscape:!!f.landscape,signatures:f.signatures===false?false:f.signatures}))status('اسمح بفتح نافذة الطباعة ثم حاول مجددًا.');
 }
 async function accessView(){
@@ -246,6 +315,7 @@ function onClick(e){
   const b=e.target.closest('button');if(!b||!host||!host.contains(b))return;
   const d=b.dataset;
   if(d.fmOpen){openForm(d.fmOpen);return;}
+  if(d.fmLink){const f=byCode.get(d.fmLink),target=f&&$(f.link);if(target&&mode==='manager'&&!target.hidden){target.click();}else status('يُنفّذ هذا النموذج من «'+(f?f.linkLabel:'')+'» في المنصة، ويُطبع منه بالشكل الرسمي.');return;}
   if(b.hasAttribute('data-fm-home')){view='home';form=null;paint();status('');return;}
   if(b.hasAttribute('data-fm-access')){accessView();return;}
   if(b.hasAttribute('data-fm-grant')){grant(b.closest('tr'));return;}
