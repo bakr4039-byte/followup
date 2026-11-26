@@ -330,10 +330,10 @@
   };
   function paintQuick(){
     const host=$('saQuick');
-    host.innerHTML='<label>رصد حصة اليوم · الشعبة<select id="saQuickClass">'+classes.map(c=>'<option value="'+escape(c.id)+'">'+escape(classLabel(c))+'</option>').join('')+'</select></label>'+
+    host.innerHTML='<label>تاريخ الحصة<input type="date" id="saQuickDate" value="'+today()+'" max="'+today()+'"></label><label>الشعبة<select id="saQuickClass">'+classes.map(c=>'<option value="'+escape(c.id)+'">'+escape(classLabel(c))+'</option>').join('')+'</select></label>'+
       '<label>الحصة<select id="saQuickPeriod">'+periods.map((period,i)=>'<option value="'+(i+1)+'">'+period+'</option>').join('')+'</select></label>'+
       '<button type="button" id="saQuickOpen">فتح رصد الحصة</button>';
-    $('saQuickOpen').onclick=()=>{if(!busy&&$('saQuickClass').value)openLesson(today(),$('saQuickClass').value,Number($('saQuickPeriod').value),'');};
+    $('saQuickOpen').onclick=()=>{if(!busy&&$('saQuickClass').value)openLesson(($('saQuickDate').value&&$('saQuickDate').value<=today()?$('saQuickDate').value:today()),$('saQuickClass').value,Number($('saQuickPeriod').value),'');};
   }
   if(app){
     let actor='';
