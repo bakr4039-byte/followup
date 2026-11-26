@@ -60,3 +60,13 @@
 }
 
 @media print{.btn,.iconbtn{box-shadow:none}}
+/* Loading card: shown until week modes and logs finish loading. */
+.load-card{display:flex;gap:16px;align-items:flex-start;background:#fff;border:1px solid #dae5df;border-radius:18px;padding:22px 24px;margin:0 0 20px;box-shadow:0 3px 16px #183e2e08}
+.load-card[hidden]{display:none!important}
+.load-card h2{margin:0 0 8px;font-size:18px;color:#123e36}
+.load-card ul{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:4px;font-size:14px;color:#5b6b66}
+.load-card li.done{color:#176c4e;font-weight:600}
+.load-card .note{margin:0 0 10px}
+.load-spin{width:34px;height:34px;flex:none;border-radius:50%;border:4px solid #d7e6df;border-top-color:#176c4e;animation:load-spin 1s linear infinite}
+@keyframes load-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.load-spin{animation:none;border-top-color:#8bb4a2}}
