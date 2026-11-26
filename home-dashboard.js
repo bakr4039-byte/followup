@@ -18,7 +18,7 @@ const LINKS=[
  ['vTeachers','دليل المنسوبين','بيانات المعلمين والإداريين']
 ];
 let host=null,queued=false,last='';
-function hijri(){try{return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(new Date())+'هـ'}catch(e){return ''}}
+function hijri(){try{return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(new Date())}catch(e){return ''}}
 function ensure(){
   if(host&&host.isConnected)return host;
   const ws=$('schoolWorkspace');if(!ws)return null;
@@ -44,9 +44,17 @@ function todo(){
   if(!items.length)items.push({text:'لا توجد مهام متأخرة الآن',kind:'ok'});
   return items;
 }
+function homeButton(show){
+  const links=document.querySelector('.school-sidebar-links');if(!links)return;
+  let b=$('schoolHomeLink');
+  if(!b){b=document.createElement('button');b.type='button';b.id='schoolHomeLink';b.className='school-home-link';b.dataset.workspaceKey='home';b.textContent='الصفحة الرئيسية';links.prepend(b)}
+  else if(links.firstElementChild!==b)links.prepend(b);
+  if(b.hidden===show)b.hidden=!show;
+}
 function paint(){
   queued=false;const h=ensure();if(!h)return;
   const show=!!(root.__FUACC&&root.__FUACC.state&&root.__FUACC.state.role===-1);
+  homeButton(show);
   if(h.hidden===show)h.hidden=!show;if(!show)return;
   const links=LINKS.filter(([id])=>{const b=$(id);return b&&!b.hidden&&!b.closest('[hidden]')});
   const html='<div class="hd-hero"><p>'+esc(hijri())+'</p><h2>'+(new Date().getHours()<12?'صباح الخير':'مساء الخير')+'، مدير المدرسة</h2><p>ملخص المتابعة وما ينتظر إجراءك اليوم</p></div>'+
