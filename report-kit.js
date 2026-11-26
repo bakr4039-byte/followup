@@ -19,7 +19,7 @@ const CSS='*{box-sizing:border-box}'+
 '.rk-sign{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:28px;text-align:center;font-size:12px;break-inside:avoid}.rk-sign div{padding-top:36px;border-top:1px dashed #889}'+
 '.rk-foot{margin-top:14px;font-size:10px;color:#889;text-align:center}'+
 '@media print{.rk-toolbar{display:none}.rk-page{max-width:none;padding:0}}';
-function hijri(d){try{return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura',{day:'numeric',month:'long',year:'numeric'}).format(d)}catch(e){return d.toLocaleDateString('ar')}}
+function hijri(d){try{return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(d)}catch(e){return d.toLocaleDateString('ar')}}
 function html(o){
   o=o||{};const base=(root.location&&root.location.href)||'';
   let logo='';try{logo=new URL('assets/sahafa-school-logo.jpeg',base).href}catch(e){}
@@ -34,7 +34,7 @@ function html(o){
   '<div class="rk-ttl"><h1>'+esc(o.title)+'</h1>'+(o.subtitle?'<p>'+esc(o.subtitle)+'</p>':'')+'</div></header>'+
   '<main class="rk-body">'+(o.body||'')+'</main>'+
   (signs.length?'<section class="rk-sign">'+signs.map(s=>'<div>'+esc(s)+'</div>').join('')+'</section>':'')+
-  '<footer class="rk-foot">صدر من منصة المتابعة · '+SCHOOL+' · '+esc(hijri(new Date()))+'هـ</footer></div></body></html>';
+  '<footer class="rk-foot">صدر من منصة المتابعة · '+SCHOOL+' · '+esc(hijri(new Date()))+'</footer></div></body></html>';
 }
 function open(o){
   const w=root.open('','_blank');if(!w)return null;
