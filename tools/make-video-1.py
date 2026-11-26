@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Builds explainer video 1 (platform tour) with Arabic narration (voice: ar-EG-ShakirNeural).
 Visuals are designed slides with sample data only: no real student or staff data. Run in Cloud Shell."""
-import asyncio, os, subprocess
+import asyncio, os, re, subprocess
 import edge_tts, imageio_ffmpeg
 from mutagen.mp3 import MP3
 from playwright.async_api import async_playwright
@@ -90,7 +90,7 @@ async def main():
             audio = f'{OUT}/a{i}.mp3'
             for attempt in range(4):
                 try:
-                    await edge_tts.Communicate(s['say'], VOICE).save(audio)
+                    await edge_tts.Communicate(re.sub('[\u064b-\u0652]', '', s['say']), VOICE).save(audio)
                     break
                 except Exception as err:
                     print('retry voice', i, attempt + 1, err, flush=True)
