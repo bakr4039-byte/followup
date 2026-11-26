@@ -20,3 +20,17 @@ body{font-family:var(--f-body);color:var(--ink);background:var(--bg)}
 h1,h2,h3{font-family:var(--f-display);font-weight:600}
 :focus-visible{outline:3px solid var(--brass);outline-offset:2px}
 ::selection{background:var(--accent-soft)}
+
+/* Shared confirm/alert dialog (ui-kit.js). */
+.uk-dialog{border:0;border-radius:16px;padding:0;width:min(460px,92vw);box-shadow:0 20px 50px rgba(17,48,43,.25);color:var(--ink);background:var(--surface);font-family:var(--f-body)}
+.uk-dialog::backdrop{background:rgba(13,36,30,.45)}
+.uk-dialog form{margin:0;padding:22px 22px 18px}
+.uk-msg{margin:0 0 18px;white-space:pre-line;line-height:1.8;font-size:15px}
+.uk-actions{display:flex;gap:10px;flex-wrap:wrap}
+.uk-actions button{min-height:42px;padding:8px 20px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.uk-actions button[hidden]{display:none}
+.uk-actions .uk-ok{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.uk-actions .uk-ok.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+
+/* One look for every signature pad (drawing logic unchanged). */
+canvas.as-pad,.acc-sign canvas{background-color:#fff;border:1.5px dashed var(--accent);border-radius:12px;touch-action:none;cursor:crosshair}
