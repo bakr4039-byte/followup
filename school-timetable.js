@@ -22,7 +22,18 @@ function teacherLinks(sessions,profiles){
     return {...r,status:p?(p.active===false?'inactive':'linked'):q?'near':'missing',account:p?p.scheduleName:q?q.scheduleName:''}})
     .sort((a,b)=>ORDER[a.status]-ORDER[b.status]||a.name.localeCompare(b.name,'ar'));
 }
-const api={remoteSessions,onsiteSessions,teacherLinks,classLabel,norm};root.SchoolTimetable=api;if(typeof module==='object')module.exports=api;
+const REMOTE_TIMES=[['7:00','7:40'],['7:40','8:20'],['8:20','9:00'],['9:15','9:55'],['9:55','10:35'],['10:35','11:15'],['11:15','11:55']];
+// Onsite bell schedule approved by the school (1448): grades 1-2 and grade 3 differ only in period 3 and the first break.
+const ONSITE_TIMES={
+  1:[['7:00','7:50'],['7:50','8:40'],['9:05','9:55'],['9:55','10:45'],['10:45','11:35'],['11:35','12:20'],['12:30','1:00']],
+  3:[['7:00','7:50'],['7:50','8:40'],['8:40','9:30'],['9:55','10:45'],['10:45','11:35'],['11:35','12:20'],['12:30','1:00']]
+};
+ONSITE_TIMES[2]=ONSITE_TIMES[1];
+const ONSITE_BREAKS={1:'الطابور 6:45 – 7:00 · الفسحة الأولى 8:40 – 9:05 · الفسحة الثانية (الصلاة) 12:20 – 12:30',3:'الطابور 6:45 – 7:00 · الفسحة الأولى 9:30 – 9:55 · الفسحة الثانية (الصلاة) 12:20 – 12:30'};
+ONSITE_BREAKS[2]=ONSITE_BREAKS[1];
+function gradeOf(classId){const m=/^g([123])-/.exec(classId||'');return m?Number(m[1]):0}
+function periodTime(type,period,classId){const t=type==='remote'?REMOTE_TIMES[period-1]:(ONSITE_TIMES[gradeOf(classId)]||[])[period-1];return t?t[0]+' – '+t[1]:''}
+const api={remoteSessions,onsiteSessions,teacherLinks,classLabel,norm,periodTime,gradeOf};root.SchoolTimetable=api;if(typeof module==='object')module.exports=api;
 if(!root.document||!root.__FUACC)return;
 const F=root.__FUACC,$=id=>document.getElementById(id);
 let section=null,btn=null,tab='remote',classSel='',teacherSel='',onsite=null,profiles=null,loading=false,error='',queued=false;
@@ -47,12 +58,12 @@ async function load(force){
   catch(e){error='تعذّر تحميل الجدول الحضوري أو حسابات المعلمين. حدّث الصفحة وحاول مجددًا.'}
   finally{loading=false;render()}
 }
-const REMOTE_TIMES=[['7:00','7:40'],['7:40','8:20'],['8:20','9:00'],['9:15','9:55'],['9:55','10:35'],['10:35','11:15'],['11:15','11:55']];
-function times(type,i){const t=type==='remote'&&REMOTE_TIMES[i];return t?t[0]+' – '+t[1]:''}
+function times(type,i,classId){return periodTime(type,i+1,classId)}
 function gridHtml(type,sessions,data){
-  const head='<thead><tr><th>اليوم</th>'+PERIODS.map((p,i)=>'<th>'+p+(times(type,i)?'<small>'+times(type,i)+'</small>':'')+'</th>').join('')+'</tr></thead>';
+  const headClass=teacherSel?'':classSel;
+  const head='<thead><tr><th>اليوم</th>'+PERIODS.map((p,i)=>{const t=(type==='remote'||headClass)?times(type,i,headClass):'';return '<th>'+p+(t?'<small>'+t+'</small>':'')+'</th>'}).join('')+'</tr></thead>';
   const body=DAYS.map((d,di)=>'<tr><th>'+d+'</th>'+PERIODS.map((p,pi)=>{const here=sessions.filter(s=>s.day===di&&s.period===pi+1);
-    return '<td class="tt-cell">'+(here.length?here.map(s=>'<b>'+esc(s.subject)+'</b><small>'+esc(teacherSel?s.classIds.map(id=>classLabel(type,id,data)).join('، '):s.teacher)+'</small>').join('<hr>'):'<span class="tt-empty">—</span>')+'</td>'}).join('')+'</tr>').join('');
+    return '<td class="tt-cell">'+(here.length?here.map(s=>'<b>'+esc(s.subject)+'</b><small>'+esc(teacherSel?s.classIds.map(id=>classLabel(type,id,data)).join('، '):s.teacher)+'</small>'+(teacherSel&&type==='onsite'?'<small>'+esc(periodTime(type,s.period,s.classIds[0]))+'</small>':'')).join('<hr>'):'<span class="tt-empty">—</span>')+'</td>'}).join('')+'</tr>').join('');
   return '<table class="tt-grid">'+head+'<tbody>'+body+'</tbody></table>';
 }
 function render(){
@@ -79,7 +90,7 @@ function render(){
   html+='<div class="tt-bar"><label>الفصل<select data-f="class"'+(teacherSel?' disabled':'')+'>'+classes.map(id=>'<option value="'+esc(id)+'"'+(id===classSel?' selected':'')+'>'+esc(classLabel(type,id,data))+'</option>').join('')+'</select></label>'+
     '<label>أو المعلم<select data-f="teacher"><option value="">— حسب الفصل —</option>'+teachers.map(t=>'<option'+(t===teacherSel?' selected':'')+'>'+esc(t)+'</option>').join('')+'</select></label>'+
     '<div class="tt-actions"><button type="button" data-print>طباعة</button><button type="button" data-reload>تحديث</button></div></div>';
-  html+='<p class="tt-sum">جدول '+TYPES[type]+' · '+(teacherSel?esc(teacherSel):esc(classLabel(type,classSel,data)))+' · '+shown.length+' حصة أسبوعيًا · مجموع الجدول: '+sessions.length+' حصة، '+classes.length+' فصل، '+teachers.length+' معلم'+(type==='onsite'?' · أوقات الحصص الحضورية تُضبط في الجزء التالي':'')+'</p>';
+  html+='<p class="tt-sum">جدول '+TYPES[type]+' · '+(teacherSel?esc(teacherSel):esc(classLabel(type,classSel,data)))+' · '+shown.length+' حصة أسبوعيًا · مجموع الجدول: '+sessions.length+' حصة، '+classes.length+' فصل، '+teachers.length+' معلم'+'</p>'+(type==='onsite'&&!teacherSel&&ONSITE_BREAKS[gradeOf(classSel)]?'<p class="tt-note">'+ONSITE_BREAKS[gradeOf(classSel)]+'</p>':'');
   html+=sessions.length?'<div class="tt-wrap">'+gridHtml(type,shown,data)+'</div>':'<p class="tt-note">لا توجد حصص في هذا الجدول بعد.</p>';
   box.innerHTML=html;
 }
