@@ -88,7 +88,15 @@ async def main():
         pg = await browser.new_page(viewport={'width': 1920, 'height': 1080})
         for i, s in enumerate(SCENES, 1):
             audio = f'{OUT}/a{i}.mp3'
-            await edge_tts.Communicate(s['say'], VOICE, rate='-4%').save(audio)
+            for attempt in range(4):
+                try:
+                    await edge_tts.Communicate(s['say'], VOICE).save(audio)
+                    break
+                except Exception as err:
+                    print('retry voice', i, attempt + 1, err, flush=True)
+                    await asyncio.sleep(3)
+            else:
+                raise SystemExit('voice generation failed for scene %d' % i)
             dur = MP3(audio).info.length + 0.8
             await pg.set_content(page(s, i, len(SCENES)), wait_until='networkidle')
             await pg.wait_for_timeout(400)
