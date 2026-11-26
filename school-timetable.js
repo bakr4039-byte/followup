@@ -101,12 +101,13 @@ function render(){
   html+='<div class="tt-bar"><label>الفصل<select data-f="class"'+(teacherSel?' disabled':'')+'>'+classes.map(id=>'<option value="'+esc(id)+'"'+(id===classSel?' selected':'')+'>'+esc(classLabel(type,id,data))+'</option>').join('')+'</select></label>'+
     '<label>أو المعلم<select data-f="teacher"><option value="">— حسب الفصل —</option>'+teachers.map(t=>'<option'+(t===teacherSel?' selected':'')+'>'+esc(t)+'</option>').join('')+'</select></label>'+
     '<div class="tt-actions"><button type="button" data-print>طباعة</button><button type="button" data-reload>تحديث</button></div></div>';
-  html+='<p class="tt-sum">جدول '+TYPES[type]+' · '+(teacherSel?esc(teacherSel):esc(classLabel(type,classSel,data)))+' · '+shown.length+' حصة أسبوعيًا · مجموع الجدول: '+sessions.length+' حصة، '+classes.length+' فصل، '+teachers.length+' معلم'+'</p>'+(type==='onsite'&&teacherSel?'<p class="tt-note">الطابور 6:45 – 7:00 · الفسحة الأولى: الأول والثاني 8:40 – 9:05، الثالث 9:30 – 9:55 · الصلاة 12:20 – 12:30</p>':'');
+  html+='<p class="tt-sum">جدول '+TYPES[type]+' · '+(teacherSel?esc(teacherSel):esc(classLabel(type,classSel,data)))+' · '+shown.length+' حصة أسبوعيًا · مجموع الجدول: '+sessions.length+' حصة، '+classes.length+' فصل، '+teachers.length+' معلم'+'</p>'+(type==='onsite'?'<p class="tt-note">ملف الجدول الحضوري الأصلي وتنزيله PDF للمعلمين والطلاب وتحديث ملفاته في «الجدول الحضوري والفصول». <button type="button" data-go="vSchoolSchedule">فتحه</button></p>':'')+(type==='onsite'&&teacherSel?'<p class="tt-note">الطابور 6:45 – 7:00 · الفسحة الأولى: الأول والثاني 8:40 – 9:05، الثالث 9:30 – 9:55 · الصلاة 12:20 – 12:30</p>':'');
   html+=sessions.length?'<div class="tt-wrap">'+gridHtml(type,shown,data)+'</div>':'<p class="tt-note">لا توجد حصص في هذا الجدول بعد.</p>';
   box.innerHTML=html;
 }
 function onClick(e){
-  const t=e.target.closest('[data-tab],[data-reload],[data-print]');if(!t)return;
+  const t=e.target.closest('[data-tab],[data-reload],[data-print],[data-go]');if(!t)return;
+if(t.dataset.go){const b=$(t.dataset.go);if(b)b.click();return}
   if(t.dataset.tab){tab=t.dataset.tab;teacherSel='';if(tab!=='remote'&&(!onsite||!profiles))load(false);else render();return}
   if(t.hasAttribute('data-reload')){load(true);return}
   if(t.hasAttribute('data-print')&&root.ReportKit){const grid=section.querySelector('.tt-wrap');const title='الجدول المدرسي · '+TYPES[tab];const sub=teacherSel||classLabel(tab,classSel,tab==='remote'?null:onsite);root.ReportKit.open({title,subtitle:sub,body:grid?grid.innerHTML:'',landscape:true,signatures:['وكيل الشؤون التعليمية','مدير المدرسة']})}
