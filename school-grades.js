@@ -151,7 +151,7 @@ async function save(){
 }
 function gradeBooksFor(sub){return books.filter(b=>b.kind==='grade'&&(!sub||b.subject===sub)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));}
 function ranking(list){
-  return cls.students.map(s=>{let got=0,max=0;for(const b of list){const v=b.scores&&b.scores[s.id];if(v!==undefined&&v!==''&&isFinite(v)){got+=Number(v);max+=Number(b.maxScore)||0;}}return {s,got,max,p:max?got*100/max:null};})
+  return cls.students.map(s=>{let got=0,max=0;let any=false;for(const b of list){const v=b.scores&&b.scores[s.id];max+=Number(b.maxScore)||0;if(v!==undefined&&v!==''&&isFinite(v)){got+=Number(v);any=true;}}return {s,got,max,p:any&&max?got*100/max:null};})
     .filter(r=>r.p!==null).sort((a,b)=>b.p-a.p);
 }
 function topView(){
