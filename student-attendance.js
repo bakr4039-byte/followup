@@ -201,6 +201,8 @@
   };
   const classLabel=c=>grades[c.grade]+' · '+c.grade+'/'+c.section;
   const periods=['الأولى','الثانية','الثالثة','الرابعة','الخامسة','السادسة','السابعة'];
+  const TABS=[['record','رصد الحصص'],['reports','التقارير'],['absence','الغياب والإشعارات'],['import','الاستيراد']];
+  let tab='record';
   const button=document.createElement('button');
   button.type='button';button.id='vStudentAttendance';button.className='btn ghost';
   button.textContent='سجل حضور الطلاب';button.hidden=true;
@@ -209,15 +211,16 @@
   const view=document.createElement('section');
   view.id='studentAttendance';view.hidden=true;view.setAttribute('aria-labelledby','saTitle');
   view.innerHTML='<header><h2 id="saTitle" tabindex="-1">سجل حضور الطلاب</h2><button type="button" id="saClose">العودة</button></header>'+
-    '<form id="saFilters"><label>من تاريخ<input type="date" id="saFrom" required></label>'+
+    '<nav class="sa-tabs" role="tablist" aria-label="أقسام سجل حضور الطلاب">'+TABS.map(([key,label])=>'<button type="button" role="tab" id="saTab-'+key+'" data-sa-tab="'+key+'" aria-selected="'+(key===tab)+'">'+label+'</button>').join('')+'</nav>'+
+    '<form id="saFilters"><div class="sa-presets" role="group" aria-label="فترات جاهزة"><button type="button" data-sa-range="today">اليوم</button><button type="button" data-sa-range="week">هذا الأسبوع</button><button type="button" data-sa-range="month">هذا الشهر</button></div><label>من تاريخ<input type="date" id="saFrom" required></label>'+
     '<label>إلى تاريخ<input type="date" id="saTo" required></label>'+
     '<label>الصف<select id="saGrade"><option value="">كل الصفوف</option>'+grades.slice(1).map((grade,i)=>'<option value="'+(i+1)+'">'+grade+' بالكامل</option>').join('')+'</select></label>'+
     '<label>الشعبة<select id="saClass"><option value="">كل الشعب</option></select></label>'+
     '<label>الحصة<select id="saPeriod"><option value="">جميع الحصص</option>'+periods.map((period,i)=>'<option value="'+(i+1)+'">'+period+'</option>').join('')+'</select></label>'+
     '<label>المعلم<select id="saTeacher"><option value="">الجميع</option></select></label>'+
-    '<label>التقرير<select id="saReportKind"><option value="all">جميع التقارير</option><option value="students">أيام حضور وغياب الطلاب</option><option value="absence">غياب اليوم ورسائل أولياء الأمور</option><option value="daily">الحضور والغياب اليومي</option><option value="teachers">أعلى المعلمين حضورًا للطلاب</option></select></label>'+
+    '<label id="saKindField">التقرير<select id="saReportKind"><option value="all">جميع التقارير</option><option value="students">أيام حضور وغياب الطلاب</option><option value="daily">الحضور والغياب اليومي</option><option value="teachers">أعلى المعلمين حضورًا للطلاب</option></select></label>'+
     '<button type="submit">عرض السجل</button></form>'+
-    '<p id="saStatus" role="status"></p><section id="saReports"></section><div id="saResults"></div><section id="saBody"></section>';
+    '<p id="saStatus" role="status"></p><div id="saCards" class="sa-cards" aria-live="polite"></div><div id="saQuick" class="sa-actions" hidden></div><section id="saReports"></section><div id="saResults"></div><section id="saBody"></section>';
   let navigation;
   if(app){
     $('boardView').after(view);
@@ -252,7 +255,27 @@
     #studentAttendance button:disabled{opacity:.55}
     #studentAttendance #saSave,#saFilters button[type=submit]{background:#17624d;color:#fff}
     #saStatus:empty{display:none}
-    @media print{#saFilters,#saClose,#saStatus,#saStudentEditor,#studentAttendance button,#studentAttendance .sa-actions{display:none!important}#studentAttendance .sa-grid{overflow:visible}}
+#studentAttendance [hidden]{display:none!important}
+#studentAttendance .sa-tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid #dbe8e4;margin-bottom:14px}
+#studentAttendance .sa-tabs button{border:0;border-bottom:3px solid transparent;border-radius:8px 8px 0 0;background:transparent;padding:9px 16px;font-weight:600;color:#4a5e58;margin-bottom:-2px}
+#studentAttendance .sa-tabs button[aria-selected=true]{border-bottom-color:#17624d;color:#17624d;background:#eef6f2}
+#studentAttendance .sa-presets{display:flex;gap:6px;flex-wrap:wrap;flex-basis:100%}
+#studentAttendance .sa-presets button{padding:5px 14px;border-radius:999px;font-size:13px;background:#f2f7f5}
+#studentAttendance .sa-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:4px 0 16px}
+#studentAttendance .sa-cards:empty{display:none}
+#studentAttendance .sa-cards-title{grid-column:1/-1;margin:0;font-weight:600;color:#4a5e58}
+#studentAttendance .sa-card{display:grid;gap:2px;text-align:start;padding:12px 14px;border:1px solid #dbe8e4;border-radius:12px;background:#f7fbf9}
+#studentAttendance .sa-card b{font-size:24px;line-height:1.15}
+#studentAttendance .sa-card span{font-size:13px;color:#4a5e58}
+#studentAttendance .sa-card.ok b{color:#17633a}
+#studentAttendance .sa-card.bad b{color:#9f2727}
+#studentAttendance .sa-card.warn b{color:#9a6200}
+#studentAttendance #saQuick{padding:12px;border:1px dashed #a5c5ba;border-radius:12px;background:#f7fbf9;margin-bottom:12px}
+#studentAttendance .sa-level{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
+#studentAttendance .sa-level.l1{background:#fff4dc;color:#7a4d00}
+#studentAttendance .sa-level.l2{background:#ffe6d5;color:#8a3b00}
+#studentAttendance .sa-level.l3{background:#faebea;color:#9f2727}
+  @media print{#studentAttendance .sa-tabs,#saCards,#saQuick,#saFilters,#saClose,#saStatus,#saStudentEditor,#studentAttendance button,#studentAttendance .sa-actions{display:none!important}#studentAttendance .sa-grid{overflow:visible}}
   `;
   document.head.append(style);
   if(app){mountRosterSync();mountBatchAttendance();}
@@ -260,7 +283,7 @@
   const status=text=>{$('saStatus').textContent=text;};
   const message=err=>err?.code==='permission-denied'?'حسابك لا يملك صلاحية الوصول إلى هذا السجل.':err?.message||'تعذّر تحميل سجل الحضور.';
   const setBusy=value=>{busy=value;for(const control of view.querySelectorAll('input,select,button:not(#saClose)'))control.disabled=value;};
-  const clear=()=>{sequence++;draft=null;activeSheet=null;$('saReports').textContent='';$('saResults').textContent='';$('saResults').hidden=false;$('saBody').textContent='';status('');};
+  const clear=()=>{sequence++;draft=null;activeSheet=null;$('saReports').textContent='';$('saResults').textContent='';$('saCards').textContent='';$('saBody').textContent='';status('');};
   const counts=rows=>rows.reduce((n,r)=>{if(Object.hasOwn(n,r.status))n[r.status]++;return n;},{present:0,absent:0,unmarked:0});
   const summary=rows=>{const n=counts(rows);return 'الحضور '+n.present+' · الغياب '+n.absent+' · غير مرصود '+n.unmarked;};
   const close=()=>{
@@ -268,6 +291,50 @@
     navigation?.close();
   };
   $('saClose').onclick=close;
+  function applyTab(next){
+    if(next)tab=next;
+    if(tab==='import'&&!manager())tab='record';
+    for(const item of view.querySelectorAll('[data-sa-tab]')){
+      const on=item.dataset.saTab===tab;
+      item.setAttribute('aria-selected',String(on));item.tabIndex=on?0:-1;
+      item.hidden=item.dataset.saTab==='import'&&!manager();
+    }
+    $('saFilters').hidden=tab==='import';
+    $('saKindField').hidden=tab!=='reports';
+    $('saReports').hidden=tab==='record'||tab==='import';
+    $('saResults').hidden=tab!=='record';
+    $('saBody').hidden=tab!=='record';
+    $('saQuick').hidden=tab!=='record'||!context?.edit;
+    const batch=$('saBatchBox');if(batch)batch.hidden=tab!=='import'||!manager();
+    if(activeSheet&&(tab==='reports'||tab==='absence'))paintReports();
+  }
+  const tabList=view.querySelector('.sa-tabs');
+  tabList.onclick=event=>{const item=event.target.closest('[data-sa-tab]');if(item&&!busy)applyTab(item.dataset.saTab);};
+  tabList.onkeydown=event=>{
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    const list=[...tabList.querySelectorAll('[data-sa-tab]:not([hidden])')],index=list.indexOf(document.activeElement);
+    if(index<0)return;
+    event.preventDefault();
+    const next=event.key==='Home'?0:event.key==='End'?list.length-1:(index+(event.key==='ArrowLeft'?1:-1)+list.length)%list.length;
+    list[next].focus();applyTab(list[next].dataset.saTab);
+  };
+  $('saCards').onclick=event=>{const item=event.target.closest('[data-sa-goto]');if(item&&!busy)applyTab(item.dataset.saGoto);};
+  view.querySelector('.sa-presets').onclick=event=>{
+    const item=event.target.closest('[data-sa-range]');
+    if(!item||busy||!context)return;
+    const end=today(),start=new Date(end+'T00:00:00Z');
+    if(item.dataset.saRange==='week')start.setUTCDate(start.getUTCDate()-start.getUTCDay());
+    else if(item.dataset.saRange==='month')start.setUTCDate(1);
+    $('saFrom').value=start.toISOString().slice(0,10);$('saTo').value=end;
+    load();
+  };
+  function paintQuick(){
+    const host=$('saQuick');
+    host.innerHTML='<label>رصد حصة اليوم · الشعبة<select id="saQuickClass">'+classes.map(c=>'<option value="'+escape(c.id)+'">'+escape(classLabel(c))+'</option>').join('')+'</select></label>'+
+      '<label>الحصة<select id="saQuickPeriod">'+periods.map((period,i)=>'<option value="'+(i+1)+'">'+period+'</option>').join('')+'</select></label>'+
+      '<button type="button" id="saQuickOpen">فتح رصد الحصة</button>';
+    $('saQuickOpen').onclick=()=>{if(!busy&&$('saQuickClass').value)openLesson(today(),$('saQuickClass').value,Number($('saQuickPeriod').value),'');};
+  }
   if(app){
     let actor='';
     setInterval(()=>{
@@ -295,6 +362,7 @@
     clear();
     const token=sequence;
     context={uid,edit:manager(),teacher:''};
+    applyTab();
     for(const id of ['saFrom','saTo']){$(id).value=today();$(id).max=today();}
     setBusy(true);
     try{
@@ -303,6 +371,7 @@
         if(token!==sequence)return;
         classes=Object.values(snap.data()?.classes||{}).filter(c=>c.active!==false).sort(classOrder);
         refreshClasses(classes);
+        paintQuick();applyTab();
       }else if(isTeacher){
         const snap=await db.doc('teacherProfiles/'+uid).get();
         if(token!==sequence)return;
@@ -468,7 +537,17 @@
       return [...new Set(periods)];
     };
     const days=dailyAttendance(book.dailyRecords||book.records,rosterMap,book.dates,expected),totals=attendanceDays(days);
-    const kind=$('saReportKind').value;
+    const kind=tab==='absence'?'absence':$('saReportKind').value;
+    const cardDay=book.to,dayRows=days.filter(row=>row.date===cardDay);
+    const lessonsDay=(book.dailyRecords||book.records).filter(record=>record.date===cardDay).length;
+    const card=(count,label,tone,target)=>'<button type="button" class="sa-card '+tone+'" data-sa-goto="'+target+'"><b>'+count+'</b><span>'+escape(label)+'</span></button>';
+    $('saCards').innerHTML='<p class="sa-cards-title">ملخص يوم '+escape(cardDay)+'</p>'+
+      card(dayRows.length,'طالبًا مطلوب رصدهم','','record')+
+      card(dayRows.filter(row=>row.status==='present').length,'حاضرون','ok','record')+
+      card(dayRows.filter(row=>row.status==='absent').length,'غائبون اليوم كاملًا','bad','absence')+
+      card(dayRows.filter(row=>row.status!=='absent'&&row.absentLessons>0).length,'غياب جزئي عن حصص','warn','absence')+
+      card(dayRows.filter(row=>row.status==='unmarked').length,'غير مكتمل الرصد','warn','record')+
+      card(lessonsDay,'حصة مرصودة','','record');
     const className=id=>book.items.find(c=>c.id===id)?.label||id;
     const table=(head,body)=>'<div class="sa-grid"><table><thead><tr>'+head.map(x=>'<th>'+escape(x)+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table></div>';
     const cells=values=>'<tr>'+values.map(x=>'<td>'+escape(x)+'</td>').join('')+'</tr>';
@@ -477,6 +556,10 @@
     const daily=table(['التاريخ','عدد الطلاب','حاضر خلال اليوم','غائب اليوم كاملًا','غير مكتمل الرصد'],dailyRows);
     const ranking=table(['الصف','المعلم','الحصص المرصودة','حالات الحضور','حالات الغياب','غير مرصود','نسبة الحضور'],teacherRanking(book.records).map(row=>cells([grades[row.grade]||'—',root.StaffSettings?.displayName(row.teacher)||row.teacher,row.lessons,row.present,row.absent,row.unmarked,row.rate===null?'—':(row.rate*100).toFixed(1)+'%'])).join(''));
     const reportDate=book.to;
+    const level=count=>count>=20?['l3','20 يومًا فأكثر: إحالة إلى لجنة التوجيه والإرشاد']:count>=10?['l2','10 أيام: إنذار واستدعاء ولي الأمر']:count>=5?['l1','5 أيام: تنبيه أول والتواصل مع ولي الأمر']:null;
+    const escalated=totals.filter(row=>level(row.absent));
+    const escalation='<h3>متابعة الغياب المتراكم للفترة</h3><p>تُحسب أيام الغياب الكامل خلال الفترة المختارة. اختر «هذا الشهر» أو فترة أطول لمتابعة التراكم.</p>'+
+      (escalated.length?table(['الطالب','الفصل','أيام الغياب الكامل','الإجراء المقترح'],escalated.map(row=>{const [tone,text]=level(row.absent);return '<tr><td>'+escape(row.name)+'</td><td>'+escape([...row.classes].map(className).join('، '))+'</td><td>'+row.absent+'</td><td><span class="sa-level '+tone+'">'+escape(text)+'</span></td></tr>';}).join('')):'<p>لا يوجد طلاب بلغوا 5 أيام غياب كامل في الفترة المختارة.</p>');
     const todayRows=days.filter(row=>row.date===reportDate&&row.absentLessons>0);
     const absent=table(['الطالب','الفصل','حصص الغياب','حالة اليوم','إشعار ولي الأمر'],todayRows.map(row=>{
       const text='ولي أمر الطالب '+row.name+'، السلام عليكم ورحمة الله. نحيطكم برصد غياب الطالب عن '+row.absentLessons+' حصة بتاريخ '+reportDate+' في ثانوية الصحافة الأهلية. نأمل التواصل مع المدرسة وبيان العذر. شكرًا لتعاونكم.';
@@ -485,7 +568,7 @@
     }).join(''));
     host.innerHTML='<h3>تقارير الطلاب للفترة '+escape(book.from)+' إلى '+escape(book.to)+'</h3><p>يحسب حضور اليوم من حضور حصة واحدة على الأقل، ويحسب غياب اليوم الكامل بعد رصد كل الحصص المطلوبة بالغياب. المتأخرون ضمن الحضور. الأيام غير المكتملة تحتاج استكمال الرصد. إحصاءات الأيام تشمل جميع حصص الطالب، وفلاتر المعلم والحصة تطبق على ترتيب المعلمين وسجل الحصص.</p><div class="sa-actions"><button type="button" id="saReportPrint">طباعة التقارير / حفظ PDF</button><button type="button" id="saReportExport">تنزيل التقارير Excel (CSV)</button></div>'+
       ((kind==='all'||kind==='students')?'<h3>سجل أيام حضور وغياب كل طالب</h3>'+students:'')+
-      ((kind==='all'||kind==='absence')?'<h3>غياب يوم '+escape(reportDate)+'</h3><p>طلاب رُصد لهم غياب في حصة واحدة على الأقل: '+todayRows.length+' · غياب اليوم الكامل: '+todayRows.filter(row=>row.status==='absent').length+'</p>'+absent:'')+
+      (kind==='absence'?'<h3>غياب يوم '+escape(reportDate)+'</h3><p>طلاب رُصد لهم غياب في حصة واحدة على الأقل: '+todayRows.length+' · غياب اليوم الكامل: '+todayRows.filter(row=>row.status==='absent').length+'</p>'+absent+escalation:'')+
       ((kind==='all'||kind==='daily')?'<h3>تقرير الحضور والغياب اليومي</h3>'+daily:'')+
       ((kind==='all'||kind==='teachers')?'<h3>أعلى المعلمين حضورًا للطلاب لكل صف</h3><p>الترتيب حسب نسبة الحضور من الحالات المرصودة في الحصص، وتطبق فلاتر الصف والشعبة والحصة والمعلم.</p>'+ranking:'');
     for(const heading of host.querySelectorAll('h3')){
@@ -511,7 +594,6 @@
       };
       heading.insertAdjacentElement('afterend',share);
     }
-    $('saResults').hidden=kind!== 'all';
     $('saReportPrint').onclick=()=>{
       if(root.ReportKit){if(!root.ReportKit.open({title:'تقارير حضور الطلاب',subtitle:'من '+book.from+' إلى '+book.to,body:host.innerHTML,landscape:true}))status('اسمح بفتح نافذة الطباعة ثم حاول مجددًا.');return;}
       const printWindow=root.open('','_blank');
@@ -713,11 +795,12 @@
   }
   function mountBatchAttendance(){
     const box=document.createElement('details');
-    box.hidden=true;
-    box.innerHTML='<summary>استيراد دفعة كشوف فيوكلاس</summary><label>كشوف الحصص<textarea id="saBatchInput" rows="4" dir="ltr"></textarea></label>'+
+    box.hidden=true;box.id='saBatchBox';box.open=true;
+    box.innerHTML='<summary>استيراد دفعة كشوف فيوكلاس</summary><p>لتحديث قوائم الطلاب وأرقام أولياء الأمور: <button type="button" id="saRosterOpen">مطابقة قوائم فيوكلاس</button></p><label>كشوف الحصص<textarea id="saBatchInput" rows="4" dir="ltr"></textarea></label>'+
       '<div class="sa-actions"><button type="button" id="saBatchPreview">مطابقة الكشوف</button><button type="button" id="saBatchSave" hidden>حفظ الرصد المطابق</button></div><p id="saBatchStatus" role="status"></p>';
     $('saFilters').after(box);
-    setInterval(()=>{const hidden=!manager();if(box.hidden!==hidden)box.hidden=hidden;},500);
+    $('saRosterOpen').onclick=()=>{const dialog=document.getElementById('viewClassRosterSync');if(dialog&&manager()&&!dialog.open)dialog.showModal();};
+    setInterval(()=>{const hidden=!manager()||tab!=='import';if(box.hidden!==hidden)box.hidden=hidden;},500);
     const input=box.querySelector('textarea'),preview=$('saBatchPreview'),save=$('saBatchSave'),output=$('saBatchStatus');
     let matched=[],working=false;
     const reset=()=>{save.hidden=true;matched=[];output.textContent='';};
