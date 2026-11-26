@@ -9,11 +9,13 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const DAYS=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس'];
 const KIND=['مستهلك','مستديم'];
-const ROLES={deputy:'الوكالة (الشؤون المدرسية والطلابية)',exams:'الاختبارات',lab:'المختبر والمستودع',lrc:'مصادر التعلم',activity:'النشاط الطلابي'};
-const ROLE_HINTS={deputy:/وكيل/,exams:/وكيل الشؤون التعليمية|اختبار/,lab:/مختبر|مستودع/,lrc:/مصادر التعلم/,activity:/النشاط/};
+const ROLES={quality:'المدير والجودة والاتصالات الإدارية',counselor:'الإرشاد الطلابي',studentAffairs:'شؤون الطلاب (بيانات حساسة)',deputy:'الوكالة (الشؤون المدرسية والطلابية)',exams:'الاختبارات',lab:'المختبر والمستودع',lrc:'مصادر التعلم',activity:'النشاط الطلابي'};
+const ROLE_HINTS={quality:/جودة|سكرتير|مدير المدرسة/,counselor:/موجه|مرشد/,studentAffairs:/شؤون الطلاب/,deputy:/وكيل/,exams:/وكيل الشؤون التعليمية|اختبار/,lab:/مختبر|مستودع/,lrc:/مصادر التعلم/,activity:/النشاط/};
 const YEAR={key:'year',label:'العام الدراسي',def:'year'};
 const TERM={key:'term',label:'الفصل الدراسي',type:'select',options:['الأول','الثاني','الثالث']};
 const NO={key:'no',label:'رقم الصنف'},NAME={key:'name',label:'اسم الصنف'},UNIT={key:'unit',label:'الوحدة'},QTY={key:'qty',label:'الكمية',type:'number'},NOTES={key:'notes',label:'ملاحظات'};
+const C=(key,label,type,options)=>Object.assign({key,label},type?{type}:{},options?{options}:{});
+const DATE=k=>C(k||'date','التاريخ','date'),LONG=(k,l)=>C(k,l,'long'),SIGN=(k,l)=>C(k||'sign',l||'التوقيع','blank');
 const LAB_SIGNS=['محضر المختبر','وكيل الشؤون المدرسية'],LRC_SIGNS=['أمين مركز مصادر التعلم'];
 const FORMS=[
   {code:'و.م.ع.ن-06-01',owner:'lab',title:'كشف بموجودات المستودع العام للمدرسة',landscape:true,
@@ -119,9 +121,87 @@ const FORMS=[
     header:[{key:'person',label:'اسم مقدّم الطلب'},{key:'date',label:'التاريخ',type:'date'},{key:'decision',label:'رأي مدير المدرسة',type:'select',options:['الموافقة','عدم الموافقة']}],
     statement:'المكرم مدير المدرسة، السلام عليكم ورحمة الله وبركاته. آمل التكرم بتعديل الدرجة / الدرجات للطلاب التالية أسماؤهم، مع جزيل الشكر.',
     sections:[{key:'grades',columns:[{key:'subject',label:'المادة'},{key:'student',label:'اسم الطالب'},{key:'cls',label:'الصف'},{key:'before',label:'الدرجة قبل التعديل'},{key:'after',label:'الدرجة بعد التعديل'},{key:'reason',label:'سبب التعديل'},{key:'registrar',label:'مسجّل المعلومات'},{key:'changed',label:'تاريخ التعديل',type:'date'},{key:'sign',label:'التوقيع',type:'blank'}]}],
-    signatures:['مقدّم الطلب','مسجّل المعلومات','مدير المدرسة']}
+    signatures:['مقدّم الطلب','مسجّل المعلومات','مدير المدرسة']},
+  {code:'و.ط.ع.ن-03-02',owner:'counselor',title:'تحويل طالب متكرر الغياب والتأخر لوكيل شؤون الطلاب',header:[C('student','اسم الطالب'),C('cls','الصف / الفصل'),DATE(),C('absent','عدد أيام الغياب','number'),C('late','عدد مرات التأخر','number'),LONG('actions','الإجراءات التي اتخذها الموجه الطلابي'),LONG('reason','سبب التحويل والمطلوب')],sections:[],signatures:['الموجه الطلابي','وكيل شؤون الطلاب']},
+  {code:'و.ط.ع.ن-04-02',owner:'counselor',title:'استمارة إبلاغ عن حالة طالب',landscape:true,header:[C('to','المكرم الأستاذ'),DATE()],statement:'يوضح الجدول أدناه الحالة / الحالات الصحية للطالب / الطلاب، والتي تتطلب منكم التعامل معها حسب ما هو موضح.',
+    sections:[{key:'cases',columns:[C('student','اسم الطالب'),C('cls','الصف'),C('desc','وصف الحالة'),C('action','الإجراء المطلوب عند وقوع الحالة'),C('advice','التوصيات')]}],signatures:['الموجه الطلابي','مدير المدرسة']},
+  {code:'و.ط.ع.ن-04-01',owner:'counselor',title:'كشف بالحالات المرضية للطلاب',landscape:true,
+    sections:[{key:'cases',columns:[C('student','اسم الطالب'),C('cls','الصف'),C('home','هاتف المنزل'),C('work','هاتف العمل'),C('mobile','جوال ولي الأمر'),C('desc','وصف الحالة المرضية'),C('action','الإجراء المطلوب عند وقوع الحالة'),C('advice','التوصيات')]}],signatures:['الموجه الطلابي','مدير المدرسة']},
+  {code:'و.ط.ع.ن-04-04',owner:'counselor',title:'البرامج الإرشادية المقدمة للطلاب',header:[YEAR],sections:[{key:'programs',columns:[C('name','اسم البرنامج'),DATE(),C('occasion','المناسبة'),C('count','عدد المستفيدين','number')]}],signatures:['الموجه الطلابي','مدير المدرسة']},
+  {code:'و.ط.ع.ن-04-05',owner:'counselor',title:'التقرير الفصلي للإرشاد الطلابي',landscape:true,header:[YEAR,TERM,C('person','اسم الموجه الطلابي'),DATE(),LONG('notes','ملحوظات عامة ومقترحات')],
+    sections:[{key:'care',title:'رعاية الفئات',columns:[C('group','الفئة','select',['رعاية الطلاب المعيدين','رعاية الطلاب المتأخرين دراسيًا','رعاية الطلاب المتفوقين','حالات التأخر والغياب']),C('count','عدد الطلاب','number'),C('programs','البرامج المنفذة'),C('benef','المستفيدون','number'),C('response','مدى الاستجابة'),C('hard','الصعوبات'),C('ideas','المقترحات')]},
+      {key:'behavior',title:'الحالات السلوكية',columns:[C('desc','وصف الحالة'),C('repeat','التكرار','number'),C('actions','الإجراءات المتخذة'),C('effect','فاعلية الإجراء'),C('state','وضع الحالة','select',['مستمر','انتهى'])]},
+      {key:'awareness',title:'البرامج والنشرات التوعوية',columns:[C('name','اسم البرنامج'),DATE(),C('count','عدد المستفيدين','number')]}],signatures:['الموجه الطلابي','مدير المدرسة']},
+  {code:'م.م.ع.ن-04-01',owner:'counselor',title:'رصد اتجاهات المتعلمين نحو المدرسة (تفريغ الاستبانة)',landscape:true,
+    header:[C('grade','الصف الدراسي'),C('respondents','عدد المستجيبين','number'),C('excellent','التقويم العام: ممتاز','number'),C('good','التقويم العام: جيد','number'),C('weak','التقويم العام: ضعيف','number'),LONG('ideas','الاقتراحات لتطوير المدرسة')],
+    statement:'تفريغ استجابات الطلاب: عدد من اختار كل خانة لكل عبارة. الاستبانة سرّية ولا تُستخدم إلا لتطوير خدمات المدرسة.',
+    sections:[{key:'items',columns:[C('domain','المجال'),C('statement','العبارة'),C('agree','أوافق تمامًا','number'),C('partly','أوافق إلى حد ما','number'),C('disagree','لا أوافق','number')],preset:[{"domain":"القيادة","statement":"توضح المدرسة تعليماتها من بداية العام الدراسي لجميع الطلاب."},{"domain":"القيادة","statement":"القرارات التي تتخذها المدرسة عادلة بين الطلاب."},{"domain":"القيادة","statement":"أتواصل مع المدرسة بسهولة عند الحاجة."},{"domain":"القيادة","statement":"تستطلع المدرسة آراء الطلاب حول خدماتها."},{"domain":"التدريس","statement":"أحاور المعلمين بحرية وبلا تخوف."},{"domain":"التدريس","statement":"لا تراعي المدرسة اختلاف القدرات بين الطلاب."},{"domain":"التدريس","statement":"يمكن أن أحقق أداء أفضل لو كنت في مدرسة أخرى."},{"domain":"التدريس","statement":"يحرص المعلمون في المدرسة على استثمار زمن الحصة الدراسية."},{"domain":"التدريس","statement":"يحرص المعلمون على توجيهي تربويًا."},{"domain":"رعاية الطلاب","statement":"تسعى المدرسة إلى التعرف على مواهبي وإبداعاتي."},{"domain":"رعاية الطلاب","statement":"يحصل الطالب المجدّ على تقدير كافٍ من المدرسة."},{"domain":"رعاية الطلاب","statement":"أتوجه إلى الموجه الطلابي عندما أتعرض لمشكلة ما."},{"domain":"رعاية الطلاب","statement":"تسخّر المدرسة مرافقها وإمكاناتها لخدمة طلابها (معامل، مصادر التعلم، صالات...)."},{"domain":"الانضباط","statement":"أحرص على الحضور المبكر يوميًا إلى المدرسة."},{"domain":"الانضباط","statement":"الانضباط في مدرستي قلّل من مشكلات الطلاب."},{"domain":"السلوك","statement":"أشعر بالقلق أثناء وجودي في المدرسة."},{"domain":"السلوك","statement":"يمكن أن أتعرض للإيذاء من قِبل بعض الطلاب داخل المدرسة."},{"domain":"السلوك","statement":"أعرف النظام المطبق في المدرسة بشأن السلوك."},{"domain":"السلوك","statement":"أرى من بعض الطلاب سلوكيات غير لائقة داخل المدرسة."},{"domain":"البيئة المدرسية","statement":"أحب مدرستي كثيرًا."},{"domain":"البيئة المدرسية","statement":"أرغب في الانتقال إلى مدرسة أخرى."},{"domain":"البيئة المدرسية","statement":"توجهني المدرسة للاستخدام الأمثل لوسائل الأمن والسلامة."},{"domain":"البيئة المدرسية","statement":"تقام في المدرسة أنشطة وفعاليات طلابية."}]}],signatures:['الموجه الطلابي','مدير المدرسة']},
+  {code:'خاص بالمدرسة',key:'خاص-إفادة-طالب',owner:'counselor',title:'إفادة طالب',header:[C('student','اسم الطالب'),C('school','المدرسة'),C('cls','الصف'),DATE(),LONG('summary','ملخص الإفادة')],sections:[],signatures:['الطالب','الموجه الطلابي']},
+  {code:'خاص بالمدرسة',key:'خاص-الاتفاق-السلوكي',owner:'counselor',title:'نموذج الاتفاق السلوكي',header:[C('student','الطالب'),C('party','الطرف الآخر (المعلم / الموجه)'),C('from','تبدأ الاتفاقية في','date'),C('to','وتنتهي في','date'),LONG('task','المهمة التي سيؤديها الطالب'),LONG('reward','المكافأة التي سيحصل عليها'),LONG('notes','ملاحظات')],sections:[],signatures:['الطالب','المعلم','الموجه الطلابي']},
+  {code:'خاص بالمدرسة',key:'خاص-الالتزام-المدرسي',owner:'deputy',title:'نموذج الالتزام المدرسي',header:[YEAR],
+    letter:(h,st)=>'<table><tbody><tr><th>خاص ببيانات الطالب</th><td>الاسم: <b>'+esc(st.student||'....................')+'</b> · الفصل: '+esc(st.cls||'........')+'</td></tr>'+
+      '<tr><th>خاص بولي الأمر</th><td>نعم أنا ولي أمر الطالب الموضح اسمه وبياناته أعلاه، قد اطلعت على محتوى قواعد السلوك والمواظبة، وبناءً عليه أتعهد أن أتعاون مع إدارة المدرسة في سبيل مصلحة ابني ليكون ملتزمًا بالأنظمة والتعليمات الخاصة بقواعد السلوك والمواظبة، وأتحمل مسؤولية صحة أرقام التواصل التالية:<br>الاسم: .................... التوقيع: .................... التاريخ: ..../..../.......هـ<br>العمل: .................... هاتف العمل: .................... هاتف المنزل: .................... الجوال: .................... رقم آخر: ....................</td></tr>'+
+      '<tr><th>خاص بإدارة المدرسة</th><td>وكيل شؤون الطلاب: .................... التوقيع: .................... · مدير المدرسة: حسن بن محمد العمري التوقيع: ....................</td></tr></tbody></table>'+
+      '<p><small>ملحوظة: يؤخذ توقيع ولي الأمر في بداية العام الدراسي، وتُحفظ النماذج في ملف خاص لدى وكيل شؤون الطلاب.</small></p>',
+    sections:[{key:'students',title:'الطلاب (يُطبع نموذج لكل طالب)',columns:[C('student','اسم الطالب'),C('cls','الفصل')]}],signatures:false},
+  {code:'و.ط.ع.ن-04-01',key:'و.ط.ع.ن-04-01-إعانة',owner:'studentAffairs',title:'كشف بأسماء الطلاب المستحقين للإعانة والمكافأة',landscape:true,header:[YEAR,TERM],
+    sections:[{key:'students',columns:[C('student','اسم الطالب'),C('civil','رقم السجل المدني'),C('cls','الصف'),C('type','نوع الإعانة'),DATE(),SIGN(null,'توقيع الطالب'),C('bank','رقم الحساب البنكي')]}],signatures:['اسم المسؤول','وكيل شؤون الطلاب']},
+  {code:'و.ط.ع.ن-01-02',owner:'studentAffairs',title:'استمارة البيانات الشخصية للطالب',
+    header:[C('name','الاسم رباعيًا'),C('nameEn','الاسم بالإنجليزية'),C('stage','المرحلة الدراسية'),C('grade','الصف الدراسي'),C('cls','الفصل'),C('nationality','الجنسية'),C('civil','رقم السجل المدني / الإقامة'),C('idDate','تاريخ الهوية'),C('studentNo','رقم الطالب (خاص بالمدرسة)'),C('passport','رقم جواز السفر'),C('birth','تاريخ الميلاد'),C('birthPlace','مكان الميلاد (الدولة / المدينة)'),C('blood','فئة الدم'),C('housing','ملكية السكن'),
+      C('region','المنطقة الإدارية'),C('city','المدينة'),C('district','الحي'),C('street','الشارع'),C('guardian','اسم ولي الأمر'),C('relation','صلة القرابة'),C('mobile','جوال ولي الأمر'),C('phone','هاتف المنزل'),LONG('notes','ملاحظات')],sections:[],signatures:['ولي الأمر','وكيل شؤون الطلاب']},
+  {code:'و.ط.ع.ن-02-01',owner:'deputy',title:'كشف تسليم الكتب المقررة للطلاب',landscape:true,header:[YEAR,C('program','البرنامج'),C('grade','الصف'),C('cls','الفصل'),C('day','اليوم','select',DAYS),DATE()],
+    sections:[{key:'students',columns:[C('student','اسم الطالب'),SIGN('pledge','وثيقة المحافظة على الكتب (التوقيع)'),C('returned','استلام الكتب نهاية الفصل','select',['','تم استلامها','لم يستلم']),SIGN('sign2','التوقيع')]}],statement:'أتعهد بالمحافظة على كتبي وتسليمها بعد نهاية الفصل الدراسي.',signatures:['وكيل شؤون الطلاب']},
+  {code:'م.م.ع.ن-02-01',owner:'quality',title:'سجل الوارد',landscape:true,header:[YEAR],statement:'ابدأ برقم جديد وصفحة جديدة مع بداية كل عام هجري.',
+    sections:[{key:'items',columns:[C('no','رقم الوارد'),DATE(),C('type','النوع'),C('from','الجهة الواردة منها المعاملة'),C('att','المرفقات'),C('subject','الموضوع'),C('file','رقم الملف')]}],signatures:['المسؤول عن الاتصالات الإدارية','مدير المدرسة']},
+  {code:'م.م.ع.ن-02-02',owner:'quality',title:'بيان اطلاع الموظفين على التعاميم',header:[YEAR,TERM,C('circular','رقم التعميم'),C('circDate','تاريخ التعميم','date'),C('source','الصادر من'),C('about','بخصوص')],statement:'الإخوة منسوبي المدرسة: آمل بعد الاطلاع على التعميم المرفق التوقيع بالعلم، والله يحفظكم.',
+    sections:[{key:'staff',columns:[C('name','اسم الموظف'),SIGN()]}],signatures:['مدير المدرسة']},
+  {code:'م.م.ع.ن-02-03',owner:'quality',title:'سجل الصادر العام',landscape:true,header:[YEAR],statement:'ابدأ برقم جديد وصفحة جديدة مع بداية كل عام هجري.',
+    sections:[{key:'items',columns:[C('no','رقم الصادر'),DATE(),C('type','النوع'),C('to','الجهة الصادرة إليها المعاملة'),C('att','المرفقات'),C('subject','الموضوع'),C('file','رقم الملف')]}],signatures:['المسؤول عن الاتصالات الإدارية','مدير المدرسة']},
+  {code:'م.م.ع.ن-02-04',owner:'quality',title:'سجل توديع المعاملات',landscape:true,header:[YEAR],statement:'ابدأ برقم جديد وصفحة جديدة مع بداية كل عام هجري.',
+    sections:[{key:'items',columns:[C('no','رقم المعاملة'),C('type','النوع'),C('att','المرفقات'),C('subject','الموضوع'),C('to','الجهة المرسل إليها'),C('receiver','اسم المستلم'),C('day','اليوم','select',DAYS),DATE(),SIGN(null,'توقيع المستلم')]}],signatures:['المسؤول عن الاتصالات الإدارية']},
+  {code:'و.م.ع.ن-02-01',owner:'deputy',title:'سجل العمل الرسمي (دوام الموظفين)',landscape:true,header:[YEAR,TERM,C('day','اليوم','select',DAYS),DATE()],
+    sections:[{key:'present',title:'الحاضرون قبل بداية الاصطفاف الصباحي',columns:[C('name','اسم الموظف'),C('in','وقت الحضور','time'),SIGN('sign1'),C('out','وقت الخروج','time'),SIGN('sign2')]},
+      {key:'absent',title:'الموظفون الغائبون',columns:[C('name','اسم الموظف'),C('work','عمله'),C('reason','سبب الغياب')]},
+      {key:'duty',title:'المعلم المناوب بداية ونهاية العمل',columns:[C('name','اسم المعلم'),SIGN()]}],signatures:['وكيل الشؤون المدرسية','مدير المدرسة']},
+  {code:'و.ت.ع.ن-04-01',owner:'deputy',title:'الخطة الفصلية لتوزيع المادة الدراسية',landscape:true,header:[C('stage','المرحلة الدراسية'),C('subject','المادة'),C('grade','الصف'),TERM],
+    sections:[{key:'weeks',columns:[C('week','الأسبوع'),C('from','من','date'),C('to','إلى','date'),C('content','الموضوعات / الدروس')]}],signatures:['معلم المادة','وكيل الشؤون التعليمية','مدير المدرسة']},
+  {code:'م.م.ع.ن-03-02',owner:'quality',title:'استمارة دعم وتطوير الهيئة التعليمية',link:'schoolSupervisionLink',linkLabel:'الزيارات والخطط العلاجية',sections:[]},
+  {code:'م.م.ع.ن-05-01',owner:'quality',title:'نموذج تقويم الأداء الوظيفي لشاغلي الوظائف التعليمية',landscape:true,
+    header:[C('person','الاسم رباعيًا'),C('job','مسمى الوظيفة / العمل الحالي'),C('major','التخصص'),C('level','المستوى / المرتبة'),C('grade','الدرجة'),C('jobNo','رقم الوظيفة'),C('qual','آخر مؤهل علمي وتاريخه'),C('start','بداية الخدمة'),C('lastReport','نتيجة آخر تقرير أداء'),YEAR,C('category','الفئة','select',['أ','ب','ج']),C('subjects','المادة أو المواد التي يدرسها'),C('periods','عدد الحصص','number'),C('total','المجموع الكلي','number'),C('rating','التقدير','select',['ممتاز','جيد جدًا','جيد','مرضٍ','غير مرضٍ']),LONG('notes','ملاحظات الرئيس المباشر')],
+    statement:'تُعبّأ عناصر التقويم ودرجاتها حسب النموذج الرسمي المعتمد للفئة.',
+    sections:[{key:'elements',title:'عناصر التقويم',columns:[C('element','العنصر'),C('max','الحد الأعلى','number'),C('given','الدرجة المعطاة','number')]}],
+    signatures:['الموظف','الرئيس المباشر','مدير المدرسة']},
+  {code:'م.م.ع.ن-05-02',owner:'quality',title:'تقويم الأداء الوظيفي لشاغلي الوظائف التعليمية (الموجه الطلابي)',landscape:true,
+    header:[C('person','الاسم رباعيًا'),C('job','مسمى الوظيفة / العمل الحالي'),C('major','التخصص'),C('level','المستوى / المرتبة'),C('grade','الدرجة'),C('jobNo','رقم الوظيفة'),C('qual','آخر مؤهل علمي وتاريخه'),C('start','بداية الخدمة'),C('lastReport','نتيجة آخر تقرير أداء'),YEAR,C('total','المجموع الكلي','number'),C('rating','التقدير','select',['ممتاز','جيد جدًا','جيد','مرضٍ','غير مرضٍ']),LONG('notes','ملاحظات الرئيس المباشر')],
+    statement:'تُعبّأ عناصر التقويم ودرجاتها حسب النموذج الرسمي المعتمد للفئة.',
+    sections:[{key:'elements',title:'عناصر التقويم',columns:[C('element','العنصر'),C('max','الحد الأعلى','number'),C('given','الدرجة المعطاة','number')]}],
+    signatures:['الموظف','الرئيس المباشر','مدير المدرسة']},
+  {code:'م.م.ع.ن-05-03',owner:'quality',title:'تقويم الأداء الوظيفي لشاغلي الوظائف التنفيذية (إدارية)',landscape:true,
+    header:[C('person','الاسم رباعيًا'),C('job','مسمى الوظيفة / العمل الحالي'),C('major','التخصص'),C('level','المستوى / المرتبة'),C('grade','الدرجة'),C('jobNo','رقم الوظيفة'),C('qual','آخر مؤهل علمي وتاريخه'),C('start','بداية الخدمة'),C('lastReport','نتيجة آخر تقرير أداء'),YEAR,C('category','الفئة','select',['أ','ب']),C('total','المجموع الكلي','number'),C('rating','التقدير','select',['ممتاز','جيد جدًا','جيد','مرضٍ','غير مرضٍ']),LONG('notes','ملاحظات الرئيس المباشر')],
+    statement:'تُعبّأ عناصر التقويم ودرجاتها حسب النموذج الرسمي المعتمد للفئة.',
+    sections:[{key:'elements',title:'عناصر التقويم',columns:[C('element','العنصر'),C('max','الحد الأعلى','number'),C('given','الدرجة المعطاة','number')]}],
+    signatures:['الموظف','الرئيس المباشر','مدير المدرسة']},
+  {code:'م.م.ع.ن-05-04',owner:'quality',title:'بيان اطلاع الموظفين على تقويم الأداء الوظيفي',header:[YEAR],statement:'على الرئيس المباشر تزويد الموظف بنسخة من تقويم الأداء الوظيفي المُعَد عنه بعد اعتماده.',
+    sections:[{key:'staff',columns:[C('name','اسم الموظف'),C('job','العمل الحالي'),C('rating','التقدير'),SIGN(null,'توقيع الموظف بالاطلاع')]}],signatures:['مدير المدرسة']},
+  {code:'م.م.ع.ن-06-01',owner:'quality',title:'خطة التدقيق الداخلي النصف سنوية',landscape:true,header:[YEAR,TERM,C('start','بداية التدقيق','date'),C('end','نهاية التدقيق','date')],
+    sections:[{key:'plan',columns:[C('process','العمليات'),C('people','الأشخاص المعنيون بالتدقيق'),C('auditor','اسم المدقق'),C('month','الشهر'),C('week','الأسبوع','select',['1','2','3','4']),C('day','اليوم','select',DAYS),DATE(),C('time','الزمن','time')]}],signatures:['رئيس فريق التدقيق الداخلي']},
+  {code:'م.م.ع.ن-06-02',owner:'quality',title:'إشعار موعد التدقيق الداخلي',header:[C('no','تدقيق داخلي رقم'),C('from','من'),C('to','إلى'),C('process','اسم العملية'),C('planned','تاريخ التدقيق حسب الخطة','date'),C('actual','التاريخ الفعلي للتدقيق','date'),C('day','اليوم','select',DAYS),C('time','الوقت','time'),C('reviewer','اسم المراجع'),C('place','مكان التدقيق'),LONG('docs','الوثائق والأدوات المطلوبة للتدقيق')],
+    statement:'الأصل للمدقق عليه، وصورة للمراجع، وصورة لملف التدقيق الداخلي.',sections:[],signatures:['رئيس فريق التدقيق الداخلي']},
+  {code:'م.م.ع.ن-06-03',owner:'quality',title:'نموذج التدقيق الداخلي',header:[C('day','اليوم','select',DAYS),DATE(),C('process','العملية'),C('auditor','اسم المراجع (المدقق)'),C('auditee','اسم المراجع عليه'),C('result','نتيجة التدقيق النهائية','select',['مطابق','غير مطابق']),LONG('actions','الإجراءات المتخذة')],
+    sections:[{key:'questions',columns:[C('q','السؤال'),C('a','الإجابة'),C('state','الحالة','select',['مطابق','غير مطابق'])]}],signatures:['المدقق','المدقق عليه']},
+  {code:'م.م.ع.ن-06-04',owner:'quality',title:'عدم المطابقة',landscape:true,header:[C('no','الرقم'),C('auditDate','تاريخ التدقيق','date'),C('process','اسم العملية'),C('auditor','اسم المدقق'),C('auditee','اسم المدقق عليه'),C('done','تم تنفيذ الإجراءات التصحيحية بتاريخ','date')],
+    sections:[{key:'items',columns:[C('case','حالة عدم المطابقة'),C('fix','الإجراء التصحيحي المطلوب'),C('due','تاريخ التنفيذ','date'),C('owner','اسم المسؤول عن التنفيذ'),SIGN()]}],signatures:['المدقق','المسؤول عن التنفيذ']},
+  {code:'م.م.ع.ن-06-05',owner:'quality',title:'تقرير التدقيق الداخلي',landscape:true,header:[C('to','إلى','text'),C('day','اليوم','select',DAYS),C('date','تاريخ التقرير','date'),C('start','بداية أعمال التدقيق','date'),C('end','نهاية أعمال التدقيق','date'),LONG('plus','الإيجابيات خلال فترة التدقيق'),LONG('minus','السلبيات خلال فترة التدقيق'),LONG('advice','التوصيات')],
+    sections:[{key:'processes',columns:[C('process','العمليات المدقق عليها'),C('type','نوع التدقيق'),C('result','نتيجة التدقيق','select',['مطابق','غير مطابق']),C('cases','وصف حالات عدم المطابقة'),C('fix','الإجراء التصحيحي'),C('exec','التنفيذ','select',['نعم','لا'])]}],signatures:['رئيس فريق التدقيق الداخلي','رئيس لجنة التميز والجودة']},
+  {code:'م.م.ع.ن-07-01',owner:'quality',title:'طلب إجراء تصحيحي',header:[C('issueNo','رقم الإصدار'),C('issueDate','تاريخ الإصدار','date'),C('proc','اسم الإجراء'),C('procCode','رمز الإجراء'),C('detect','طريقة الكشف عن المشكلة'),LONG('problem','شرح المشكلة'),LONG('cause','سبب المشكلة'),LONG('solution','اقتراح الحل'),C('employee','اسم الموظف'),LONG('owner','رأي مسؤول الجهة المعنية في المدرسة'),LONG('team','إجراء فريق التميز والجودة')],sections:[],signatures:['الموظف','مسؤول الجهة المعنية','فريق التميز والجودة']},
+  {code:'م.م.ع.ن-07-02',owner:'quality',title:'سجل طلبات الإجراءات التصحيحية',landscape:true,header:[C('issueNo','رقم الإصدار'),C('issueDate','تاريخ الإصدار','date'),C('entity','الجهة المعنية في المدرسة')],
+    sections:[{key:'requests',columns:[C('no','رقم الطلب'),C('proc','اسم الإجراء'),C('procCode','رمز الإجراء'),C('detect','طريقة الكشف عن المشكلة'),C('action','إجراء الجودة'),DATE(),C('review','المراجعة'),C('reviewDate','تاريخ المراجعة','date')]}],signatures:['رئيس لجنة التميز والجودة']},
+  {code:'م.م.ع.ن-08-01',owner:'quality',title:'تسليم نسخ موثقة',landscape:true,header:[C('issueNo','رقم الإصدار'),C('issueDate','تاريخ الإصدار','date')],
+    sections:[{key:'copies',columns:[C('doc','اسم الوثيقة'),C('code','رمز الوثيقة'),C('issue','الإصدار'),C('copies','عدد النسخ','number'),C('entity','الجهة'),C('no','رقم المستلم'),DATE(),C('name','اسم المستلم'),SIGN()]}],signatures:['رئيس لجنة التميز والجودة']},
+  {code:'م.م.ع.ن-08-02',owner:'quality',title:'طلب (إصدار / إلغاء / تعديل) وثيقة',header:[C('issueNo','رقم الإصدار'),C('issueDate','تاريخ الإصدار','date'),C('entity','الجهة المعنية'),DATE(),C('docName','نوع واسم الوثيقة'),C('docCode','رمز الوثيقة'),C('docIssue','رقم إصدار الوثيقة'),C('docIssueDate','تاريخ إصدار الوثيقة','date'),C('action','المطلوب','select',['إصدار','تعديل','إلغاء']),LONG('summary','ملخص المطلوب وسببه'),C('requester','اسم مقدم الطلب'),LONG('issuer','رأي مسؤول جهة الإصدار'),C('affected','الجهة المتأثرة بالوثيقة'),LONG('affectedOpinion','رأي مسؤول الجهة المتأثرة'),LONG('decision','قرار معتمد الوثيقة (رئيس لجنة الجودة والتميز)')],sections:[],signatures:['مقدم الطلب','مسؤول جهة الإصدار','رئيس لجنة الجودة والتميز']}
 ];
-const byCode=new Map(FORMS.map(f=>[f.code,f]));
+FORMS.forEach(f=>{f.key=f.key||f.code;});
+const byCode=new Map(FORMS.map(f=>[f.key,f]));
 const signedIn=()=>!!(root.firebase&&firebase.apps.length&&firebase.auth().currentUser);
 const managerMode=()=>!!(root.__FUACC&&root.__FUACC.state&&root.__FUACC.state.role===-1&&signedIn());
 const employeeMode=()=>!!(root.EmployeePortal&&signedIn()&&$('account')&&!$('account').hidden);
@@ -170,7 +250,7 @@ function paint(){
   else if(view==='record')body.innerHTML=recordView();
 }
 function homeView(){
-  const groups=roles.map(r=>'<section class="fm-group"><h3>'+esc(ROLES[r])+'</h3><div class="fm-list">'+FORMS.filter(f=>f.owner===r).map(f=>'<button type="button" class="fm-card" '+(f.link?'data-fm-link':'data-fm-open')+'="'+esc(f.code)+'"><b>'+esc(f.title)+'</b><small>رمز النموذج: '+esc(f.code)+'</small></button>').join('')+'</div></section>').join('');
+  const groups=roles.map(r=>'<section class="fm-group"><h3>'+esc(ROLES[r])+'</h3><div class="fm-list">'+FORMS.filter(f=>f.owner===r).map(f=>'<button type="button" class="fm-card" '+(f.link?'data-fm-link':'data-fm-open')+'="'+esc(f.key)+'"><b>'+esc(f.title)+'</b><small>رمز النموذج: '+esc(f.code)+'</small></button>').join('')+'</div></section>').join('');
   return (mode==='manager'?'<div class="fm-bar"><button type="button" data-fm-access>صلاحيات الموظفين على النماذج</button></div><div id="fmAccess"></div>':'')+(groups||'<p class="fm-hint">لا توجد نماذج مخصصة لك.</p>');
 }
 function formView(){
@@ -214,14 +294,14 @@ async function openForm(code){
   form=byCode.get(code);if(!form)return;
   view='form';records=[];paint();status('جارٍ التحميل…');
   try{
-    const snap=await fs().collection('formRecords').where('owner','==',form.owner).where('formCode','==',form.code).get();
-    if(form&&form.code===code){records=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>((b.updatedAt&&b.updatedAt.seconds)||0)-((a.updatedAt&&a.updatedAt.seconds)||0));status('');paint();}
+    const snap=await fs().collection('formRecords').where('owner','==',form.owner).where('formCode','==',form.key).get();
+    if(form&&form.key===code){records=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>((b.updatedAt&&b.updatedAt.seconds)||0)-((a.updatedAt&&a.updatedAt.seconds)||0));status('');paint();}
   }catch(err){status(message(err));}
 }
 function newRecord(){
   const header={};for(const c of form.header||[])header[c.key]=c.def==='year'?hijriYear():'';
   record={id:'',revision:0,status:'draft',header,rows:[]};
-  for(const s of form.sections)record.rows.push({s:s.key});
+  for(const s of form.sections){if(s.preset)for(const p of s.preset)record.rows.push(Object.assign({s:s.key},p));else record.rows.push({s:s.key});}
   view='record';paint();
 }
 async function save(final){
@@ -232,7 +312,7 @@ async function save(final){
   if(final&&root.UIKit&&!await root.UIKit.confirm('بعد الاعتماد لا يمكن تعديل هذا السجل. هل تريد الاعتماد؟'))return;
   busy=true;status('جارٍ الحفظ…');
   const db=fs(),me=firebase.auth().currentUser.uid,ts=firebase.firestore.FieldValue.serverTimestamp();
-  const data={formCode:form.code,owner:form.owner,title:form.title,header:record.header,rows,status:final?'final':'draft',updatedBy:me,updatedAt:ts};
+  const data={formCode:form.key,owner:form.owner,title:form.title,header:record.header,rows,status:final?'final':'draft',updatedBy:me,updatedAt:ts};
   try{
     if(!record.id){
       const ref=await db.collection('formRecords').add(Object.assign({},data,{revision:1,createdBy:me,createdAt:ts}));
