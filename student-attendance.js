@@ -396,6 +396,21 @@
     }
     return dates;
   }
+  async function weekModeMap(){
+    if(!root.WeekModes)return {};
+    try{
+      const result=await db.collection('weekModes').get(),map={};
+      result.docs.forEach(doc=>{map[doc.id]=doc.data();});
+      return map;
+    }catch{return {};}
+  }
+  function dayModeOf(map,date){
+    if(!root.WeekModes)return 'remote';
+    const day=new Date(date+'T00:00:00Z'),weekday=day.getUTCDay();
+    day.setUTCDate(day.getUTCDate()-weekday);
+    return root.WeekModes.dayMode(map,day.toISOString().slice(0,10),weekday);
+  }
+  const modeNames={holiday:'إجازة',onsite:'حضوري'};
   async function recordsForRange(from,to,teacher){
     const collection=db.collection('studentAttendance');
     if(!teacher){
@@ -538,10 +553,11 @@
     };
     const days=dailyAttendance(book.dailyRecords||book.records,rosterMap,book.dates,expected),totals=attendanceDays(days);
     const kind=tab==='absence'?'absence':$('saReportKind').value;
-    const cardDay=book.to,dayRows=days.filter(row=>row.date===cardDay);
+    const cardDay=book.dates.includes(book.to)?book.to:book.dates[book.dates.length-1],dayRows=days.filter(row=>row.date===cardDay);
+    const toMode=book.skipped?.get(book.to);
     const lessonsDay=(book.dailyRecords||book.records).filter(record=>record.date===cardDay).length;
     const card=(count,label,tone,target)=>'<button type="button" class="sa-card '+tone+'" data-sa-goto="'+target+'"><b>'+count+'</b><span>'+escape(label)+'</span></button>';
-    $('saCards').innerHTML='<p class="sa-cards-title">ملخص يوم '+escape(cardDay)+'</p>'+
+    $('saCards').innerHTML='<p class="sa-cards-title">'+(toMode?'يوم '+escape(book.to)+' '+escape(modeNames[toMode]||toMode)+' ولا يُحتسب في رصد الحضور عن بُعد · ملخص آخر يوم دراسي '+escape(cardDay):'ملخص يوم '+escape(cardDay))+(book.skipped?.size?' · استُبعد من الفترة '+book.skipped.size+' يوم إجازة أو حضوري':'')+'</p>'+
       card(dayRows.length,'طالبًا مطلوب رصدهم','','record')+
       card(dayRows.filter(row=>row.status==='present').length,'حاضرون','ok','record')+
       card(dayRows.filter(row=>row.status==='absent').length,'غائبون اليوم كاملًا','bad','absence')+
@@ -555,7 +571,7 @@
     const dailyRows=book.dates.map(date=>{const rows=days.filter(row=>row.date===date);return cells([date,rows.length,rows.filter(row=>row.status==='present').length,rows.filter(row=>row.status==='absent').length,rows.filter(row=>row.status==='unmarked').length]);}).join('');
     const daily=table(['التاريخ','عدد الطلاب','حاضر خلال اليوم','غائب اليوم كاملًا','غير مكتمل الرصد'],dailyRows);
     const ranking=table(['الصف','المعلم','الحصص المرصودة','حالات الحضور','حالات الغياب','غير مرصود','نسبة الحضور'],teacherRanking(book.records).map(row=>cells([grades[row.grade]||'—',root.StaffSettings?.displayName(row.teacher)||row.teacher,row.lessons,row.present,row.absent,row.unmarked,row.rate===null?'—':(row.rate*100).toFixed(1)+'%'])).join(''));
-    const reportDate=book.to;
+    const reportDate=cardDay;
     const level=count=>count>=20?['l3','20 يومًا فأكثر: إحالة إلى لجنة التوجيه والإرشاد']:count>=10?['l2','10 أيام: إنذار واستدعاء ولي الأمر']:count>=5?['l1','5 أيام: تنبيه أول والتواصل مع ولي الأمر']:null;
     const escalated=totals.filter(row=>level(row.absent));
     const escalation='<h3>متابعة الغياب المتراكم للفترة</h3><p>تُحسب أيام الغياب الكامل خلال الفترة المختارة. اختر «هذا الشهر» أو فترة أطول لمتابعة التراكم.</p>'+
@@ -634,7 +650,15 @@
     if(!dateList.length){status('لا توجد أيام دراسية في الفترة المحددة.');return;}
     setBusy(true);status('جارٍ تحميل السجل…');
     try{
-      const records=await recordsForRange(from,to,actor.teacher);
+      const [records,modes]=await Promise.all([recordsForRange(from,to,actor.teacher),weekModeMap()]);
+      // Count only remote school days; holiday and onsite days stay only when lessons were recorded on them.
+      const skipped=new Map();
+      for(const date of [...dateList]){
+        const mode=dayModeOf(modes,date);
+        if(mode!=='remote'&&!records.some(record=>record.date===date)){skipped.set(date,mode);dateList.splice(dateList.indexOf(date),1);}
+      }
+      if(token!==sequence)return;
+      if(!dateList.length){status('الفترة المحددة لا تحتوي أيام تعليم عن بُعد (إجازة أو حضوري)، فلا يوجد رصد لعرضه.');return;}
       if(token!==sequence)return;
       if(!actor.edit){
         classes=[...new Map(records.map(record=>[record.classId,{id:record.classId,grade:gradeOf(record.classId),section:Number(record.classId.split('-s')[1])}])).values()].sort(classOrder);
@@ -655,7 +679,7 @@
       }
       if(token!==sequence)return;
       const dailyRecords=records.filter(record=>(!grade||gradeOf(record.classId)===grade)&&(!classId||record.classId===classId));
-      activeSheet={records:selected,dailyRecords,items,rosters,period,teacher,from,to,dates:dateList};
+      activeSheet={records:selected,dailyRecords,items,rosters,period,teacher,from,to,dates:dateList,skipped};
       $('saResults').innerHTML='<div id="saSheet"></div><div id="saPeriodTotals"></div>';
       paintSheet();
       status('');
