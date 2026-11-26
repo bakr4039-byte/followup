@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const source=fs.readFileSync('accountability.js','utf8');
 function setup(size=120){
   const pages=[];let captures=0;
-  const host={innerHTML:'',querySelector(selector){if(selector==='img')return {complete:true};return {html:this.innerHTML}}};
+  const host={innerHTML:'',querySelectorAll:()=>[],querySelector(selector){if(selector==='img')return {complete:true};return {html:this.innerHTML}}};
   const document={baseURI:'https://example.test/followup/',fonts:{ready:Promise.resolve()},getElementById:()=>host,createElement:()=>({getContext:()=>({measureText:t=>({width:t.length*9})})})};
   class Reader{readAsDataURL(blob){blob.arrayBuffer().then(b=>{this.result='data:application/pdf;base64,'+Buffer.from(b).toString('base64');this.onload()}).catch(e=>this.onerror(e))}}
   class Pdf{addImage(){}addPage(){}output(){return new Blob([new Uint8Array(size)],{type:'application/pdf'})}}
@@ -23,7 +23,7 @@ test('older records without archive fields still generate PDFs',async()=>{const 
 test('PDF render queue recovers after failed job',async()=>{const {A}=setup();await assert.rejects(A.pdfFile({archivePdf:'!invalid',archiveFileName:'نموذج-invalid.pdf'}));const f=await A.pdfFile({teacher:'معلم',date:'2026-11-07'});assert.ok(f.size)});
 test('teacher history retains legacy records, excludes deleted, sorts and filters archive/month',()=>{
   const {A}=setup();const elements=new Map();let section,authCallback;
-  const element=()=>({innerHTML:'',value:'',hidden:true,setAttribute(){},addEventListener(){}});
+  const element=()=>({innerHTML:'',value:'',hidden:true,setAttribute(){},addEventListener(){},querySelectorAll:()=>[]});
   const document={head:{appendChild(){}},createElement:()=>element(),querySelector:()=>({after(el){section=el}}),getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id)}};
   const records=[{id:'old',date:'2026-10-01',teacher:'أ',status:'decided',reply:'الرد القديم'},{id:'closed',date:'2026-11-03',teacher:'أ',status:'decided',archivedAt:new Date('2026-11-04'),archivePdf:'JVBERg=='},{id:'gone',teacher:'أ',status:'deleted'},{id:'waiting',teacher:'أ',date:'2026-11-07',status:'sent'}];
   const user={uid:'teacher-1'},auth={currentUser:user,onAuthStateChanged:cb=>authCallback=cb};
