@@ -462,7 +462,7 @@
         context.teacher=snap.data().scheduleName;
       }
       await load();
-      if(isTeacher&&token===sequence){applyTab();paintTeacherPanel();}
+      if(isTeacher&&context?.uid===uid){applyTab();paintTeacherPanel();}
     }catch(err){if(token===sequence){status(message(err));context=null;}}
     finally{setBusy(false);}
   };
