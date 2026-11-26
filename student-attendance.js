@@ -222,7 +222,7 @@
     '<label>المعلم<select id="saTeacher"><option value="">الجميع</option></select></label>'+
     '<label id="saKindField">التقرير<select id="saReportKind"><option value="all">جميع التقارير</option><option value="students">أيام حضور وغياب الطلاب</option><option value="daily">الحضور والغياب اليومي</option><option value="teachers">أعلى المعلمين حضورًا للطلاب</option></select></label>'+
     '<button type="submit">عرض السجل</button></form>'+
-    '<p id="saStatus" role="status"></p><div id="saCards" class="sa-cards" aria-live="polite"></div><div id="saQuick" class="sa-actions" hidden></div><section id="saReports"></section><div id="saResults"></div><section id="saBody"></section>';
+    '<p id="saStatus" role="status"></p><div id="saCards" class="sa-cards" aria-live="polite"></div><div id="saQuick" class="sa-actions" hidden></div><div id="saTeacherPanel" hidden></div><section id="saReports"></section><div id="saResults"></div><section id="saBody"></section>';
   let navigation;
   if(app){
     $('boardView').after(view);
@@ -278,6 +278,14 @@
 #studentAttendance .sa-level.l2{background:#ffe6d5;color:#8a3b00}
 #studentAttendance .sa-level.l3{background:#faebea;color:#9f2727}
 #studentAttendance .sa-missing{color:#9f2727}
+#saTeacherPanel{padding:12px;border:1px dashed #a5c5ba;border-radius:12px;background:#f7fbf9;margin-bottom:12px}
+#studentAttendance .sa-tlist{list-style:none;padding:0;margin:10px 0;display:grid;gap:6px}
+#studentAttendance .sa-tlist li{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #dbe8e4;border-radius:10px;background:#fff}
+#studentAttendance .sa-tlist li span{flex:1}
+#studentAttendance .sa-tlist button{min-width:64px;min-height:40px}
+#studentAttendance .sa-tlist button[aria-pressed=true][data-t-s=present]{background:#e8f5e9;border-color:#17633a;color:#17633a;font-weight:700}
+#studentAttendance .sa-tlist button[aria-pressed=true][data-t-s=absent]{background:#faebea;border-color:#9f2727;color:#9f2727;font-weight:700}
+#studentAttendance #saTSave{background:#17624d;color:#fff;min-height:44px;padding-inline:20px}
 #studentAttendance .sa-action-form{display:grid;gap:8px;text-align:start;white-space:normal;padding:8px}
 #studentAttendance .sa-action-form textarea{font:inherit;padding:7px 9px;border:1px solid #a5c5ba;border-radius:8px;width:100%}
   @media print{#studentAttendance .sa-tabs,#saCards,#saQuick,#saFilters,#saClose,#saStatus,#saStudentEditor,#studentAttendance button,#studentAttendance .sa-actions{display:none!important}#studentAttendance .sa-grid{overflow:visible}}
@@ -310,6 +318,7 @@
     $('saResults').hidden=tab!=='record';
     $('saBody').hidden=tab!=='record';
     $('saQuick').hidden=tab!=='record'||!context?.edit;
+    $('saTeacherPanel').hidden=tab!=='record'||!isTeacher||!context?.teacher;
     const batch=$('saBatchBox');if(batch)batch.hidden=tab!=='import'||!manager();
     if(activeSheet&&(tab==='reports'||tab==='absence'))paintReports();
   }
@@ -333,6 +342,75 @@
     $('saFrom').value=start.toISOString().slice(0,10);$('saTo').value=end;
     load();
   };
+  // Teacher self-recording for onsite lessons. Teachers read published class name lists (classRosters: names only,
+  // no phones or civil IDs) and may record their own lessons for today or yesterday; Firestore rules enforce both.
+  let teacherDraft=null;
+  const localDayMode=(map,date)=>{
+    const d=new Date(date+'T00:00:00Z'),weekday=d.getUTCDay();d.setUTCDate(d.getUTCDate()-weekday);
+    const value=map[d.toISOString().slice(0,10)],base=typeof value==='string'?value:value&&value.mode;
+    return (value&&typeof value==='object'&&value.days&&value.days[String(weekday)])||base||'remote';
+  };
+  async function paintTeacherPanel(){
+    const host=$('saTeacherPanel');if(!host||!isTeacher||!context?.teacher)return;
+    const actor=context;
+    host.innerHTML='<p>جارٍ تحميل حصصك…</p>';
+    try{
+      const [rosters,modes]=await Promise.all([db.collection('classRosters').where('teachers','array-contains',actor.teacher).get(),db.collection('weekModes').get()]);
+      if(context!==actor)return;
+      const map={};modes.docs.forEach(doc=>{map[doc.id]=doc.data();});
+      const list=rosters.docs.map(doc=>doc.data());
+      if(!list.length){host.innerHTML='<p>لم تُنشر قوائم فصولك بعد. تواصل مع الإدارة.</p>';return;}
+      const first=new Date(today()+'T00:00:00Z');first.setUTCDate(first.getUTCDate()-1);
+      host.innerHTML='<h3>رصد حضور حصتي (الأيام الحضورية)</h3><div class="sa-actions"><label>التاريخ<input type="date" id="saTDate" value="'+today()+'" min="'+first.toISOString().slice(0,10)+'" max="'+today()+'"></label>'+
+        '<label>الحصة<select id="saTLesson"></select></label><button type="button" id="saTOpen">فتح الرصد</button></div><p id="saTNote"></p><div id="saTEditor"></div>';
+      let options=[];
+      const fill=()=>{
+        const date=$('saTDate').value,mode=localDayMode(map,date),weekday=new Date(date+'T00:00:00Z').getUTCDay();
+        options=[];
+        for(const roster of list)for(const lesson of roster.lessons||[])if(lesson.teacher===actor.teacher&&lesson.day===weekday)options.push({roster,lesson});
+        options.sort((a,b)=>a.lesson.period-b.lesson.period);
+        $('saTLesson').innerHTML=options.map((o,i)=>'<option value="'+i+'">الحصة '+escape(periods[o.lesson.period-1]||o.lesson.period)+' · '+escape(o.roster.classLabel)+' · '+escape(o.lesson.subject)+'</option>').join('');
+        $('saTOpen').disabled=mode!=='onsite'||!options.length;
+        $('saTNote').textContent=mode==='holiday'?'هذا اليوم إجازة.':mode==='remote'?'هذا اليوم عن بُعد، ويُرصد الحضور من فيوكلاس.':options.length?'':'لا توجد لك حصص حضورية في هذا اليوم.';
+        $('saTEditor').textContent='';teacherDraft=null;
+      };
+      $('saTDate').onchange=fill;fill();
+      $('saTOpen').onclick=()=>{const o=options[Number($('saTLesson').value)];if(o&&!$('saTOpen').disabled)openTeacherLesson(o.roster,o.lesson,$('saTDate').value);};
+    }catch(err){if(context===actor)host.innerHTML='<p>'+escape(message(err))+'</p>';}
+  }
+  async function openTeacherLesson(roster,lesson,date){
+    const box=$('saTEditor');box.textContent='جارٍ التحميل…';
+    const ref=db.doc('studentAttendance/'+date+'_'+roster.classId+'_p'+lesson.period);
+    let old={};
+    try{old=(await ref.get()).data()||{};}catch(err){box.textContent='هذه الحصة رُصدت من حساب آخر، ولا يمكن تعديلها من حسابك.';return;}
+    const marks=new Map((old.students||[]).map(row=>[row.id,row.status]));
+    const draft=teacherDraft={ref,date,roster,lesson,revision:old.revision||0,students:(roster.students||[]).map(row=>({id:row.id,name:row.name,status:marks.get(row.id)||'unmarked',entry:''}))};
+    const paint=()=>{
+      const n=counts(draft.students);
+      box.innerHTML='<h4>'+escape(roster.classLabel+' · '+lesson.subject+' · '+date)+'</h4><p>حاضر '+n.present+' · غائب '+n.absent+' · غير مرصود '+n.unmarked+'</p>'+
+        '<div class="sa-actions"><button type="button" data-t-all="present">الكل حاضر</button></div><ul class="sa-tlist">'+
+        draft.students.map((row,i)=>'<li><span>'+escape(row.name)+'</span><button type="button" data-t-i="'+i+'" data-t-s="present" aria-pressed="'+(row.status==='present')+'">حاضر</button><button type="button" data-t-i="'+i+'" data-t-s="absent" aria-pressed="'+(row.status==='absent')+'">غائب</button></li>').join('')+
+        '</ul><button type="button" id="saTSave">حفظ الرصد</button>';
+    };
+    paint();
+    box.onclick=async event=>{
+      const control=event.target.closest('button');if(!control||teacherDraft!==draft)return;
+      if(control.dataset.tAll){draft.students.forEach(row=>{row.status='present';});paint();return;}
+      if(control.dataset.tI!==undefined){const row=draft.students[Number(control.dataset.tI)];row.status=row.status===control.dataset.tS?'unmarked':control.dataset.tS;paint();return;}
+      if(control.id!=='saTSave'||!draft.students.length)return;
+      control.disabled=true;
+      try{
+        const uid=auth.currentUser.uid;
+        await db.runTransaction(async tx=>{
+          const previous=await tx.get(draft.ref);
+          if((previous.data()?.revision||0)!==draft.revision)throw Error('تغيّر الرصد من جلسة أخرى. أعد فتح الحصة.');
+          tx.set(draft.ref,{date:draft.date,classId:roster.classId,classLabel:roster.classLabel,period:lesson.period,teacher:context.teacher,subject:lesson.subject,
+            students:draft.students.map(row=>({...row})),revision:draft.revision+1,updatedBy:uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        });
+        draft.revision++;paint();status('تم حفظ رصد الحصة.');
+      }catch(err){status(message(err));control.disabled=false;}
+    };
+  }
   function paintQuick(){
     const host=$('saQuick');
     host.innerHTML='<label>تاريخ الحصة<input type="date" id="saQuickDate" value="'+today()+'" max="'+today()+'"></label><label>الشعبة<select id="saQuickClass">'+classes.map(c=>'<option value="'+escape(c.id)+'">'+escape(classLabel(c))+'</option>').join('')+'</select></label>'+
@@ -384,6 +462,7 @@
         context.teacher=snap.data().scheduleName;
       }
       await load();
+      if(isTeacher&&context?.uid===uid){applyTab();paintTeacherPanel();}
     }catch(err){if(token===sequence){status(message(err));context=null;}}
     finally{setBusy(false);}
   };
@@ -887,9 +966,32 @@
   function mountBatchAttendance(){
     const box=document.createElement('details');
     box.hidden=true;box.id='saBatchBox';box.open=true;
-    box.innerHTML='<summary>استيراد دفعة كشوف فيوكلاس</summary><p>لتحديث قوائم الطلاب وأرقام أولياء الأمور: <button type="button" id="saRosterOpen">مطابقة قوائم فيوكلاس</button></p><label>كشوف الحصص<textarea id="saBatchInput" rows="4" dir="ltr"></textarea></label>'+
+    box.innerHTML='<summary>استيراد دفعة كشوف فيوكلاس</summary><p>لتحديث قوائم الطلاب وأرقام أولياء الأمور: <button type="button" id="saRosterOpen">مطابقة قوائم فيوكلاس</button></p><p>ليرصد المعلمون حصصهم الحضورية من جوالاتهم: <button type="button" id="saRosterPublish">نشر قوائم الأسماء للمعلمين</button> <small>(الأسماء والجدول فقط، دون أرقام أولياء الأمور أو السجل المدني)</small> <span id="saRosterPublishStatus" role="status"></span></p><label>كشوف الحصص<textarea id="saBatchInput" rows="4" dir="ltr"></textarea></label>'+
       '<div class="sa-actions"><button type="button" id="saBatchPreview">مطابقة الكشوف</button><button type="button" id="saBatchSave" hidden>حفظ الرصد المطابق</button></div><p id="saBatchStatus" role="status"></p>';
     $('saFilters').after(box);
+    $('saRosterPublish').onclick=async()=>{
+      const control=$('saRosterPublish'),out=$('saRosterPublishStatus');
+      if(!manager()||control.disabled)return;
+      control.disabled=true;out.textContent='جارٍ النشر…';
+      try{
+        const registry=(await db.doc('config/onsite-classes').get()).data()?.classes||{};
+        const lessons=(await db.doc('config/subs-onsite-data').get()).data()?.lessons||[];
+        const active=Object.values(registry).filter(c=>c.active!==false&&/^g[123]-s[1-9][0-9]?$/.test(c.id));
+        const rosters=await Promise.all(active.map(c=>db.doc('config/onsite-students-'+c.id).get()));
+        const batch=db.batch(),uid=auth.currentUser.uid;
+        active.forEach((c,i)=>{
+          const own=lessons.filter(l=>l.classId===c.id).map(l=>({day:Number(l.day),period:Number(l.period),subject:String(l.subject||'').slice(0,100),teacher:String(l.scheduleName||l.teacher||'').slice(0,150)}))
+            .filter(l=>l.teacher&&l.subject&&l.period>=1&&l.period<=7).slice(0,120);
+          // Names only: guardian phones and civil IDs stay in the manager-only roster.
+          const students=(rosters[i].data()?.students||[]).map(row=>({id:String(row.id),name:String(row.name||'').slice(0,150)})).slice(0,80);
+          batch.set(db.doc('classRosters/'+c.id),{classId:c.id,classLabel:classLabel(c),students,teachers:[...new Set(own.map(l=>l.teacher))].slice(0,60),lessons:own,
+            updatedBy:uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        });
+        await batch.commit();
+        out.textContent='نُشرت قوائم '+active.length+' فصلًا للمعلمين.';
+      }catch(err){out.textContent=message(err);}
+      finally{control.disabled=false;}
+    };
     $('saRosterOpen').onclick=()=>{const dialog=document.getElementById('viewClassRosterSync');if(dialog&&manager()&&!dialog.open)dialog.showModal();};
     setInterval(()=>{const hidden=!manager()||tab!=='import';if(box.hidden!==hidden)box.hidden=hidden;},500);
     const input=box.querySelector('textarea'),preview=$('saBatchPreview'),save=$('saBatchSave'),output=$('saBatchStatus');
