@@ -10,7 +10,7 @@ const groups=[
 {key:'family',title:'أولياء الأمور والتواصل',note:'بيانات أولياء الأمور والإعلانات',ids:['schoolFamilyLink']},
 {key:'admin',title:'الإدارة والإعدادات',note:'الحسابات والصلاحيات وحماية المنصة',ids:['schoolAuditLink','vStaffSettings','vSchoolStudents','vEmployeeAccounts','namesBtn','pwBtn','securityAuditBtn','securityLoginBtn']}
 ];
-const labels={vSchoolSchedule:'الجداول والفصول',vEmployeeAccounts:'الحسابات والصلاحيات',namesBtn:'إعدادات المدرسة',pwBtn:'كلمة مروري',securityLoginBtn:'أمان الدخول',vTeachers:'دليل المنسوبين',vBoard:'مؤشرات المدرسة',vStaff:'متابعة المسؤولين والمشرفين',vSignatures:'التوقيعات والإقرارات'};
+const labels={vSchoolSchedule:'الجدول الحضوري والفصول',vEmployeeAccounts:'الحسابات والصلاحيات',namesBtn:'إعدادات المدرسة',pwBtn:'كلمة مروري',securityLoginBtn:'أمان الدخول',vTeachers:'دليل المنسوبين',vBoard:'مؤشرات المدرسة',vStaff:'متابعة المسؤولين والمشرفين',vSignatures:'التوقيعات والإقرارات'};
 const $=id=>document.getElementById(id),personal=!!root.TeacherPortal||!!root.EmployeePortal;let queued=false;
 function move(button,target){if(button&&target&&button.parentElement!==target)target.append(button)}
 function rename(button,label){if(button&&label&&button.textContent.trim()!==label)button.textContent=label}
