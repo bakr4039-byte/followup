@@ -107,3 +107,11 @@ canvas.as-pad,.acc-sign canvas{background-color:#fff;border:1.5px dashed var(--a
 .tt-badge{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600}
 .tt-badge.linked{background:var(--ok-soft);color:var(--ok)}.tt-badge.near{background:var(--warn-soft);color:var(--warn)}.tt-badge.missing{background:var(--bad-soft);color:var(--bad)}.tt-badge.inactive{background:var(--idle-soft);color:var(--idle)}
 .tt-note{background:var(--surface-2);border-radius:12px;padding:10px 14px;font-size:13px;color:var(--muted);margin:0;line-height:1.8}
+
+/* Onsite timetable: assembly, break and prayer columns. */
+.tt-grid th.tt-break,.tt-grid td.tt-break{width:52px;min-width:52px;padding:6px 4px;font-weight:700;vertical-align:middle;font-size:12px}
+.tt-grid td.tt-break span{display:inline-block;writing-mode:vertical-rl;letter-spacing:.5px;line-height:1.3}
+.tt-grid .tt-line{background:#eef3f8;color:#2f5573}
+.tt-grid .tt-break.tt-break{background:var(--warn-soft);color:var(--warn)}
+.tt-grid .tt-prayer{background:var(--ok-soft);color:var(--ok)}
+.tt-grid thead .tt-break small{color:inherit;opacity:.85}
