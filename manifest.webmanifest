@@ -1,0 +1,33 @@
+{
+  "name": "منصة ثانوية الصحافة الأهلية",
+  "short_name": "الصحافة",
+  "description": "منصة الإدارة والمتابعة المدرسية",
+  "lang": "ar",
+  "dir": "rtl",
+  "id": "./",
+  "start_url": "./index.html?source=app",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EEF2F1",
+  "theme_color": "#123e36",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
