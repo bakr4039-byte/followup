@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="theme-color" content="#116c59">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<link rel="stylesheet" href="design-system.css?v=20261126-1"><style>:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}
+<link rel="stylesheet" href="design-system.css?v=20261126-2"><script src="ui-kit.js?v=20261126-1"></script><style>:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}
 /* charts */
 .cgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .cgrid .c-days{grid-column:span 2}
@@ -1636,7 +1636,7 @@ async function activateSecure(){const err=t=>{$('scErr').textContent=t};err('');
   try{const m=await migrateAccount(-1,apw);if(m!==true){err('تعذّر تجهيز حساب المدير'+(m==='other'?': يوجد حساب بكلمة مرور مختلفة، احذفه من Firebase ← Authentication':''));return}
     const rd=(state.secureDoc&&state.secureDoc.ready)||{};
     const missing=[0,1,2,3,4,5,6,7,8].filter(r=>(r<4||storedHash(r))&&rd[roleKey(r)]!==true);
-    if(missing.length&&!confirm(`لم يجهز بعد: ${missing.map(roleName).join('، ')}.\nلن يستطيعوا الدخول حتى تنشئ لهم حسابًا من الإعدادات بكلمة مرور جديدة.\nهل تريد التفعيل الآن؟`)){return}
+    if(missing.length&&!await (typeof UIKit!=='undefined'?UIKit:{confirm:async m=>confirm(m)}).confirm(`لم يجهز بعد: ${missing.map(roleName).join('، ')}.\nلن يستطيعوا الدخول حتى تنشئ لهم حسابًا من الإعدادات بكلمة مرور جديدة.\nهل تريد التفعيل الآن؟`)){return}
     // lock unused monitor emails with random passwords so nobody else can claim them
     for(const r of [4,5,6,7,8])if(!storedHash(r)&&rd[roleKey(r)]!==true){try{await api.createAccount(roleEmail(r),randPw())}catch(e){}}
     btn.textContent='جارٍ التفعيل…';
