@@ -3,6 +3,14 @@
   'use strict';
   const groups = new Map();
   let host = null;
+  // Open the sidebar section that holds the request before opening it, so it is visible.
+  function reveal(label) {
+    const key = /مساءل/.test(label) ? 'accountability' : /تكليف/.test(label) ? 'assignments' : /إقرار|اطلاع|توقيع/.test(label) ? 'signatures' : '';
+    if (!key) return;
+    const ids = { assignments: 'vAssignments', signatures: 'vSignatures', accountability: 'vAcc' };
+    const b = document.querySelector('.school-sidebar-links [data-workspace-key="' + key + '"]') || document.getElementById(ids[key]);
+    if (b && b.closest('.school-sidebar-links')) b.click();
+  }
   function paint() {
     const items = Array.from(groups.values()).flat();
     if (!host && !items.length) return;
@@ -32,7 +40,7 @@
       button.className = 'btn';
       button.style.cssText = 'display:block;text-align:right;width:100%;margin:8px 0;padding:12px;white-space:normal';
       button.textContent = item.label + ' — فتح الطلب';
-      button.onclick = item.open;
+      button.onclick = (event) => { reveal(item.label); if (item.open) item.open(event); };
       host.appendChild(button);
     }
   }
