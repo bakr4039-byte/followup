@@ -513,6 +513,7 @@
     }
     $('saResults').hidden=kind!== 'all';
     $('saReportPrint').onclick=()=>{
+      if(root.ReportKit){if(!root.ReportKit.open({title:'تقارير حضور الطلاب',subtitle:'من '+book.from+' إلى '+book.to,body:host.innerHTML,landscape:true}))status('اسمح بفتح نافذة الطباعة ثم حاول مجددًا.');return;}
       const printWindow=root.open('','_blank');
       if(!printWindow){status('اسمح بفتح نافذة الطباعة ثم حاول مجددًا.');return;}
       printWindow.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقارير حضور الطلاب</title><style>body{font:14px Tahoma,Arial;direction:rtl;padding:20px}table{width:100%;border-collapse:collapse;margin:12px 0}td,th{border:1px solid #999;padding:7px;text-align:right}th{background:#e8f2ed}h3{margin-top:24px}button,.sa-actions,a{display:none}@page{size:A4 landscape;margin:12mm}</style></head><body>'+host.innerHTML+'</body></html>');
