@@ -57,3 +57,12 @@ canvas.as-pad,.acc-sign canvas{background-color:#fff;border:1.5px dashed var(--a
 .school-sidebar .school-sidebar-links>.school-home-link:before{content:'⌂';font-size:16px;color:#dfc788;width:18px;text-align:center}
 .school-sidebar .school-sidebar-links>.school-home-link:hover{background:#ffffff17}
 .school-sidebar .school-sidebar-links>.school-home-link[hidden]{display:none}
+
+/* Install-the-app hint (pwa.js). */
+.pwa-hint{position:fixed;inset-inline:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:200;display:flex;align-items:center;gap:12px;max-width:560px;margin-inline:auto;padding:12px 14px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 30px rgba(17,48,43,.18);font-family:var(--f-body)}
+.pwa-hint img{width:42px;height:42px;border-radius:10px;flex:none}
+.pwa-hint p{margin:0;flex:1;font-size:13.5px;line-height:1.7}
+.pwa-hint div{display:flex;gap:6px;align-items:center}
+.pwa-go{font:inherit;font-weight:700;border:0;border-radius:10px;padding:8px 16px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.pwa-close{font:inherit;font-size:20px;line-height:1;border:0;background:none;color:var(--muted);cursor:pointer;padding:4px 8px}
+@media print{.pwa-hint{display:none}}
