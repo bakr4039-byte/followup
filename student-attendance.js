@@ -330,10 +330,10 @@
   };
   function paintQuick(){
     const host=$('saQuick');
-    host.innerHTML='<label>رصد حصة اليوم · الشعبة<select id="saQuickClass">'+classes.map(c=>'<option value="'+escape(c.id)+'">'+escape(classLabel(c))+'</option>').join('')+'</select></label>'+
+    host.innerHTML='<label>تاريخ الحصة<input type="date" id="saQuickDate" value="'+today()+'" max="'+today()+'"></label><label>الشعبة<select id="saQuickClass">'+classes.map(c=>'<option value="'+escape(c.id)+'">'+escape(classLabel(c))+'</option>').join('')+'</select></label>'+
       '<label>الحصة<select id="saQuickPeriod">'+periods.map((period,i)=>'<option value="'+(i+1)+'">'+period+'</option>').join('')+'</select></label>'+
       '<button type="button" id="saQuickOpen">فتح رصد الحصة</button>';
-    $('saQuickOpen').onclick=()=>{if(!busy&&$('saQuickClass').value)openLesson(today(),$('saQuickClass').value,Number($('saQuickPeriod').value),'');};
+    $('saQuickOpen').onclick=()=>{if(!busy&&$('saQuickClass').value)openLesson(($('saQuickDate').value&&$('saQuickDate').value<=today()?$('saQuickDate').value:today()),$('saQuickClass').value,Number($('saQuickPeriod').value),'');};
   }
   if(app){
     let actor='';
@@ -545,7 +545,8 @@
       const group=grade===3?(section===10?'ba':section===9?'cs':'c3'):'c'+grade;
       const day=new Date(date+'T00:00:00Z').getUTCDay();
       const sessions=(app?.S||[]).filter(row=>row.day===day&&row.cls===group);
-      const periods=sessions.map(row=>row.slot+1);
+      const onsiteDay=book.modes&&book.onsiteLessons?.length&&dayModeOf(book.modes,date)==='onsite';
+      const periods=onsiteDay?book.onsiteLessons.filter(l=>l.classId===classId&&Number(l.day)===day).map(l=>Number(l.period)):sessions.map(row=>row.slot+1);
       if(!app?.S?.length)periods.push(...scheduleColumns.map(column=>column.period));
       // Include saved lessons when their schedule changed after attendance was recorded.
       for(const record of book.dailyRecords||book.records)if(record.classId===classId&&record.date===date&&!periods.includes(record.period))periods.push(record.period);
@@ -658,6 +659,11 @@
         if(mode!=='remote'&&!records.some(record=>record.date===date)){skipped.set(date,mode);dateList.splice(dateList.indexOf(date),1);}
       }
       if(token!==sequence)return;
+      let onsiteLessons=[];
+      if(dateList.some(date=>dayModeOf(modes,date)==='onsite')){
+        try{onsiteLessons=(await db.doc('config/subs-onsite-data').get()).data()?.lessons||[];}catch{onsiteLessons=[];}
+        if(token!==sequence)return;
+      }
       if(!dateList.length){status('الفترة المحددة لا تحتوي أيام تعليم عن بُعد (إجازة أو حضوري)، فلا يوجد رصد لعرضه.');return;}
       if(token!==sequence)return;
       if(!actor.edit){
@@ -679,7 +685,7 @@
       }
       if(token!==sequence)return;
       const dailyRecords=records.filter(record=>(!grade||gradeOf(record.classId)===grade)&&(!classId||record.classId===classId));
-      activeSheet={records:selected,dailyRecords,items,rosters,period,teacher,from,to,dates:dateList,skipped};
+      activeSheet={records:selected,dailyRecords,items,rosters,period,teacher,from,to,dates:dateList,skipped,modes,onsiteLessons};
       $('saResults').innerHTML='<div id="saSheet"></div><div id="saPeriodTotals"></div>';
       paintSheet();
       status('');
@@ -706,9 +712,21 @@
         phones.set(student.id,student.guardianPhone||'');
         if(!ready.has(student.id))ready.set(student.id,{id:student.id,name:student.name,status:'unmarked',entry:''});
       }
-      const sessions=remoteSessions(app.S,date,c.grade,period,subs.data()?.map);
-      if(!sessions.length)throw Error('لا توجد حصة مطابقة في جدول المنصة عن بُعد لهذا اليوم والفصل.');
-      draft={ref,date,c,period,phones,sessions,students:[...ready.values()],teacher:old.teacher||'',subject:old.subject||'',revision:old.revision||0};
+      const mode=dayModeOf(await weekModeMap(),date);
+      if(token!==sequence)return;
+      if(mode==='holiday')throw Error('هذا اليوم إجازة حسب إعداد الأسبوع، فلا يوجد رصد.');
+      let sessions;
+      if(mode==='onsite'){
+        // Onsite days use the onsite timetable (config/subs-onsite-data).
+        const onsite=(await db.doc('config/subs-onsite-data').get()).data()?.lessons||[];
+        if(token!==sequence)return;
+        const weekday=new Date(date+'T00:00:00Z').getUTCDay();
+        sessions=onsite.filter(l=>l.classId===c.id&&Number(l.day)===weekday&&Number(l.period)===period)
+          .map((l,i)=>({id:'onsite-'+c.id+'-d'+weekday+'-p'+period+'-'+i,cls:'onsite',subj:String(l.subject||''),teacher:String(l.scheduleName||l.teacher||'')}))
+          .filter(l=>l.subj&&l.teacher);
+      }else sessions=remoteSessions(app.S,date,c.grade,period,subs.data()?.map);
+      if(!sessions.length)throw Error(mode==='onsite'?'لا توجد حصة لهذه الشعبة في الجدول الحضوري في هذا اليوم والحصة.':'لا توجد حصة مطابقة في جدول المنصة عن بُعد لهذا اليوم والفصل.');
+      draft={ref,date,c,period,phones,sessions,mode,students:[...ready.values()],teacher:old.teacher||'',subject:old.subject||'',revision:old.revision||0};
       renderEditor();
       $('saBody').scrollIntoView({block:'start'});
       status(draft.students.length?'':'لا توجد أسماء طلاب لهذه الشعبة.');
@@ -722,11 +740,11 @@
   }
   function renderEditor(){
     const current=draft;
-    const groups={c1:'الأول الثانوي',c2:'الثاني الثانوي',c3:'الثالث الثانوي',ba:'إدارة الأعمال',cs:'الحاسب والهندسة'};
+    const groups={onsite:'حضوري',c1:'الأول الثانوي',c2:'الثاني الثانوي',c3:'الثالث الثانوي',ba:'إدارة الأعمال',cs:'الحاسب والهندسة'};
     const fromRecord=current.sessions.find(lesson=>lesson.teacher===current.teacher&&lesson.subj===current.subject);
     const selected=fromRecord?.id||(current.sessions.length===1?current.sessions[0].id:'');
     $('saBody').innerHTML='<section id="saStudentEditor"><div class="sa-actions"><h3>'+escape(classLabel(current.c)+' · '+current.date+' · الحصة '+periods[current.period-1])+'</h3><button id="saBackToSheet" type="button">العودة إلى سجل الطلاب</button></div>'+
-      '<form id="saEdit"><label>الحصة حسب جدول عن بُعد<select id="saSession" required><option value="">اختر الحصة أو المسار</option>'+
+      '<form id="saEdit"><label>الحصة حسب '+(current.mode==='onsite'?'الجدول الحضوري':'جدول عن بُعد')+'<select id="saSession" required><option value="">اختر الحصة أو المسار</option>'+
       current.sessions.map(lesson=>'<option '+(lesson.id===selected?'selected ':'')+'value="'+escape(lesson.id)+'">'+escape(groups[lesson.cls]+' · '+lesson.subj+' · '+(root.StaffSettings?.displayName(lesson.teacher)||lesson.teacher))+'</option>').join('')+
       '</select></label>'+
       '<div class="sa-actions"><label>كشف الحضور من فيوكلاس<input type="file" accept=".xlsx,.xls,.csv" id="saReport"></label><button type="button" id="saPreview">معاينة كشف الحضور</button></div>'+
