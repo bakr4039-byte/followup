@@ -37,10 +37,10 @@ service cloud.firestore {
   function validNote() { return request.resource.data.keys().hasOnly(['text','updatedBy','updatedAt']) && request.resource.data.text is string && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is string; }
   function lessonDayKey(id) { return id.matches('.*-d0-.*') ? '0' : id.matches('.*-d1-.*') ? '1' : id.matches('.*-d2-.*') ? '2' : id.matches('.*-d3-.*') ? '3' : '4'; }
   function remoteLesson(week,id) { return !exists(/databases/$(database)/documents/weekModes/$(week)) || get(/databases/$(database)/documents/weekModes/$(week)).data.get('days',{}).get(lessonDayKey(id),get(/databases/$(database)/documents/weekModes/$(week)).data.mode) == 'remote'; }
-  function validDayModes(d) { return d is map && d.keys().hasOnly(['0','1','2','3','4']) && d.get('0','remote') in ['remote','onsite'] && d.get('1','remote') in ['remote','onsite'] && d.get('2','remote') in ['remote','onsite'] && d.get('3','remote') in ['remote','onsite'] && d.get('4','remote') in ['remote','onsite']; }
+  function validDayModes(d) { return d is map && d.keys().hasOnly(['0','1','2','3','4']) && d.get('0','remote') in ['remote','onsite','holiday'] && d.get('1','remote') in ['remote','onsite','holiday'] && d.get('2','remote') in ['remote','onsite','holiday'] && d.get('3','remote') in ['remote','onsite','holiday'] && d.get('4','remote') in ['remote','onsite','holiday']; }
   match /weekModes/{week} {
     allow read: if signed();
-    allow create, update: if admin() && week.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}') && request.resource.data.keys().hasOnly(['mode','days','updatedAt','updatedBy']) && request.resource.data.mode in ['remote','onsite'] && validDayModes(request.resource.data.get('days',{})) && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+    allow create, update: if admin() && week.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}') && request.resource.data.keys().hasOnly(['mode','days','updatedAt','updatedBy']) && request.resource.data.mode in ['remote','onsite','holiday'] && validDayModes(request.resource.data.get('days',{})) && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
     allow delete: if false;
   }
   match /recordWeeks/{week}/logs/{id} {
