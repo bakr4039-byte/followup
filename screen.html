@@ -1,0 +1,46 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://www.recaptcha.net; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://www.google.com https://www.gstatic.com; frame-src https://www.google.com https://www.recaptcha.net; object-src 'none'; base-uri 'self'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>شاشة العرض — ثانوية الصحافة الأهلية</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%}body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;background:linear-gradient(160deg,#0f3530,#17624d);color:#fff;display:grid;grid-template-rows:auto 1fr auto;overflow:hidden}
+header{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:3vh 4vw}
+.brand{display:flex;align-items:center;gap:18px}.brand img{width:9vh;height:9vh;object-fit:contain;border-radius:16px;background:#fff;padding:6px}.brand h1{margin:0;font-size:4vh}.brand p{margin:4px 0 0;font-size:2.4vh;opacity:.85}
+.clock{text-align:left}.clock b{display:block;font-size:9vh;font-variant-numeric:tabular-nums;line-height:1}.clock span{font-size:2.6vh;opacity:.9}
+main{display:grid;place-items:center;padding:0 6vw}
+.news{width:100%;max-width:1500px;background:#ffffff14;border:1px solid #ffffff33;border-radius:32px;padding:6vh 5vw;min-height:46vh;display:flex;flex-direction:column;justify-content:center;transition:opacity .6s}
+.news.fade{opacity:0}.news h2{margin:0 0 3vh;font-size:6.5vh;line-height:1.3;color:#ffe7a6}.news p{margin:0;font-size:4.2vh;line-height:1.6;white-space:pre-wrap}
+.empty{font-size:4vh;opacity:.85;text-align:center}
+footer{display:flex;justify-content:space-between;align-items:center;padding:2vh 4vw;font-size:2.2vh;opacity:.85}.dots{display:flex;gap:8px}.dots i{width:12px;height:12px;border-radius:50%;background:#ffffff55}.dots i.on{background:#ffe7a6}
+@media(prefers-reduced-motion:reduce){.news{transition:none}}
+</style></head><body>
+<header><div class="brand"><img src="assets/sahafa-school-logo.jpeg" alt="شعار مدارس الصحافة الأهلية"><div><h1>ثانوية الصحافة الأهلية</h1><p>إعلانات المدرسة</p></div></div><div class="clock"><b id="time">--:--</b><span id="date"></span></div></header>
+<main><section class="news" id="news" aria-live="polite"><p class="empty">جارٍ تحميل الإعلانات…</p></section></main>
+<footer><span id="note">تُحدّث الإعلانات تلقائيًا</span><div class="dots" id="dots"></div></footer>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" integrity="sha384-AQ3POAMqIhwS81FrUH95ekxqBZHeP5tG2JfEL3+7GuTtfRLWnrRh32UxwzM+//A9" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js" integrity="sha384-E3vxFxXu8FhW5kvqdQJ5Yf8ugrV7iCJP8jgnItRH2Rk8Q08cJzJGTi/oMC3FEp3j" crossorigin="anonymous"></script>
+<script src="app-check.js?v=20261013"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" integrity="sha384-qn4Jh88HhJA8dplNQyGjOh9OGI4izVhrfj/qIFgaKcdgOE06pXqIKGlsCILZcLAC" crossorigin="anonymous"></script>
+<script>
+(function(){'use strict';
+var CONFIG={apiKey:"AIzaSyBkzpz7hLmQlnL5nODu3dpKZD_if71nOcY",authDomain:"alsahafa-followup.firebaseapp.com",projectId:"alsahafa-followup",storageBucket:"alsahafa-followup.firebasestorage.app",messagingSenderId:"652830562435",appId:"1:652830562435:web:1c1b529b5d6b57c944a3b6"};
+var $=function(id){return document.getElementById(id);};
+var TZ='Asia/Riyadh',list=[],idx=0;
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function today(){var p=new Intl.DateTimeFormat('en',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());return ['year','month','day'].map(function(k){return p.find(function(x){return x.type===k;}).value;}).join('-');}
+function clock(){var d=new Date();$('time').textContent=new Intl.DateTimeFormat('ar-SA-u-nu-latn',{timeZone:TZ,hour:'2-digit',minute:'2-digit',hour12:true}).format(d);
+  var h='';try{h=new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn',{timeZone:TZ,weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(d);}catch(e){}
+  $('date').textContent=h+' — '+new Intl.DateTimeFormat('ar-u-nu-latn',{timeZone:TZ,day:'numeric',month:'long',year:'numeric'}).format(d)+' م';}
+function live(a){var t=today();return a.active!==false&&(!a.start||a.start<=t)&&(!a.end||a.end>=t);}
+function show(){var box=$('news'),cur=list.filter(live);
+  $('dots').innerHTML=cur.map(function(_,i){return '<i class="'+(i===idx%Math.max(cur.length,1)?'on':'')+'"></i>';}).join('');
+  if(!cur.length){box.innerHTML='<p class="empty">لا توجد إعلانات حالية — نتمنى لكم يومًا دراسيًا موفقًا</p>';return;}
+  var a=cur[idx%cur.length];box.classList.add('fade');
+  setTimeout(function(){box.innerHTML='<h2>'+esc(a.title)+'</h2><p>'+esc(a.body)+'</p>';box.classList.remove('fade');},400);}
+clock();setInterval(clock,1000);
+try{var app=firebase.initializeApp(CONFIG);window.FollowupAppCheck.activate(app);
+  firebase.firestore().collection('announcements').where('audience','==','screen').onSnapshot(function(s){
+    list=s.docs.map(function(d){return d.data();}).sort(function(a,b){return String(b.start||'').localeCompare(String(a.start||''));});idx=0;show();
+  },function(){$('note').textContent='تعذّر تحميل الإعلانات — تحقق من الاتصال';});
+}catch(e){$('note').textContent='تعذّر تشغيل الشاشة';}
+setInterval(function(){idx++;show();},12000);
+setInterval(function(){location.reload();},6*3600*1000);
+})();
+</script></body></html>
