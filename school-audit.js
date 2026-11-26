@@ -149,7 +149,7 @@ async function weeklySummary(start){
   if(radio){const r=radio.docs.map(d=>d.data());rows.push(['الإذاعة المدرسية',r.filter(x=>x.status==='done').length+' نُفّذ من '+r.filter(x=>x.status!=='cancelled').length,r.filter(x=>x.status==='planned'&&x.date<riyadhToday()).length?r.filter(x=>x.status==='planned'&&x.date<riyadhToday()).length+' يوم لم يُسجّل تنفيذه':'']);}else rows.push(['الإذاعة المدرسية',na,'']);
   if(ann){const a=ann.docs.map(d=>d.data()).filter(x=>x.active!==false&&(!x.start||x.start<=end)&&(!x.end||x.end>=start));rows.push(['الإعلانات الظاهرة',a.length+' إعلان',a.filter(x=>x.audience==='screen').length+' على شاشة العرض']);}
   const inWeek=e=>+e.at>=+since&&+e.at<+until;
-  for(const [col,label] of SOURCES){if(['announcements','radioPrograms','formAccess','classRosters'].includes(col))continue;const list=events.filter(e=>e.col===col&&inWeek(e));rows.push([label,list.length+' عملية',list.filter(e=>e.created).length+' جديد، '+list.filter(e=>!e.created).length+' تعديل']);}
+  for(const [col,label] of SOURCES){if(['announcements','radioPrograms','formAccess','classRosters','absenceActions'].includes(col))continue;const list=events.filter(e=>e.col===col&&inWeek(e));rows.push([label,list.length+' عملية',list.filter(e=>e.created).length+' جديد، '+list.filter(e=>!e.created).length+' تعديل']);}
   return rows;
 }
 async function paintWeekly(){
