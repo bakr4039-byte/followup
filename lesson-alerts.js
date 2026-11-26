@@ -19,7 +19,16 @@ function todayLessons(o){
 function due(lessons,nowMin){return lessons.filter(s=>s.start-nowMin<=LEAD&&s.start-nowMin>=-5)}
 const api={riyadhNow,weekOf,startMin,todayLessons,due,LEAD};root.LessonAlerts=api;if(typeof module==='object')module.exports=api;
 if(!root.document||!root.firebase)return;
-let name=null,uid=null,week='',modes={},onsite=null;
+let name=null,uid=null,week='',modes={},onsite=null,subs={};
+const DAY_NAMES=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس'];
+// Substitution lessons assigned to this teacher this week (config/subs-<week>: {map:{lessonId:{t:substitute,o:original}}}).
+function mySubstitutions(now){
+  const T=root.SchoolTimetable,remote=typeof S!=='undefined'?S:[];if(!T||!name)return [];
+  return Object.entries(subs).filter(([,x])=>x&&x.t===name).map(([id,x])=>{const l=remote.find(s=>s.id===id);if(!l)return null;
+    const range=T.periodTime('remote',l.slot+1,l.cls),start=startMin(range);
+    if(l.day<now.dow||(l.day===now.dow&&start!=null&&start+50<now.min))return null;
+    return {day:l.day,start,range,label:'حصة انتظار مسندة إليك: '+l.subj+' · '+T.classLabel('remote',l.cls)+' · '+DAY_NAMES[l.day]+' '+range+(x.o?' · بدلًا من '+x.o:'')}}).filter(Boolean).sort((a,b)=>a.day-b.day||a.start-b.start);
+}
 function post(list){
   if(!root.ActionReminders)return;
   root.ActionReminders.set('lesson-alerts',list.map(s=>({label:'حصتك القادمة: '+s.subject+' · '+s.cls+' · '+s.range+(s.mode==='remote'?' (عن بُعد)':' (حضوري)'),
@@ -27,8 +36,9 @@ function post(list){
 }
 async function load(){
   const db=firebase.firestore(),now=riyadhNow();week=weekOf(now.date,now.dow);
-  const [m,o]=await Promise.all([db.doc('weekModes/'+week).get().catch(()=>null),db.doc('config/subs-onsite-data').get().catch(()=>null)]);
+  const [m,o,sb]=await Promise.all([db.doc('weekModes/'+week).get().catch(()=>null),db.doc('config/subs-onsite-data').get().catch(()=>null),db.doc('config/subs-'+week).get().catch(()=>null)]);
   modes=m&&m.exists?{[week]:m.data()}:{};onsite=o&&o.exists?o.data():null;
+  const sv=sb&&sb.exists?sb.data():null;subs=sv&&sv.map&&typeof sv.map==='object'?sv.map:{};
 }
 async function refresh(user){
   if(!user){uid=null;name=null;post([]);return}
@@ -38,11 +48,12 @@ async function refresh(user){
   tick();
 }
 async function tick(){
-  if(!name){post([]);return}
-  const now=riyadhNow();if(now.dow<0||now.dow>4){post([]);return}
+  if(!name){post([]);if(root.ActionReminders)root.ActionReminders.set('substitutions',[]);return}
+  const now=riyadhNow();if(now.dow<0||now.dow>4){post([]);if(root.ActionReminders)root.ActionReminders.set('substitutions',[]);return}
   if(weekOf(now.date,now.dow)!==week){try{await load()}catch(e){}}
   const mode=root.WeekModes?root.WeekModes.dayMode(modes,week,now.dow):'remote';
   post(due(todayLessons({name,mode,day:now.dow,remote:typeof S!=='undefined'?S:[],onsite}),now.min));
+  if(root.ActionReminders)root.ActionReminders.set('substitutions',mode==='holiday'?[]:mySubstitutions(now).map(x=>({label:x.label,open:()=>{const b=document.querySelector('.school-sidebar-links [data-workspace-key="schedule"]');if(b)b.click()}})));
 }
 function start(){if(!firebase.apps||!firebase.apps.length){setTimeout(start,500);return}firebase.auth().onAuthStateChanged(refresh);setInterval(tick,30000)}
 start();
