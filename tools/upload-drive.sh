@@ -21,7 +21,9 @@ if [ -z "$T" ] || ! curl -sf -H "Authorization: Bearer $T" -H "$H" 'https://www.
 fi
 R=$(curl -s -H "Authorization: Bearer $T" -H "$H" 'https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)')
 echo "DRIVE-CHECK $R" | head -c 600; echo
-FOLDER=$(curl -s -H "Authorization: Bearer $T" -H "$H" -H 'Content-Type: application/json; charset=UTF-8' \
+# Reuse the folder from an earlier upload when it exists.
+EXIST=$(curl -s -G -H "Authorization: Bearer $T" -H "$H" --data-urlencode "q=name='فيديوهات منصة ثانوية الصحافة - الأقسام الجديدة' and mimeType='application/vnd.google-apps.folder' and trashed=false" 'https://www.googleapis.com/drive/v3/files?fields=files(id)' | python3 -c 'import sys,json;f=json.load(sys.stdin).get("files",[]);print(f[0]["id"] if f else "")')
+[ -n "$EXIST" ] && FOLDER=$EXIST || FOLDER=$(curl -s -H "Authorization: Bearer $T" -H "$H" -H 'Content-Type: application/json; charset=UTF-8' \
   -d '{"name":"فيديوهات منصة ثانوية الصحافة - الأقسام الجديدة","mimeType":"application/vnd.google-apps.folder"}' \
   'https://www.googleapis.com/drive/v3/files?fields=id' | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
 LIST=${VIDEOS:-'8 9 10 11 12'}
@@ -30,7 +32,7 @@ case $i in
 1) n='01 جولة في المنصة';; 2) n='02 تثبيت المنصة والدخول';; 3) n='03 دليل مدير المدرسة';; 4) n='04 دليل المعلم';;
 5) n='05 التكليفات والتوقيعات';; 6) n='06 المساءلات';; 7) n='07 التقارير والطباعة';;
 8) n='08 الإعلانات وشاشة العرض وأولياء الأمور';; 9) n='09 الإذاعة المدرسية';; 10) n='10 النماذج الرسمية';;
-11) n='11 سجل العمليات والنسخ الاحتياطي';; 12) n='12 الملخص الأسبوعي ومتابعة الفصول';;
+11) n='11 سجل العمليات والنسخ الاحتياطي';; 12) n='12 الملخص الأسبوعي ومتابعة الفصول';; 13) n='13 القائمة الجديدة وأماكن الأزرار';;
 esac
   f=video$i.mp4
   [ -f "$f" ] || { echo "MISSING $f"; continue; }
