@@ -1,22 +1,20 @@
 /* Move existing controls into one school navigation; preserve their listeners and role gates. */
 (function(root){'use strict';if(!root.document)return;document.body.classList.add('school-ui');
 const groups=[
-{key:'students',title:'شؤون الطلاب والحضور',note:'حضور الطلاب وملفاتهم والإذاعة المدرسية',ids:['vStudentAttendance','schoolProfilesLink','schoolRadioLink']},
-{key:'day',title:'شؤون المعلمين والمتابعة',note:'جدول اليوم والانتظار والمناوبة والزيارات',ids:['vSchedule','vSubs','vSchoolDuty','vStaff','schoolSupervisionLink']},
-{key:'schedules',title:'الجداول',note:'الجدول المدرسي وملفات الجداول',ids:['vTimetable','schoolTimetableBuilderLink','vSchoolSchedule']},
-{key:'followup',title:'التقارير والمؤشرات',note:'التقارير ومؤشرات المدرسة',ids:['schoolReportsLink','vReport','vBoard']},
-{key:'people',title:'شؤون المنسوبين والاعتمادات',note:'الدليل والتكليفات والتوقيعات والمساءلات',ids:['vTeachers','vAssignments','vCoordinatorPage','vSignatures','vAcc','schoolPlansLink']},
-{key:'guide',title:'النماذج والدليل الإجرائي',note:'النماذج الرسمية للمدرسة',ids:['schoolFormsLink']},
-{key:'family',title:'أولياء الأمور والتواصل',note:'بيانات أولياء الأمور والإعلانات',ids:['schoolFamilyLink']},
-{key:'admin',title:'الإدارة والإعدادات',note:'الحسابات والصلاحيات وحماية المنصة',ids:['schoolAuditLink','vStaffSettings','vSchoolStudents','vEmployeeAccounts','namesBtn','pwBtn','securityAuditBtn','securityLoginBtn']}
+{key:'students',title:'شؤون الطلاب',note:'حضور الطلاب وملفاتهم وأولياء الأمور والإذاعة',ids:['vStudentAttendance','schoolProfilesLink','schoolFamilyLink','schoolRadioLink','schoolRosterSyncBtn']},
+{key:'day',title:'المعلمون والمتابعة اليومية',note:'جدول اليوم والانتظار والمناوبة والزيارات',ids:['vSchedule','vSubs','vSchoolDuty','vStaff','schoolSupervisionLink']},
+{key:'schedules',title:'الجداول',note:'الجدول المدرسي والجدول الحضوري',ids:['vTimetable','schoolTimetableBuilderLink','vSchoolSchedule']},
+{key:'followup',title:'التقارير',note:'مركز التقارير ومؤشرات المدرسة',ids:['schoolReportsLink','vReport','vBoard']},
+{key:'people',title:'المنسوبون والاعتمادات',note:'الدليل والتكليفات والتوقيعات والمساءلات والنماذج',ids:['vTeachers','vAssignments','vCoordinatorPage','vSignatures','vAcc','schoolFormsLink','schoolPlansLink']},
+{key:'admin',title:'الإدارة',note:'الإعدادات والحسابات وسجل العمليات',ids:['vStaffSettings','vEmployeeAccounts','schoolAuditLink','vSchoolStudents','namesBtn','securityAuditBtn','securityLoginBtn']}
 ];
-const labels={vSchoolSchedule:'الجدول الحضوري والفصول',vEmployeeAccounts:'الحسابات والصلاحيات',namesBtn:'إعدادات المدرسة',pwBtn:'كلمة مروري',securityLoginBtn:'أمان الدخول',vTeachers:'دليل المنسوبين',vBoard:'مؤشرات المدرسة',vStaff:'متابعة المسؤولين والمشرفين',vSignatures:'التوقيعات والإقرارات'};
+const labels={vSchoolSchedule:'الجدول الحضوري والفصول',vEmployeeAccounts:'الحسابات والصلاحيات',namesBtn:'إعدادات المدرسة',pwBtn:'كلمة مروري',securityAuditBtn:'سجل الأمان والدخول',securityLoginBtn:'أمان الدخول',vTeachers:'دليل المنسوبين',vBoard:'مؤشرات المدرسة',vStaff:'متابعة المسؤولين والمشرفين',vSignatures:'التوقيعات والإقرارات',schoolRosterSyncBtn:'مطابقة قوائم الطلاب'};
 const $=id=>document.getElementById(id),personal=!!root.TeacherPortal||!!root.EmployeePortal;let queued=false;
 function move(button,target){if(button&&target&&button.parentElement!==target)target.append(button)}
 function rename(button,label){if(button&&label&&button.textContent.trim()!==label)button.textContent=label}
 function accountTools(){const center=$('eaMain');if(!center)return;const title=center.querySelector('h2');if(title&&title.textContent!=='الحسابات والصلاحيات')title.textContent='الحسابات والصلاحيات';let section=$('schoolAccountTools');if(!section){section=document.createElement('section');section.id='schoolAccountTools';section.className='school-account-tools';section.innerHTML='<h3>إدارة الحسابات وتوزيع المسؤوليات</h3><p>إضافة حسابات المعلمين، وتوزيع مهام الإداريين والمشرفين، وإعداد حساب مسؤول رصد المساءلات.</p><div class="school-account-actions"></div>';const header=center.querySelector('.ea-actions');if(header)header.after(section);else center.prepend(section)}const box=section.querySelector('.school-account-actions');for(const id of ['vCreateTeacher','vPersonalTasks','vRecorderAccount'])move($(id),box)}
 function sync(){queued=false;if(personal&&root.SchoolWorkspace?.active)return;if(personal){const actions=document.querySelector('#account .welcome .actions');if(!actions)return;actions.classList.add('school-personal-actions');const map=[{key:'documents',title:'المهام والمستندات',ids:['vAssignments','vSignatures']},{key:'learning',title:'الجداول والتقارير',ids:['vSchoolSchedule','printReport','downloadPdf']}];for(const g of map){let group=actions.querySelector('[data-personal-group="'+g.key+'"]');if(!group){group=document.createElement('div');group.className='school-personal-group';group.dataset.personalGroup=g.key;group.innerHTML='<span>'+g.title+'</span><div></div>';actions.append(group)}const box=group.querySelector('div');for(const id of g.ids){const button=$(id);if(button){rename(button,id==='vSchoolSchedule'?'ملفات الجداول':id==='vAssignments'?'تكليفاتي':id==='vSignatures'?'التوقيعات والإقرارات':null);move(button,box)}}const empty=![...box.children].some(b=>!b.hidden);if(group.hidden!==empty)group.hidden=empty}return}
-const nav=document.querySelector('.views');if(!nav)return;nav.classList.add('school-hub');nav.setAttribute('role','navigation');nav.setAttribute('aria-label','أقسام المدرسة');for(const [i,g]of groups.entries()){let section=$('schoolGroup-'+g.key);if(!section){section=document.createElement('section');section.id='schoolGroup-'+g.key;section.className='school-nav-group';section.innerHTML='<header><span class="school-group-order">'+String(i+1).padStart(2,'0')+'</span><div><h3>'+g.title+'</h3><p>'+g.note+'</p></div></header><div class="school-nav-links"></div>';nav.append(section)}const box=section.querySelector('.school-nav-links');for(const id of g.ids){const button=$(id);if(button){rename(button,labels[id]);move(button,box)}}const restricted=['people','admin','guide','family'].includes(g.key)&&root.__FUACC?.state?.role!==-1;const empty=restricted||![...box.children].some(b=>!b.hidden);if(section.hidden!==empty)section.hidden=empty}accountTools();}
+const nav=document.querySelector('.views');if(!nav)return;nav.classList.add('school-hub');nav.setAttribute('role','navigation');nav.setAttribute('aria-label','أقسام المدرسة');const rosterSync=[...nav.querySelectorAll('button')].find(b=>!b.id&&/مطابقة قوائم فيوكلاس/.test(b.textContent));if(rosterSync)rosterSync.id='schoolRosterSyncBtn';for(const [i,g]of groups.entries()){let section=$('schoolGroup-'+g.key);if(!section){section=document.createElement('section');section.id='schoolGroup-'+g.key;section.className='school-nav-group';section.innerHTML='<header><span class="school-group-order">'+String(i+1).padStart(2,'0')+'</span><div><h3>'+g.title+'</h3><p>'+g.note+'</p></div></header><div class="school-nav-links"></div>';nav.append(section)}const box=section.querySelector('.school-nav-links');for(const id of g.ids){const button=$(id);if(button){rename(button,labels[id]);move(button,box)}}const ordered=g.ids.map(id=>$(id)).filter(b=>b&&b.parentElement===box),now=[...box.children].filter(b=>ordered.includes(b));if(ordered.some((b,n)=>now[n]!==b))for(const b of ordered)box.append(b);const restricted=['people','admin'].includes(g.key)&&root.__FUACC?.state?.role!==-1;const empty=restricted||![...box.children].some(b=>!b.hidden);if(section.hidden!==empty)section.hidden=empty}accountTools();}
 function schedule(){if(!queued){queued=true;queueMicrotask(sync)}}
 new MutationObserver(schedule).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden']});sync();
 })(window);
@@ -141,7 +139,7 @@ move(nav,links);if(!personal&&!recorder&&selected==='home'&&root.__FUACC?.state?
 const name=personal?$('name')?.textContent.trim():null;
 const role=personal?(root.EmployeePortal?'حساب الإداري':'حساب المعلم'):recorder?'مسؤول رصد المساءلات':root.__FUACC?.state?.role===-1?'حساب مدير المدرسة':root.__FUACC?.state?.role!=null?'حساب المتابعة':'الإدارة والمتابعة';
 const label=name?name+' · '+role:role;if($('schoolSidebarAccount').textContent!==label)$('schoolSidebarAccount').textContent=label;
-move($(personal?'logout':'logoutBtn'),session);
+if(!personal&&!recorder&&$('pwBtn')){move($('pwBtn'),session);if($('pwBtn').textContent.trim()!=='كلمة مروري')$('pwBtn').textContent='كلمة مروري'}move($(personal?'logout':'logoutBtn'),session);
 if(recorder&&!links.querySelector('.school-recorder-link')){const b=document.createElement('button');b.type='button';b.className='school-recorder-link';b.textContent='رصد المساءلات';b.onclick=()=>$('acDrawer')?.scrollIntoView({behavior:'smooth'});links.append(b)}
 if(selected!=='home'&&!links.querySelector('[data-sidebar-active=true]')&&!links.querySelector('[aria-pressed=true]')){const first=[...links.querySelectorAll('button')].find(b=>!b.hidden&&!b.closest('[hidden]'));if(first)first.dataset.sidebarActive='true'}
 }
@@ -253,4 +251,73 @@ let queued=false;
 function sync(){queued=false;inlineSubs();watchDrawers()}
 new MutationObserver(()=>{if(!queued){queued=true;queueMicrotask(sync)}}).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden']});
 sync();
+})(window);
+
+
+/* Easier finding and orientation:
+   - the group holding the current section opens by itself;
+   - a heading at the top of the page shows "group › section" with a back button;
+   - the platform reopens the last section used on this device;
+   - a quick search box at the top of the sidebar filters the buttons. */
+(function(root){
+'use strict';
+if(!root.document||new URLSearchParams(location.search).get('embedded')==='1')return;
+const $=id=>document.getElementById(id);
+const LAST='school-last-section',SECTION_IDS=['vSchedule','vReport','vTeachers','vBoard','vStaff','vStudentAttendance','vAssignments','vCoordinatorPage','vSignatures','vAcc','vSchoolDuty','vSchoolSchedule','vTimetable'];
+const css=document.createElement('style');
+css.textContent='#schoolCrumb{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #dae5df;border-radius:14px;padding:10px 14px;margin:0 0 14px;font-size:14px;color:#4a5e58}#schoolCrumb b{color:#123e36;font-size:16px}#schoolCrumb button{font:inherit;border:1px solid #a5c5ba;background:#fff;border-radius:9px;padding:5px 12px;cursor:pointer;color:#123e36}#schoolCrumb[hidden],#schoolCrumb button[hidden]{display:none}'+
+  '.school-sidebar-search{margin:8px 14px 0;position:relative}.school-sidebar-search input{width:100%;box-sizing:border-box;border:1px solid #ffffff30;background:#ffffff12;color:#fff;border-radius:10px;padding:9px 12px;font:inherit;font-size:13px}.school-sidebar-search input::placeholder{color:#a9c4ba}.school-sidebar [data-search-hidden]{display:none!important}';
+document.head.append(css);
+const sidebarLinks=()=>document.querySelector('.school-sidebar-links');
+const keyOf=b=>b.id||(b.dataset.workspaceKey?'k:'+b.dataset.workspaceKey:'');
+const buttonOf=k=>k&&(k.startsWith('k:')?document.querySelector('.school-sidebar-links button[data-workspace-key="'+k.slice(2)+'"]'):$(k));
+const restorable=b=>!!b&&(!!b.dataset.workspaceKey||SECTION_IDS.includes(b.id));
+function activeButton(){const l=sidebarLinks();return l&&(l.querySelector('button[data-sidebar-active=true]')||l.querySelector('.school-nav-links button[aria-pressed=true]'))}
+function expandFor(b){
+  const group=b&&b.closest('.school-nav-group');if(!group||group.dataset.schoolExpanded==='true')return;
+  for(const other of document.querySelectorAll('.school-sidebar .school-nav-group')){if(other!==group&&other.dataset.schoolExpanded){other.removeAttribute('data-school-expanded');const t=other.querySelector('.school-group-toggle');if(t)t.setAttribute('aria-expanded','false')}}
+  group.dataset.schoolExpanded='true';const t=group.querySelector('.school-group-toggle');if(t)t.setAttribute('aria-expanded','true');
+}
+let crumb=null;
+function paintCrumb(){
+  const main=document.querySelector('.school-sidebar-page>.wrap,.school-sidebar-page>.shell');if(!main)return;
+  if(!crumb||!crumb.isConnected){crumb=document.createElement('nav');crumb.id='schoolCrumb';crumb.setAttribute('aria-label','موقعك في المنصة');crumb.innerHTML='<button type="button" data-crumb-back>→ رجوع</button><span></span>';main.prepend(crumb);crumb.querySelector('[data-crumb-back]').onclick=()=>history.back()}
+  const b=activeButton(),group=b&&b.closest('.school-nav-group'),gt=group&&group.querySelector('h3');
+  const text=b?(gt?gt.textContent.trim()+' › ':'')+'<b>'+b.textContent.trim().replace(/[<>&]/g,'')+'</b>':'<b>الصفحة الرئيسية</b>';
+  const span=crumb.querySelector('span');if(span.innerHTML!==text)span.innerHTML=text;
+  const back=crumb.querySelector('[data-crumb-back]'),can=!!(history.state&&history.state.schoolNav);if(back.hidden===can)back.hidden=!can;
+}
+let searchBox=null;
+function ensureSearch(){
+  const side=$('schoolSidebar'),links=sidebarLinks();if(!side||!links||searchBox&&searchBox.isConnected)return;
+  searchBox=document.createElement('div');searchBox.className='school-sidebar-search';searchBox.innerHTML='<input type="search" placeholder="ابحث عن قسم…" aria-label="البحث في أقسام المنصة">';
+  links.before(searchBox);
+  searchBox.querySelector('input').addEventListener('input',e=>{
+    const q=e.target.value.trim();
+    for(const b of links.querySelectorAll('.school-nav-links button')){const hit=!q||b.textContent.includes(q);if(hit)b.removeAttribute('data-search-hidden');else b.setAttribute('data-search-hidden','')}
+    for(const g of document.querySelectorAll('.school-sidebar .school-nav-group')){
+      const any=[...g.querySelectorAll('.school-nav-links button')].some(b=>!b.hasAttribute('data-search-hidden')&&!b.hidden);
+      if(q){if(any){g.dataset.schoolExpanded='true';g.removeAttribute('data-search-hidden')}else g.setAttribute('data-search-hidden','')}
+      else{g.removeAttribute('data-search-hidden');if(g.dataset.schoolExpanded)g.removeAttribute('data-school-expanded')}
+    }
+    if(!q)expandFor(activeButton());
+  });
+}
+// Remember the last section opened from the sidebar, and reopen it once on the next visit.
+document.addEventListener('click',e=>{const b=e.target.closest('.school-sidebar-links button');if(!b||b.classList.contains('school-group-toggle'))return;if(restorable(b))try{localStorage.setItem(LAST,keyOf(b))}catch(err){}else if(b.id==='schoolHomeLink')try{localStorage.removeItem(LAST)}catch(err){}},true);
+let restored=new URLSearchParams(location.search).has('view')||!!(history.state&&history.state.schoolNav),tries=0;
+function restoreLast(){
+  if(restored)return;let k='';try{k=localStorage.getItem(LAST)||''}catch(err){}
+  if(!k){restored=true;return}
+  const b=buttonOf(k),ready=b&&!b.hidden&&!b.closest('[hidden]')&&document.body.classList.contains('school-sidebar-page');
+  if(!ready){if(++tries>60)restored=true;return}
+  restored=true;b.click();
+}
+let queued=false;
+function sync(){queued=false;ensureSearch();const q=searchBox&&searchBox.querySelector('input').value.trim();if(!q)expandFor(activeButton());paintCrumb();restoreLast()}
+const schedule=()=>{if(!queued){queued=true;setTimeout(sync,120)}};
+new MutationObserver(schedule).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','data-sidebar-active','aria-pressed']});
+root.addEventListener('popstate',schedule);
+setInterval(()=>{if(!restored)schedule()},500);
+schedule();
 })(window);
