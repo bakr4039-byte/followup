@@ -57,6 +57,7 @@ async function load(){
   }));
   if(now!==actor)return;
   events=got.flat().map(e=>({col:e.col,label:e.label,id:e.id,what:labelOf(e.data)||e.id,by:e.data.updatedBy||e.data.createdBy||'',at:toDate(e.data.updatedAt),created:+(toDate(e.data.createdAt)||0)===+(toDate(e.data.updatedAt)||1),data:e.data})).filter(e=>e.at&&!isNaN(e.at)).sort((a,b)=>b.at-a.at);
+  try{const logSnap=await db.collection('activityLog').orderBy('at','desc').limit(400).get();const logged=logSnap.docs.map(d=>{const x=d.data();return {col:String(x.path||'').split('/')[0],label:x.section||'',id:d.id,what:x.target||'',by:x.uid||'',at:toDate(x.at),created:x.action==='إنشاء',action:x.action||'',data:{}};}).filter(e=>e.at&&!isNaN(e.at));if(logged.length){const oldest=Math.min(...logged.map(e=>+e.at));events=logged.concat(events.filter(e=>+e.at<oldest)).sort((a,b)=>b.at-a.at);}}catch(err){}
   bin=[];
   for(const e of got.flat()){
     if(e.col==='announcements'&&e.data.active===false)bin.push({kind:'announcement',id:e.id,src:'الإعلانات',what:e.data.title,state:'موقوف',by:e.data.updatedBy,at:toDate(e.data.updatedAt),restore:true});
@@ -90,11 +91,11 @@ function visible(){
 function logView(){
   const users=[...new Set(events.map(e=>e.by).filter(Boolean))];
   const list=visible();
-  const bar='<div class="au-bar"><label>القسم<select id="auSrc"><option value="">كل الأقسام</option>'+SOURCES.map(([c,l])=>'<option value="'+c+'"'+(c===filter.src?' selected':'')+'>'+l+'</option>').join('')+'</select></label>'+
+  const bar='<div class="au-bar"><label>القسم<select id="auSrc"><option value="">كل الأقسام</option>'+[...new Map(events.map(e=>[e.col,e.label])).entries()].map(([c,l])=>'<option value="'+esc(c)+'"'+(c===filter.src?' selected':'')+'>'+esc(l)+'</option>').join('')+'</select></label>'+
     '<label>المستخدم<select id="auWho"><option value="">الجميع</option>'+users.map(u=>'<option value="'+esc(u)+'"'+(u===filter.who?' selected':'')+'>'+esc(who(u))+'</option>').join('')+'</select></label>'+
     '<label>المدة<select id="auDays">'+[['1','اليوم'],['7','آخر 7 أيام'],['30','آخر 30 يومًا'],['','الكل']].map(([v,l])=>'<option value="'+v+'"'+(v===filter.days?' selected':'')+'>'+l+'</option>').join('')+'</select></label>'+
     '<button type="button" data-au-reload>تحديث</button><button type="button" data-au-print>طباعة السجل</button><button type="button" data-au-csv>تصدير CSV</button>'+($('securityAuditBtn')?'<button type="button" data-au-security>سجل الأمان والدخول</button>':'')+'</div>';
-  const rows=list.slice(0,300).map(e=>'<tr><td>'+esc(when(e.at))+'</td><td>'+esc(who(e.by))+'</td><td>'+esc(e.label)+'</td><td>'+(e.created?'إنشاء':'تعديل')+'</td><td>'+esc(e.what)+'</td></tr>').join('');
+  const rows=list.slice(0,300).map(e=>'<tr><td>'+esc(when(e.at))+'</td><td>'+esc(who(e.by))+'</td><td>'+esc(e.label)+'</td><td>'+esc(e.action||(e.created?'إنشاء':'تعديل'))+'</td><td>'+esc(e.what)+'</td></tr>').join('');
   return bar+'<p class="au-hint">'+list.length+' عملية. يعرض السجل آخر 40 تعديلًا من كل قسم، مأخوذة من ختم «آخر تعديل» المحفوظ مع كل سجل، ويُسجَّل بوقت الخادم.</p>'+
     (rows?'<div class="au-grid"><table><thead><tr><th>الوقت</th><th>المستخدم</th><th>القسم</th><th>العملية</th><th>العنصر</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="au-hint">لا توجد عمليات في هذه المدة.</p>');
 }
@@ -110,8 +111,8 @@ async function onClick(e){
   if(d.auTab){tab=d.auTab;paint();status('');return;}
   if(b.hasAttribute('data-au-reload')){load();return;}
   if(b.hasAttribute('data-au-security')){const s=$('securityAuditBtn');if(s)s.click();return;}
-  if(b.hasAttribute('data-au-print')){if(!root.ReportKit)return status('أداة الطباعة غير متاحة.');const list=visible();root.ReportKit.open({title:'سجل العمليات',subtitle:list.length+' عملية',body:'<table><thead><tr><th>الوقت</th><th>المستخدم</th><th>القسم</th><th>العملية</th><th>العنصر</th></tr></thead><tbody>'+list.map(x=>'<tr><td>'+esc(when(x.at))+'</td><td>'+esc(who(x.by))+'</td><td>'+esc(x.label)+'</td><td>'+(x.created?'إنشاء':'تعديل')+'</td><td>'+esc(x.what)+'</td></tr>').join('')+'</tbody></table>',signatures:false})||status('اسمح بفتح نافذة الطباعة ثم حاول مجددًا.');return;}
-  if(b.hasAttribute('data-au-csv')){const lines=[['الوقت','المستخدم','القسم','العملية','العنصر']].concat(visible().map(x=>[x.at.toISOString(),who(x.by),x.label,x.created?'إنشاء':'تعديل',x.what])).map(r=>r.map(csvCell).join(','));const url=URL.createObjectURL(new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='activity-log.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);return;}
+  if(b.hasAttribute('data-au-print')){if(!root.ReportKit)return status('أداة الطباعة غير متاحة.');const list=visible();root.ReportKit.open({title:'سجل العمليات',subtitle:list.length+' عملية',body:'<table><thead><tr><th>الوقت</th><th>المستخدم</th><th>القسم</th><th>العملية</th><th>العنصر</th></tr></thead><tbody>'+list.map(x=>'<tr><td>'+esc(when(x.at))+'</td><td>'+esc(who(x.by))+'</td><td>'+esc(x.label)+'</td><td>'+esc(x.action||(x.created?'إنشاء':'تعديل'))+'</td><td>'+esc(x.what)+'</td></tr>').join('')+'</tbody></table>',signatures:false})||status('اسمح بفتح نافذة الطباعة ثم حاول مجددًا.');return;}
+  if(b.hasAttribute('data-au-csv')){const lines=[['الوقت','المستخدم','القسم','العملية','العنصر']].concat(visible().map(x=>[x.at.toISOString(),who(x.by),x.label,x.action||(x.created?'إنشاء':'تعديل'),x.what])).map(r=>r.map(csvCell).join(','));const url=URL.createObjectURL(new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='activity-log.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);return;}
   if(d.auRestore!=null){restore(bin[+d.auRestore]);}
 }
 async function restore(item){
@@ -189,5 +190,5 @@ style.textContent='.au-page{direction:rtl}.au-head{background:#fff;border:1px so
   '.au-grid{overflow:auto;background:#fff;border:1px solid #dae5df;border-radius:12px}.au-grid table{border-collapse:collapse;width:100%;font-size:14px}.au-grid th,.au-grid td{border-bottom:1px solid #e3ece8;padding:7px;text-align:start;vertical-align:top}.au-grid thead{background:#e8f2ed}'+
   '.au-group{margin:18px 0 8px;color:#123e36}.au-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.au-page .au-card{display:grid;gap:6px;text-align:start;padding:14px 16px;border-radius:14px;border:1px solid #dae5df;background:#fff}.au-card:hover,.au-card:focus-visible{border-color:#17624d;background:#f4faf7}.au-card b{color:#123e36}.au-card span{font-size:13px;color:#5b6b66}';
 document.head.append(style);
-setInterval(tick,1000);
+if(root.SchoolTick)root.SchoolTick.add(tick);else setInterval(tick,1000);
 })(window);

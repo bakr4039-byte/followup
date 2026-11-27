@@ -167,5 +167,5 @@ style.textContent='.ra-page{direction:rtl}.ra-head{background:#fff;border:1px so
   '.ra-act{display:flex;gap:4px;flex-wrap:wrap}.ra-open{background:#f4faf7}.ra-edit{display:grid;gap:10px}.ra-segs input{width:100%}.ra-st{font-weight:600}.ra-done{color:#17633a}.ra-planned{color:#7a4d00}.ra-cancelled{color:#9f2727}'+
   '.ra-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px}.ra-kpis div{background:#fff;border:1px solid #dae5df;border-radius:12px;padding:10px 12px}.ra-kpis b{display:block;font-size:22px}.ra-kpis span{font-size:13px;color:#4a5e58}.ra-bad b{color:#9f2727}';
 document.head.append(style);
-setInterval(tick,1000);
+if(root.SchoolTick)root.SchoolTick.add(tick);else setInterval(tick,1000);
 })(window);

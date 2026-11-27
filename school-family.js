@@ -123,5 +123,5 @@ style.textContent='.fa-page{direction:rtl}.fa-head{background:#fff;border:1px so
   '.fa-grid{overflow:auto;background:#fff;border:1px solid #dae5df;border-radius:12px}.fa-grid table{border-collapse:collapse;width:100%;font-size:14px}.fa-grid th,.fa-grid td{border-bottom:1px solid #e3ece8;padding:7px;text-align:start;vertical-align:top}.fa-grid thead{background:#e8f2ed}'+
   '.fa-banner{border:1px solid #f0dca6;background:#fffaf0}.fa-banner h3{margin:0 0 8px;color:#7a4d00}.fa-banner article{border-top:1px solid #f3e6c4;padding:8px 0}.fa-banner article p{margin:4px 0;white-space:pre-wrap}.fa-banner small{color:#7a6a4a}';
 document.head.append(style);
-setInterval(tick,1000);
+if(root.SchoolTick)root.SchoolTick.add(tick);else setInterval(tick,1000);
 })(window);

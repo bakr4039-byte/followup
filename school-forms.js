@@ -421,5 +421,5 @@ style.textContent='.fm-page{direction:rtl}.fm-head{background:#fff;border:1px so
   '.fm-statement{background:#fff8e6;border:1px solid #f0dca6;border-radius:10px;padding:10px 12px;font-weight:600}.fm-sec h4{margin:12px 0 6px;color:#123e36}.fm-blank{color:#8a9a95;font-size:12px}'+
   '.fm-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.fm-state{padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}.fm-draft{background:#fff4dc;color:#7a4d00}.fm-final{background:#e8f5e9;color:#17633a}.fm-check{display:flex;gap:4px;align-items:center}';
 document.head.append(style);
-setInterval(tick,1000);
+if(root.SchoolTick)root.SchoolTick.add(tick);else setInterval(tick,1000);
 })(window);

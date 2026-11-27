@@ -499,6 +499,18 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['supervisor','theme','segments','status','rating','notes','updatedBy','updatedAt']);
       allow delete: if false;
     }
+    // Append-only activity log: any signed-in user adds entries in their own name with the server time; only the manager reads; nobody edits or deletes.
+    match /activityLog/{entryId} {
+      allow read: if admin();
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['at','uid','section','action','target','path'])
+        && request.resource.data.uid == request.auth.uid && request.resource.data.at == request.time
+        && request.resource.data.section is string && request.resource.data.section.size() > 0 && request.resource.data.section.size() <= 40
+        && request.resource.data.action is string && request.resource.data.action.size() <= 30
+        && request.resource.data.target is string && request.resource.data.target.size() <= 160
+        && request.resource.data.path is string && request.resource.data.path.size() <= 300;
+      allow update, delete: if false;
+    }
   match /formRecords/{recordId} {
     function validForm(f) {
       return f.keys().hasOnly(['formCode','owner','title','header','rows','status','revision','createdBy','createdAt','updatedBy','updatedAt']) &&
