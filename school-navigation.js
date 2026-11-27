@@ -237,6 +237,8 @@ function inlineSubs(){
 }
 root.addEventListener('popstate',e=>{
   if(skipPop){skipPop--;return}
+  const dialog=[...document.querySelectorAll('dialog[open]')].pop();
+  if(dialog){dialog.close();return}
   const open=openDrawer();
   if(open){restoring=true;closeDrawer(open);seen.set(open,false);restoring=false;return}
   const k=(e.state&&e.state.schoolNav)||'';
