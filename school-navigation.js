@@ -121,6 +121,7 @@ if(selectionStyle.textContent!==css)selectionStyle.textContent=css;
 const region=$('schoolSection-'+key);if(region&&!region.hidden)region.open=true;
 }
 selectSection(selected);
+root.SchoolNav={select:key=>selectSection(key),selected:()=>selected};
 function close(restore=false){document.body.classList.remove('school-sidebar-open');toggle.setAttribute('aria-expanded','false');side.removeAttribute('role');side.removeAttribute('aria-modal');if(restore&&lastFocus?.isConnected)lastFocus.focus()}
 function open(){lastFocus=document.activeElement;document.body.classList.add('school-sidebar-open');toggle.setAttribute('aria-expanded','true');side.setAttribute('role','dialog');side.setAttribute('aria-modal','true');side.querySelector('.school-sidebar-close').focus()}
 toggle.onclick=()=>document.body.classList.contains('school-sidebar-open')?close(true):open();
@@ -188,3 +189,66 @@ if(expand){group.dataset.schoolExpanded='true';button.setAttribute('aria-expande
 function schedule(){if(!queued){queued=true;queueMicrotask(sync)}}
 new MutationObserver(schedule).observe(document.body,{subtree:true,childList:true});sync();
 })();
+
+
+/* Page-style navigation like other websites:
+   - "حصص الانتظار" opens inside the page as its own section instead of a panel over the page (manager page);
+   - moving between sections is recorded in the browser history, so the phone/browser Back button returns to the previous section;
+   - Back first closes an open side panel instead of leaving the platform. */
+(function(root){
+'use strict';
+if(!root.document||new URLSearchParams(location.search).get('embedded')==='1')return;
+const $=id=>document.getElementById(id),personal=!!root.TeacherPortal||!!root.EmployeePortal;
+let restoring=false,skipPop=0,subsHost=null;
+const css=document.createElement('style');
+css.textContent='#schoolSection-subs>.drawer{position:static!important;inset:auto!important;width:auto!important;max-width:none!important;height:auto!important;max-height:none!important;transform:none!important;box-shadow:none!important;z-index:auto!important;border:1px solid #dae5df;border-radius:18px;background:#fff;display:flex;flex-direction:column}#schoolSection-subs #sbClose{display:none!important}#schoolSection-subs .drawer-body{overflow:visible!important;max-height:none!important}#schoolSection-subs .drawer-foot{position:static!important}';
+document.head.append(css);
+const keyOf=b=>b.id||(b.dataset.workspaceKey?'k:'+b.dataset.workspaceKey:'');
+const buttonOf=k=>k.startsWith('k:')?document.querySelector('.school-sidebar-links button[data-workspace-key="'+k.slice(2)+'"]'):$(k);
+function current(){return (history.state&&history.state.schoolNav)||''}
+function push(entry){try{history.pushState(Object.assign({},history.state||{},entry),'',location.href)}catch(e){}}
+// Section changes from the sidebar.
+document.addEventListener('click',e=>{
+  const b=e.target.closest('.school-sidebar-links button');
+  if(!b||restoring||b.classList.contains('school-group-toggle'))return;
+  const k=keyOf(b);if(!k)return;
+  setTimeout(()=>{if(restoring)return;const opened=openDrawer();if(opened&&k!=='vSubs')return;if(current()!==k)push({schoolNav:k,schoolDrawer:null})},0);
+},true);
+// Side panels opened over the page (direct children of body).
+const drawers=()=>[...document.querySelectorAll('body>.drawer')];
+function openDrawer(){return drawers().find(d=>!d.hidden)}
+function closeDrawer(d){const x=d.querySelector('[id$=Close]')||[...d.querySelectorAll('button')].find(b=>/إغلاق/.test(b.textContent));if(x)x.click();else{d.hidden=true;const s=$(d.id.replace('Drawer','Scrim'));if(s)s.hidden=true}}
+const seen=new WeakMap();
+function watchDrawers(){
+  for(const d of drawers()){
+    const was=seen.get(d),now=!d.hidden;seen.set(d,now);
+    if(was===undefined||was===now)continue;
+    if(now&&!restoring)push({schoolDrawer:d.id});
+    else if(!now&&history.state&&history.state.schoolDrawer===d.id){skipPop++;history.back()}
+  }
+}
+// Substitutions inside the page (manager only).
+function inlineSubs(){
+  if(personal)return;const d=$('sbDrawer'),ws=$('schoolWorkspace'),b=$('vSubs');if(!d||!ws)return;
+  if(!subsHost||!subsHost.isConnected){subsHost=document.createElement('section');subsHost.id='schoolSection-subs';subsHost.className='school-workspace-section school-inline-subs';subsHost.setAttribute('aria-label','حصص الانتظار');ws.append(subsHost)}
+  if(b&&b.dataset.workspaceKey!=='subs')b.dataset.workspaceKey='subs';
+  if(!d.hidden&&d.parentElement!==subsHost){subsHost.append(d);const s=$('sbScrim');if(s)s.hidden=true;if(root.SchoolNav)root.SchoolNav.select('subs')}
+  if(d.parentElement===subsHost){const s=$('sbScrim');if(s&&!s.hidden)s.hidden=true;if(d.hidden&&root.SchoolNav&&root.SchoolNav.selected()==='subs')d.hidden=false}
+}
+root.addEventListener('popstate',e=>{
+  if(skipPop){skipPop--;return}
+  const open=openDrawer();
+  if(open){restoring=true;closeDrawer(open);seen.set(open,false);restoring=false;return}
+  const k=(e.state&&e.state.schoolNav)||'';
+  restoring=true;
+  try{
+    const b=k?buttonOf(k):($('schoolHomeLink')||null);
+    if(b){b.click();root.scrollTo(0,0)}else if(root.SchoolNav)root.SchoolNav.select(personal?(root.EmployeePortal?'followup':'schedule'):'home');
+  }finally{setTimeout(()=>{restoring=false},0)}
+});
+try{if(!history.state||!('schoolNav' in history.state))history.replaceState(Object.assign({},history.state||{},{schoolNav:''}),'',location.href)}catch(e){}
+let queued=false;
+function sync(){queued=false;inlineSubs();watchDrawers()}
+new MutationObserver(()=>{if(!queued){queued=true;queueMicrotask(sync)}}).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden']});
+sync();
+})(window);
