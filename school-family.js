@@ -105,11 +105,15 @@ async function showBanner(){
   const aud=root.EmployeePortal?'employees':'teachers';
   try{
     const db=fs(),snaps=await Promise.all([db.collection('announcements').where('audience','==','all').get(),db.collection('announcements').where('audience','==',aud).get()]);
-    const list=snaps.flatMap(s=>s.docs.map(d=>d.data())).filter(live).sort((a,b)=>String(b.start||'').localeCompare(String(a.start||'')));
+    const list=snaps.flatMap(s=>s.docs.map(d=>Object.assign({id:d.id},d.data()))).filter(live).sort((a,b)=>String(b.start||'').localeCompare(String(a.start||'')));
     if(now!==bannerActor)return;
     if(!banner){banner=document.createElement('section');banner.className='card fa-banner';banner.setAttribute('aria-label','إعلانات المدرسة');const acc=$('account');acc.insertBefore(banner,acc.children[1]||null);}
     banner.hidden=!list.length;
-    banner.innerHTML='<h3>إعلانات المدرسة</h3>'+list.map(a=>'<article><b>'+esc(a.title)+'</b><p>'+esc(a.body)+'</p><small>'+esc(hijri(a.start))+'</small></article>').join('');
+    // Unread announcements are marked «جديد» and announced once per device; ids are kept in localStorage per user.
+    const seenKey='fa-seen-'+now;let seen=[];try{seen=JSON.parse(root.localStorage.getItem(seenKey)||'[]');}catch(e){}
+    const fresh=list.filter(a=>!seen.includes(a.id));
+    banner.innerHTML='<h3>إعلانات المدرسة'+(fresh.length?' <span class="fa-badge">'+fresh.length+' جديد</span>':'')+'</h3>'+list.map(a=>'<article'+(fresh.includes(a)?' class="fa-new"':'')+'><b>'+(fresh.includes(a)?'<span class="fa-tag">جديد</span> ':'')+esc(a.title)+'</b><p>'+esc(a.body)+'</p><small>'+esc(hijri(a.start))+'</small></article>').join('');
+    if(fresh.length){try{root.localStorage.setItem(seenKey,JSON.stringify(list.map(a=>a.id).slice(0,200)));}catch(e){}const toast=document.createElement('div');toast.className='fa-toast';toast.setAttribute('role','status');toast.textContent=fresh.length===1?'إعلان جديد من المدرسة: '+fresh[0].title:'لديك '+fresh.length+' إعلانات جديدة من المدرسة';toast.addEventListener('click',()=>{banner.scrollIntoView({behavior:'smooth',block:'start'});toast.remove();});document.body.append(toast);setTimeout(()=>toast.remove(),8000);}
   }catch(err){}
 }
 const style=document.createElement('style');
@@ -121,7 +125,7 @@ style.textContent='.fa-page{direction:rtl}.fa-head{background:#fff;border:1px so
   '.fa-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;background:#fff;border:1px solid #dae5df;border-radius:14px;padding:14px;margin-bottom:12px}'+
   '.fa-page input,.fa-page select,.fa-page textarea{font:inherit;padding:7px 9px;border:1px solid #a5c5ba;border-radius:8px;background:#fff;color:inherit}.fa-page button{font:inherit;padding:7px 12px;border:1px solid #a5c5ba;border-radius:8px;background:#fff;cursor:pointer;color:inherit}.fa-page .fa-primary{background:#17624d;color:#fff;border-color:#17624d}'+
   '.fa-grid{overflow:auto;background:#fff;border:1px solid #dae5df;border-radius:12px}.fa-grid table{border-collapse:collapse;width:100%;font-size:14px}.fa-grid th,.fa-grid td{border-bottom:1px solid #e3ece8;padding:7px;text-align:start;vertical-align:top}.fa-grid thead{background:#e8f2ed}'+
-  '.fa-banner{border:1px solid #f0dca6;background:#fffaf0}.fa-banner h3{margin:0 0 8px;color:#7a4d00}.fa-banner article{border-top:1px solid #f3e6c4;padding:8px 0}.fa-banner article p{margin:4px 0;white-space:pre-wrap}.fa-banner small{color:#7a6a4a}';
+  '.fa-banner{border:1px solid #f0dca6;background:#fffaf0}.fa-banner h3{margin:0 0 8px;color:#7a4d00}.fa-banner article{border-top:1px solid #f3e6c4;padding:8px 0}.fa-banner article p{margin:4px 0;white-space:pre-wrap}.fa-banner small{color:#7a6a4a}.fa-badge,.fa-tag{background:#b3261e;color:#fff;border-radius:999px;padding:1px 8px;font-size:12px;font-weight:700}.fa-banner article.fa-new{background:#fff3e0;border-radius:8px;padding:8px}.fa-toast{position:fixed;bottom:18px;inset-inline:16px;max-width:520px;margin:auto;z-index:100;background:#123e36;color:#fff;border-radius:12px;padding:12px 16px;box-shadow:0 6px 24px #0004;cursor:pointer;font-weight:600}';
 document.head.append(style);
 if(root.SchoolTick)root.SchoolTick.add(tick);else setInterval(tick,1000);
 })(window);
