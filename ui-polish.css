@@ -86,3 +86,11 @@
 /* Teacher page: keep inner padding on the approved-schedule card and balance the name heading. */
 .school-workspace-body>.card.next{padding:18px 22px}
 #account .welcome h2{font-size:26px;line-height:1.4}
+
+/* Mobile review (2026-11-27): the floating menu button no longer covers an open side panel;
+   wide tables in the workspace scroll sideways instead of being cut off; file fields fit the screen. */
+body:has(> .drawer:not([hidden])) #schoolSidebarToggle{display:none!important}
+@media (max-width:760px){
+  #schoolWorkspace div:has(> table){overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+  #schoolWorkspace input[type=file]{max-width:100%}
+}
