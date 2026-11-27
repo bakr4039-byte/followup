@@ -190,5 +190,5 @@ style.textContent='.au-page{direction:rtl}.au-head{background:#fff;border:1px so
   '.au-grid{overflow:auto;background:#fff;border:1px solid #dae5df;border-radius:12px}.au-grid table{border-collapse:collapse;width:100%;font-size:14px}.au-grid th,.au-grid td{border-bottom:1px solid #e3ece8;padding:7px;text-align:start;vertical-align:top}.au-grid thead{background:#e8f2ed}'+
   '.au-group{margin:18px 0 8px;color:#123e36}.au-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.au-page .au-card{display:grid;gap:6px;text-align:start;padding:14px 16px;border-radius:14px;border:1px solid #dae5df;background:#fff}.au-card:hover,.au-card:focus-visible{border-color:#17624d;background:#f4faf7}.au-card b{color:#123e36}.au-card span{font-size:13px;color:#5b6b66}';
 document.head.append(style);
-setInterval(tick,1000);
+if(root.SchoolTick)root.SchoolTick.add(tick);else setInterval(tick,1000);
 })(window);
