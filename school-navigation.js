@@ -257,7 +257,6 @@ sync();
 /* Easier finding and orientation:
    - the group holding the current section opens by itself;
    - a heading at the top of the page shows "group › section" with a back button;
-   - the platform reopens the last section used on this device;
    - a quick search box at the top of the sidebar filters the buttons. */
 (function(root){
 'use strict';
@@ -303,21 +302,13 @@ function ensureSearch(){
     if(!q)expandFor(activeButton());
   });
 }
-// Remember the last section opened from the sidebar, and reopen it once on the next visit.
-document.addEventListener('click',e=>{const b=e.target.closest('.school-sidebar-links button');if(!b||b.classList.contains('school-group-toggle'))return;if(restorable(b))try{localStorage.setItem(LAST,keyOf(b))}catch(err){}else if(b.id==='schoolHomeLink')try{localStorage.removeItem(LAST)}catch(err){}},true);
-let restored=new URLSearchParams(location.search).has('view')||!!(history.state&&history.state.schoolNav),tries=0;
-function restoreLast(){
-  if(restored)return;let k='';try{k=localStorage.getItem(LAST)||''}catch(err){}
-  if(!k){restored=true;return}
-  const b=buttonOf(k),ready=b&&!b.hidden&&!b.closest('[hidden]')&&document.body.classList.contains('school-sidebar-page');
-  if(!ready){if(++tries>60)restored=true;return}
-  restored=true;b.click();
-}
+// The platform always opens on the home page after sign-in (the user asked not to reopen the last section).
+try{localStorage.removeItem(LAST)}catch(err){}
+function restoreLast(){}
 let queued=false;
 function sync(){queued=false;ensureSearch();const q=searchBox&&searchBox.querySelector('input').value.trim();if(!q)expandFor(activeButton());paintCrumb();restoreLast()}
 const schedule=()=>{if(!queued){queued=true;setTimeout(sync,120)}};
 new MutationObserver(schedule).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','data-sidebar-active','aria-pressed']});
 root.addEventListener('popstate',schedule);
-setInterval(()=>{if(!restored)schedule()},500);
 schedule();
 })(window);
