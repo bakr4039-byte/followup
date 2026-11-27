@@ -306,7 +306,9 @@ function ensureSearch(){
 try{localStorage.removeItem(LAST)}catch(err){}
 function restoreLast(){}
 let queued=false;
-function sync(){queued=false;ensureSearch();const q=searchBox&&searchBox.querySelector('input').value.trim();if(!q)expandFor(activeButton());paintCrumb();restoreLast()}
+// Open the current section's group only when the section changes, so the user can still open other groups by hand.
+let autoOpened=null;
+function sync(){queued=false;ensureSearch();const q=searchBox&&searchBox.querySelector('input').value.trim();const a=activeButton();if(!q&&a!==autoOpened){autoOpened=a;expandFor(a)}paintCrumb();restoreLast()}
 const schedule=()=>{if(!queued){queued=true;setTimeout(sync,120)}};
 new MutationObserver(schedule).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','data-sidebar-active','aria-pressed']});
 root.addEventListener('popstate',schedule);
