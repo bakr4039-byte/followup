@@ -73,3 +73,20 @@ test('radio programs: manager only, validated, cancelled instead of deleted',asy
   await assertFails(updateDoc(doc(db('admin'),'radioPrograms/r1'),{status:'cancelled',updatedBy:'other',updatedAt:ts()}));
   await assertFails(deleteDoc(doc(db('admin'),'radioPrograms/r1')));
 });
+
+test('activity log: append-only, own name, server time, manager reads',async()=>{
+  const entry=(uid,over={})=>({at:ts(),uid,section:'الإعلانات',action:'إنشاء',target:'إعلان',path:'announcements/x',...over});
+  await assertSucceeds(setDoc(doc(db('teacher'),'activityLog/a1'),entry('teacher')));
+  await assertSucceeds(setDoc(doc(db('emp'),'activityLog/a2'),entry('emp')));
+  await assertFails(setDoc(doc(db('teacher'),'activityLog/a3'),entry('admin')));
+  await assertFails(setDoc(doc(db('teacher'),'activityLog/a4'),entry('teacher',{at:new Date('2020-01-01')})));
+  await assertFails(setDoc(doc(db('teacher'),'activityLog/a5'),entry('teacher',{extra:1})));
+  await assertFails(setDoc(doc(db('teacher'),'activityLog/a6'),entry('teacher',{target:'x'.repeat(161)})));
+  await assertFails(setDoc(doc(anon(),'activityLog/a7'),entry('nobody')));
+  await assertFails(getDoc(doc(db('teacher'),'activityLog/a1')));
+  await assertSucceeds(getDocs(collection(db('admin'),'activityLog')));
+  await assertFails(updateDoc(doc(db('teacher'),'activityLog/a1'),{target:'تزوير'}));
+  await assertFails(updateDoc(doc(db('admin'),'activityLog/a1'),{target:'تزوير'}));
+  await assertFails(deleteDoc(doc(db('admin'),'activityLog/a1')));
+  await assertFails(deleteDoc(doc(db('teacher'),'activityLog/a1')));
+});
